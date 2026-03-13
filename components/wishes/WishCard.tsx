@@ -43,6 +43,14 @@ export default function WishCard({ wish, isAuthenticated, showFullText = false }
         </span>
       </div>
 
+      {/* Author email — only for open wishes */}
+      {wish.visibility === 'open' && wish.user_email && (
+        <div className="flex items-center gap-1.5 text-xs text-well-500">
+          <span>✉</span>
+          <span dir="ltr">{wish.user_email}</span>
+        </div>
+      )}
+
       {/* Text */}
       <p className="text-well-800 leading-relaxed text-base">
         {truncated}

@@ -4,7 +4,7 @@ import { enrichWish } from '@/lib/claude'
 import { processWishForMatching } from '@/lib/matching'
 import type { CreateWishInput } from '@/lib/types'
 
-const REQUIRED_CONTACT_FIELDS = ['contact_name', 'contact_email', 'contact_country', 'contact_city'] as const
+const REQUIRED_CONTACT_FIELDS = ['contact_name', 'contact_country', 'contact_city'] as const
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -47,12 +47,12 @@ export async function POST(request: NextRequest) {
     .from('wishes')
     .insert({
       user_id: user.id,
+      user_email: user.email ?? null,
       original_text: original_text.trim(),
       visibility,
       is_ai_enriched: false,
       ...(visibility === 'open' && contact ? {
         contact_name: contact.contact_name?.trim() || null,
-        contact_email: contact.contact_email?.trim() || null,
         contact_country: contact.contact_country?.trim() || null,
         contact_city: contact.contact_city?.trim() || null,
         contact_address: contact.contact_address?.trim() || null,

@@ -87,6 +87,9 @@ export default function Header() {
                     <span>✦</span>
                     <span>משאלה חדשה</span>
                   </Link>
+                  <span className="hidden sm:block text-xs text-sand-400 max-w-[140px] truncate" dir="ltr">
+                    {user.email}
+                  </span>
                   <button
                     onClick={handleSignOut}
                     className="btn-ghost text-sm text-sand-500"

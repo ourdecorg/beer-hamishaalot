@@ -32,7 +32,6 @@ const visibilityOptions: {
 
 const emptyContact: WishContactInfo = {
   contact_name: '',
-  contact_email: '',
   contact_country: '',
   contact_city: '',
   contact_address: '',
@@ -184,23 +183,6 @@ export default function WishForm() {
                 required
                 disabled={status === 'loading'}
                 className="input-base"
-              />
-            </div>
-
-            {/* Email */}
-            <div>
-              <label className="block text-xs text-well-600 mb-1">
-                אימייל <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="email"
-                value={contact.contact_email}
-                onChange={(e) => setContactField('contact_email', e.target.value)}
-                placeholder="your@email.com"
-                required
-                disabled={status === 'loading'}
-                className="input-base"
-                dir="ltr"
               />
             </div>
 

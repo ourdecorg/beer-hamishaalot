@@ -22,6 +22,7 @@ export interface Wish {
   contact_city: string | null
   contact_address: string | null
   contact_phone: string | null
+  user_email: string | null
 }
 
 export interface WishWithResonance extends Wish {
@@ -49,7 +50,6 @@ export interface Collaboration {
 // Contact info for open wishes
 export interface WishContactInfo {
   contact_name: string
-  contact_email: string
   contact_country: string
   contact_city: string
   contact_address?: string
