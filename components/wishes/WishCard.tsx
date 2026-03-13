@@ -15,9 +15,7 @@ const visibilityLabel: Record<string, string> = {
 }
 
 export default function WishCard({ wish, isAuthenticated, showFullText = false }: Props) {
-  const displayText = wish.is_ai_enriched && wish.ai_summary
-    ? wish.ai_summary
-    : wish.original_text
+  const displayText = wish.original_text
 
   const truncated =
     !showFullText && displayText.length > 220
