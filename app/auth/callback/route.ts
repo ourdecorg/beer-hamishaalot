@@ -29,10 +29,13 @@ export async function GET(request: NextRequest) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      // APP_URL overrides the internal Railway origin (localhost:8080)
+      const appBase = process.env.APP_URL ?? origin
+      return NextResponse.redirect(`${appBase}${next}`)
     }
   }
 
   // Auth error — redirect to login with error param
-  return NextResponse.redirect(`${origin}/login?error=auth`)
+  const appBase = process.env.APP_URL ?? origin
+  return NextResponse.redirect(`${appBase}/login?error=auth`)
 }
