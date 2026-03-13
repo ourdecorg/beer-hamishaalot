@@ -73,6 +73,14 @@ export default function Header() {
               {user ? (
                 <>
                   <Link
+                    href="/collaborations"
+                    className={`btn-ghost text-sm ${
+                      pathname === '/collaborations' ? 'text-well-900 bg-sand-100' : ''
+                    }`}
+                  >
+                    שיתופי פעולה
+                  </Link>
+                  <Link
                     href="/wishes/new"
                     className="btn-primary text-sm px-4 py-2"
                   >

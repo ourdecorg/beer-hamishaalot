@@ -84,7 +84,7 @@ export async function processWishForMatching(
         wish_b,
         match_score: Math.round(score.match_score * 1000) / 1000,
         match_type: score.match_type,
-        status: 'suggested',
+        status: 'connected',
       })
     }
 

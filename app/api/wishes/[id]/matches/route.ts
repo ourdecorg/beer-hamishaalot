@@ -73,25 +73,18 @@ export async function GET(_req: NextRequest, { params }: Params) {
     (ownEnrichment?.themes ?? []).map((t: string) => t.toLowerCase().trim())
   )
 
-  // If connected, fetch contact info for matched wishes
-  const connectedIds = connections
-    .filter((c) => c.status === 'connected')
-    .map((c) => (c.wish_a === params.id ? c.wish_b : c.wish_a))
+  // Fetch contact info for all matched wishes
+  const { data: contactWishes } = await supabase
+    .from('wishes')
+    .select('id, contact_name, contact_email, contact_phone')
+    .in('id', matchedWishIds)
 
-  let contactMap = new Map<string, { name: string | null; email: string | null; phone: string | null }>()
-  if (connectedIds.length > 0) {
-    const { data: contactWishes } = await supabase
-      .from('wishes')
-      .select('id, contact_name, contact_email, contact_phone')
-      .in('id', connectedIds)
-
-    contactMap = new Map(
-      (contactWishes ?? []).map((w) => [
-        w.id,
-        { name: w.contact_name, email: w.contact_email, phone: w.contact_phone },
-      ])
-    )
-  }
+  const contactMap = new Map(
+    (contactWishes ?? []).map((w) => [
+      w.id,
+      { name: w.contact_name, email: w.contact_email, phone: w.contact_phone },
+    ])
+  )
 
   // Build MatchResult array
   const results: MatchResult[] = connections.map((conn) => {
@@ -117,9 +110,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       match_summary: matchSummaryMap[conn.match_type] ?? 'התאמה',
     }
 
-    if (conn.status === 'connected') {
-      result.contact = contactMap.get(matchedWishId) ?? { name: null, email: null, phone: null }
-    }
+    result.contact = contactMap.get(matchedWishId) ?? { name: null, email: null, phone: null }
 
     return result
   })

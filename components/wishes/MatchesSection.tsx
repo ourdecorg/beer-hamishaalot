@@ -3,10 +3,10 @@
 /**
  * MatchesSection — shown to wish owner below the wish detail.
  * Fetches matches from /api/wishes/[id]/matches and renders connection cards.
- * Handles the approve/reject flow inline.
+ * All matches are immediately connected — no approval required.
  */
 import { useEffect, useState } from 'react'
-import type { MatchResult, MatchType, ConnectionStatus } from '@/lib/types'
+import type { MatchResult, MatchType } from '@/lib/types'
 
 const matchTypeLabel: Record<MatchType, string> = {
   RESONANT: '✦ הדהוד',
@@ -20,13 +20,6 @@ const matchTypeBg: Record<MatchType, string> = {
   SIMILAR: 'bg-sand-100 border-sand-200 text-sand-700',
 }
 
-const statusLabel: Record<ConnectionStatus, string> = {
-  suggested: 'ממתין לאישורך',
-  accepted_by_a: 'אישרת — ממתין לצד השני',
-  connected: 'מחוברים ✓',
-  rejected: 'דחית',
-}
-
 interface Props {
   wishId: string
 }
@@ -34,7 +27,6 @@ interface Props {
 export default function MatchesSection({ wishId }: Props) {
   const [matches, setMatches] = useState<MatchResult[]>([])
   const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`/api/wishes/${wishId}/matches`)
@@ -45,31 +37,6 @@ export default function MatchesSection({ wishId }: Props) {
       .catch(() => setMatches([]))
       .finally(() => setLoading(false))
   }, [wishId])
-
-  const handleAction = async (connectionId: string, action: 'approve' | 'reject') => {
-    setActionLoading(connectionId)
-    try {
-      const res = await fetch(`/api/connections/${connectionId}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setMatches((prev) =>
-          prev.map((m) =>
-            m.connection_id === connectionId
-              ? { ...m, status: data.status as ConnectionStatus }
-              : m
-          )
-        )
-      }
-    } catch {
-      // silently fail — user can retry
-    } finally {
-      setActionLoading(null)
-    }
-  }
 
   if (loading) {
     return (
@@ -119,10 +86,10 @@ export default function MatchesSection({ wishId }: Props) {
               </div>
             )}
 
-            {/* Connected: reveal contact */}
-            {match.status === 'connected' && match.contact && (
-              <div className="bg-well-50 border border-well-200 rounded-xl p-4 mb-4 text-sm">
-                <p className="section-label mb-2">פרטי קשר</p>
+            {/* Contact info — always visible */}
+            {match.contact && (match.contact.name || match.contact.email || match.contact.phone) && (
+              <div className="bg-well-50 border border-well-200 rounded-xl p-4 text-sm">
+                <p className="section-label mb-2">פרטי קשר לשיתוף פעולה</p>
                 {match.contact.name && <p className="text-well-800 font-medium">{match.contact.name}</p>}
                 {match.contact.email && (
                   <p className="text-well-700" dir="ltr">
@@ -134,31 +101,6 @@ export default function MatchesSection({ wishId }: Props) {
                 {match.contact.phone && <p className="text-well-700" dir="ltr">{match.contact.phone}</p>}
               </div>
             )}
-
-            {/* Actions */}
-            <div className="flex items-center gap-2">
-              {match.status === 'suggested' && (
-                <>
-                  <button
-                    onClick={() => handleAction(match.connection_id, 'approve')}
-                    disabled={actionLoading === match.connection_id}
-                    className="btn-primary text-sm px-4 py-2"
-                  >
-                    {actionLoading === match.connection_id ? '…' : 'אשר חיבור'}
-                  </button>
-                  <button
-                    onClick={() => handleAction(match.connection_id, 'reject')}
-                    disabled={actionLoading === match.connection_id}
-                    className="btn-ghost text-sm text-sand-500"
-                  >
-                    דחה
-                  </button>
-                </>
-              )}
-              {match.status !== 'suggested' && (
-                <span className="text-xs text-sand-500">{statusLabel[match.status]}</span>
-              )}
-            </div>
           </div>
         ))}
       </div>
