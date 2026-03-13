@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -16,18 +15,19 @@ export default function LoginPage() {
     setStatus('loading')
     setErrorMsg('')
 
-    // Lazy init — createClient must only run in the browser
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin}/auth/callback`,
-      },
+    // Use server-side API route so emailRedirectTo uses APP_URL runtime env var
+    // (avoids window.location.origin returning Railway's internal localhost:8080)
+    const res = await fetch('/api/auth/magic-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim() }),
     })
 
-    if (error) {
+    const data = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
       setStatus('error')
-      setErrorMsg(error.message)
+      setErrorMsg(data.error ?? 'אירעה שגיאה. נסה שוב.')
     } else {
       setStatus('sent')
     }
