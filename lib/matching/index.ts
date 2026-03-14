@@ -79,7 +79,7 @@ export async function processWishForMatching(
       )
     }
 
-    // Step 4 — Score each candidate and persist connections above threshold
+    // Step 4 — Score each candidate, log every attempt, persist connections above threshold
     const connections: Array<{
       wish_a: string
       wish_b: string
@@ -88,14 +88,37 @@ export async function processWishForMatching(
       status: string
     }> = []
 
+    const logEntries: Array<{
+      wish_id: string
+      candidate_wish_id: string
+      semantic_similarity: number
+      complementarity_score: number
+      theme_overlap: number
+      match_score: number
+      match_type: string | null
+      passed_threshold: boolean
+    }> = []
+
     for (const candidate of candidates) {
       const candidateEnrichment = enrichmentMap.get(candidate.wish_id)
       if (!candidateEnrichment) continue  // no enrichment yet — skip
 
       const complementarity = computeComplementarity(enrichment, candidateEnrichment)
       const score = computeMatchScore(candidate.similarity, complementarity)
+      const passed = score.match_score >= MATCH_THRESHOLD
 
-      if (score.match_score < MATCH_THRESHOLD) continue
+      logEntries.push({
+        wish_id: wishId,
+        candidate_wish_id: candidate.wish_id,
+        semantic_similarity: Math.round(candidate.similarity * 1000) / 1000,
+        complementarity_score: Math.round(complementarity.score * 1000) / 1000,
+        theme_overlap: Math.round(complementarity.themeOverlap * 1000) / 1000,
+        match_score: Math.round(score.match_score * 1000) / 1000,
+        match_type: passed ? score.match_type : null,
+        passed_threshold: passed,
+      })
+
+      if (!passed) continue
 
       const [wish_a, wish_b] = canonicalPair(wishId, candidate.wish_id)
       connections.push({
@@ -104,6 +127,13 @@ export async function processWishForMatching(
         match_score: Math.round(score.match_score * 1000) / 1000,
         match_type: score.match_type,
         status: 'connected',
+      })
+    }
+
+    // Write log entries (best-effort, non-blocking)
+    if (logEntries.length > 0) {
+      supabase.from('match_attempts_log').insert(logEntries).then(({ error }) => {
+        if (error) console.error('[ResonanceEngine] log insert failed:', error.message)
       })
     }
 
