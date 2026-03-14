@@ -184,7 +184,7 @@ export default async function CollaborationsPage() {
                   <div className="bg-sand-50 rounded-xl p-4 border border-sand-200">
                     <p className="text-xs text-sand-400 mb-2 font-medium">המשאלה שלך</p>
                     <p className="text-sm text-well-800 leading-relaxed line-clamp-4">
-                      {mine.ai_summary || mine.original_text}
+                      {mine.original_text || mine.ai_summary}
                     </p>
                   </div>
 
@@ -192,7 +192,7 @@ export default async function CollaborationsPage() {
                   <div className="bg-well-50 rounded-xl p-4 border border-well-200">
                     <p className="text-xs text-well-400 mb-2 font-medium">משאלה מהדהדת</p>
                     <p className="text-sm text-well-800 leading-relaxed line-clamp-4">
-                      {other.ai_summary || other.original_text}
+                      {other.original_text || other.ai_summary}
                     </p>
                   </div>
                 </div>
