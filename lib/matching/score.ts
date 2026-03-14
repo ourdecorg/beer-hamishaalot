@@ -17,7 +17,7 @@
 import type { MatchType } from '@/lib/types'
 import type { ComplementarityScore } from './complement'
 
-export const MATCH_THRESHOLD = 0.45  // minimum score to persist a connection
+export const MATCH_THRESHOLD = 0.25  // minimum score to persist a connection
 
 export interface MatchScore {
   match_score: number
