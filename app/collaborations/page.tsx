@@ -186,6 +186,12 @@ export default async function CollaborationsPage() {
                     <p className="text-sm text-well-800 leading-relaxed line-clamp-4">
                       {mine.original_text || mine.ai_summary}
                     </p>
+                    {mine.contact_email && (
+                      <p className="text-xs text-sand-500 mt-3 pt-3 border-t border-sand-200" dir="ltr">
+                        {mine.contact_name && <span className="font-medium text-well-700">{mine.contact_name} · </span>}
+                        {mine.contact_email}
+                      </p>
+                    )}
                   </div>
 
                   {/* Other wish */}
@@ -194,6 +200,12 @@ export default async function CollaborationsPage() {
                     <p className="text-sm text-well-800 leading-relaxed line-clamp-4">
                       {other.original_text || other.ai_summary}
                     </p>
+                    {other.contact_email && (
+                      <p className="text-xs text-sand-500 mt-3 pt-3 border-t border-well-200" dir="ltr">
+                        {other.contact_name && <span className="font-medium text-well-700">{other.contact_name} · </span>}
+                        {other.contact_email}
+                      </p>
+                    )}
                   </div>
                 </div>
 
