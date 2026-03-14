@@ -31,7 +31,7 @@ export default async function CollaborationsPage() {
   // Fetch all of the user's wishes
   const { data: myWishes } = await supabase
     .from('wishes')
-    .select('id, original_text, ai_summary, contact_name, contact_email, contact_phone, visibility')
+    .select('id, original_text, ai_summary, contact_name, contact_email, contact_phone, user_email, visibility')
     .eq('user_id', user.id)
     .in('visibility', ['anonymous', 'open'])
 
@@ -99,7 +99,7 @@ export default async function CollaborationsPage() {
   // Fetch wish details for all involved wishes
   const { data: allWishes } = await supabase
     .from('wishes')
-    .select('id, original_text, ai_summary, contact_name, contact_email, contact_phone, visibility, user_id')
+    .select('id, original_text, ai_summary, contact_name, contact_email, contact_phone, user_email, visibility, user_id')
     .in('id', allWishIds)
 
   const wishMap = new Map((allWishes ?? []).map((w) => [w.id, w]))
@@ -165,6 +165,9 @@ export default async function CollaborationsPage() {
             )
             const other = collab.otherWish!
             const mine = collab.myWish!
+            // For open wishes, fall back to user_email when no manual contact_email was entered
+            const otherEmail = other.contact_email || (other.visibility === 'open' ? other.user_email : null)
+            const mineEmail  = mine.contact_email  || (mine.visibility  === 'open' ? mine.user_email  : null)
 
             return (
               <div key={collab.id} className="card p-6 space-y-5">
@@ -186,13 +189,13 @@ export default async function CollaborationsPage() {
                     <p className="text-sm text-well-800 leading-relaxed line-clamp-4">
                       {mine.original_text || mine.ai_summary}
                     </p>
-                    {other.contact_email && (
+                    {otherEmail && (
                       <div className="mt-3 pt-3 border-t border-sand-200">
                         <p className="text-xs text-sand-400 mb-1">פרטי קשר של הצד השני</p>
                         <p className="text-xs text-well-700 font-medium" dir="ltr">
                           {other.contact_name && <span>{other.contact_name} · </span>}
-                          <a href={`mailto:${other.contact_email}?subject=שיתוף פעולה — באר המשאלות`} className="underline hover:no-underline">
-                            {other.contact_email}
+                          <a href={`mailto:${otherEmail}?subject=שיתוף פעולה — באר המשאלות`} className="underline hover:no-underline">
+                            {otherEmail}
                           </a>
                         </p>
                         {other.contact_phone && (
@@ -208,12 +211,12 @@ export default async function CollaborationsPage() {
                     <p className="text-sm text-well-800 leading-relaxed line-clamp-4">
                       {other.original_text || other.ai_summary}
                     </p>
-                    {mine.contact_email && (
+                    {mineEmail && (
                       <div className="mt-3 pt-3 border-t border-well-200">
                         <p className="text-xs text-well-400 mb-1">הפרטים שלך כפי שמוצגים לצד השני</p>
                         <p className="text-xs text-well-700 font-medium" dir="ltr">
                           {mine.contact_name && <span>{mine.contact_name} · </span>}
-                          {mine.contact_email}
+                          {mineEmail}
                         </p>
                         {mine.contact_phone && (
                           <p className="text-xs text-well-600 mt-0.5" dir="ltr">{mine.contact_phone}</p>
@@ -236,7 +239,7 @@ export default async function CollaborationsPage() {
                 )}
 
                 {/* Contact info + invitation */}
-                {other.contact_email && (
+                {otherEmail && (
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
                     <p
                       className="text-well-900 font-bold mb-1"
@@ -253,10 +256,10 @@ export default async function CollaborationsPage() {
                       )}
                       <p dir="ltr">
                         <a
-                          href={`mailto:${other.contact_email}?subject=שיתוף פעולה — באר המשאלות`}
+                          href={`mailto:${otherEmail}?subject=שיתוף פעולה — באר המשאלות`}
                           className="text-well-700 underline hover:no-underline font-medium"
                         >
-                          {other.contact_email}
+                          {otherEmail}
                         </a>
                       </p>
                       {other.contact_phone && (
@@ -267,7 +270,7 @@ export default async function CollaborationsPage() {
                 )}
 
                 {/* Anonymous wish — no contact */}
-                {other.visibility === 'anonymous' && !other.contact_email && (
+                {other.visibility === 'anonymous' && !otherEmail && (
                   <div className="bg-sand-100 border border-sand-200 rounded-xl p-4 text-sm text-sand-500 text-center">
                     <p>המשאלה המהדהדת היא אנונימית — פרטי קשר אינם זמינים.</p>
                   </div>
