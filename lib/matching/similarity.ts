@@ -4,7 +4,7 @@
  * Uses pgvector's cosine distance operator (<=>)  via a Supabase RPC function
  * to find the most semantically similar wishes to a given wish.
  */
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export interface SimilarWish {
   wish_id: string
@@ -24,7 +24,7 @@ export async function findSimilarWishes(
   queryEmbedding: number[],
   limit = 10
 ): Promise<SimilarWish[]> {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const { data, error } = await supabase.rpc('match_wishes', {
     query_embedding: queryEmbedding,

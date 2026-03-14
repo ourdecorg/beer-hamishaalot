@@ -11,7 +11,7 @@
  * Designed to be called fire-and-forget (never throws).
  * Only runs for non-private wishes.
  */
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { analyzeAndStoreWish } from './analyze'
 import { generateAndStoreEmbedding } from './embed'
 import { findSimilarWishes } from './similarity'
@@ -37,7 +37,7 @@ export async function processWishForMatching(
   wishText: string
 ): Promise<void> {
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     // Step 1 — Deep analysis
     const enrichment = await analyzeAndStoreWish(wishId, wishText)

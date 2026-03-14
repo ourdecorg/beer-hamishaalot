@@ -5,7 +5,7 @@
  * Results are stored in the wish_enrichment table.
  */
 import OpenAI from 'openai'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { WishEnrichment } from '@/lib/types'
 
 // Lazy singleton — mirrors the pattern in lib/claude.ts
@@ -82,7 +82,7 @@ export async function analyzeAndStoreWish(
   wishId: string,
   wishText: string
 ): Promise<WishEnrichment> {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const result = await analyzeWishText(wishText)
 
   const row = {

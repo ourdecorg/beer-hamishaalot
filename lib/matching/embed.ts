@@ -5,7 +5,7 @@
  * and stores them in the wish_embeddings table via pgvector.
  */
 import OpenAI from 'openai'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 let _openai: OpenAI | null = null
 function getOpenAI() {
@@ -32,7 +32,7 @@ export async function generateAndStoreEmbedding(
   wishId: string,
   wishText: string
 ): Promise<number[]> {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const embedding = await generateEmbedding(wishText)
 
   // Supabase expects the vector as a plain JS array — pgvector handles the cast
