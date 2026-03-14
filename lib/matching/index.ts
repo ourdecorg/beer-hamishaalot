@@ -60,6 +60,25 @@ export async function processWishForMatching(
       (enrichments ?? []).map((e) => [e.wish_id, e as WishEnrichment])
     )
 
+    // Lazy enrichment: if a candidate's enrichment isn't ready yet (race condition),
+    // fetch its text and analyze it now so we don't miss the connection.
+    const missingIds = candidateIds.filter((id) => !enrichmentMap.has(id))
+    if (missingIds.length > 0) {
+      const { data: missingWishes } = await supabase
+        .from('wishes')
+        .select('id, original_text, ai_summary')
+        .in('id', missingIds)
+
+      await Promise.allSettled(
+        (missingWishes ?? []).map(async (w) => {
+          const text = (w.original_text || w.ai_summary) as string | null
+          if (!text) return
+          const enrichment = await analyzeAndStoreWish(w.id, text)
+          enrichmentMap.set(w.id, enrichment)
+        })
+      )
+    }
+
     // Step 4 — Score each candidate and persist connections above threshold
     const connections: Array<{
       wish_a: string
