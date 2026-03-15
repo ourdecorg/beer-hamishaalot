@@ -16,7 +16,8 @@ import { analyzeAndStoreWish } from './analyze'
 import { generateAndStoreEmbedding } from './embed'
 import { findSimilarWishes } from './similarity'
 import { computeComplementarity } from './complement'
-import { computeMatchScore, MATCH_THRESHOLD } from './score'
+import { computeIntentCompatibility } from './intent'
+import { computeMatchScore, computeFreshness, buildExplanation, MATCH_THRESHOLD } from './score'
 import type { WishEnrichment } from '@/lib/types'
 
 /**
@@ -60,6 +61,16 @@ export async function processWishForMatching(
       (enrichments ?? []).map((e) => [e.wish_id, e as WishEnrichment])
     )
 
+    // Fetch candidate wish creation dates for freshness scoring
+    const { data: candidateWishes } = await supabase
+      .from('wishes')
+      .select('id, created_at')
+      .in('id', candidateIds)
+
+    const dateMap = new Map<string, string>(
+      (candidateWishes ?? []).map((w) => [w.id, w.created_at as string])
+    )
+
     // Lazy enrichment: if a candidate's enrichment isn't ready yet (race condition),
     // fetch its text and analyze it now so we don't miss the connection.
     const missingIds = candidateIds.filter((id) => !enrichmentMap.has(id))
@@ -73,8 +84,8 @@ export async function processWishForMatching(
         (missingWishes ?? []).map(async (w) => {
           const text = (w.original_text || w.ai_summary) as string | null
           if (!text) return
-          const enrichment = await analyzeAndStoreWish(w.id, text)
-          enrichmentMap.set(w.id, enrichment)
+          const enriched = await analyzeAndStoreWish(w.id, text)
+          enrichmentMap.set(w.id, enriched)
         })
       )
     }
@@ -86,6 +97,7 @@ export async function processWishForMatching(
       match_score: number
       match_type: string
       status: string
+      explanation: object
     }> = []
 
     const logEntries: Array<{
@@ -94,6 +106,8 @@ export async function processWishForMatching(
       semantic_similarity: number
       complementarity_score: number
       theme_overlap: number
+      intent_compatibility: number
+      freshness_factor: number
       match_score: number
       match_type: string | null
       passed_threshold: boolean
@@ -104,21 +118,40 @@ export async function processWishForMatching(
       if (!candidateEnrichment) continue  // no enrichment yet — skip
 
       const complementarity = computeComplementarity(enrichment, candidateEnrichment)
-      const score = computeMatchScore(candidate.similarity, complementarity)
+
+      const intentCompat = computeIntentCompatibility(
+        enrichment.collaboration_type,
+        candidateEnrichment.collaboration_type
+      )
+
+      const freshness = computeFreshness(dateMap.get(candidate.wish_id) ?? new Date().toISOString())
+
+      const score = computeMatchScore(candidate.similarity, complementarity, intentCompat, freshness)
       const passed = score.match_score >= MATCH_THRESHOLD
 
       logEntries.push({
         wish_id: wishId,
         candidate_wish_id: candidate.wish_id,
-        semantic_similarity: Math.round(candidate.similarity * 1000) / 1000,
-        complementarity_score: Math.round(complementarity.score * 1000) / 1000,
-        theme_overlap: Math.round(complementarity.themeOverlap * 1000) / 1000,
-        match_score: Math.round(score.match_score * 1000) / 1000,
+        semantic_similarity:   Math.round(candidate.similarity     * 1000) / 1000,
+        complementarity_score: Math.round(complementarity.score    * 1000) / 1000,
+        theme_overlap:         Math.round(complementarity.themeOverlap * 1000) / 1000,
+        intent_compatibility:  Math.round(intentCompat             * 1000) / 1000,
+        freshness_factor:      Math.round(freshness                * 1000) / 1000,
+        match_score:           Math.round(score.match_score        * 1000) / 1000,
         match_type: passed ? score.match_type : null,
         passed_threshold: passed,
       })
 
       if (!passed) continue
+
+      const explanation = buildExplanation(
+        score,
+        complementarity,
+        enrichment.collaboration_type,
+        candidateEnrichment.collaboration_type,
+        enrichment.themes,
+        candidateEnrichment.themes
+      )
 
       const [wish_a, wish_b] = canonicalPair(wishId, candidate.wish_id)
       connections.push({
@@ -127,6 +160,7 @@ export async function processWishForMatching(
         match_score: Math.round(score.match_score * 1000) / 1000,
         match_type: score.match_type,
         status: 'connected',
+        explanation,
       })
     }
 
