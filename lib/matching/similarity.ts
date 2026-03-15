@@ -5,6 +5,7 @@
  * to find the most semantically similar wishes to a given wish.
  */
 import { createAdminClient } from '@/lib/supabase/admin'
+import { MIN_SIMILARITY } from './score'
 
 export interface SimilarWish {
   wish_id: string
@@ -27,6 +28,7 @@ export async function findSimilarWishes(
   const { data, error } = await supabase.rpc('match_wishes', {
     query_embedding: queryEmbedding,
     match_wish_id: wishId,
+    min_similarity: MIN_SIMILARITY,
   })
 
   if (error) throw new Error(`Similarity search failed: ${error.message}`)
