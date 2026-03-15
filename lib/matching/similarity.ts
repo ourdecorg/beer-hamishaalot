@@ -12,24 +12,21 @@ export interface SimilarWish {
 }
 
 /**
- * Finds the top `limit` most similar wishes to `wishId` by vector cosine similarity.
- * Calls the `match_wishes` Postgres function defined in migration 003.
+ * Finds all public wishes similar to `wishId` by vector cosine similarity.
+ * Calls the `match_wishes` Postgres function defined in migration 009.
  *
  * @param wishId         - The source wish ID
  * @param queryEmbedding - Pre-computed embedding for the source wish
- * @param limit          - Max results (default 10)
  */
 export async function findSimilarWishes(
   wishId: string,
-  queryEmbedding: number[],
-  limit = 10
+  queryEmbedding: number[]
 ): Promise<SimilarWish[]> {
   const supabase = createAdminClient()
 
   const { data, error } = await supabase.rpc('match_wishes', {
     query_embedding: queryEmbedding,
     match_wish_id: wishId,
-    match_count: limit,
   })
 
   if (error) throw new Error(`Similarity search failed: ${error.message}`)

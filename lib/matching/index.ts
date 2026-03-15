@@ -5,7 +5,7 @@
  * It runs the full pipeline:
  *   1. Deep analysis  → wish_enrichment
  *   2. Embedding      → wish_embeddings
- *   3. Similarity     → top 10 candidate wishes
+ *   3. Similarity     → all public candidate wishes (no limit)
  *   4. Score + classify → wish_connections (upsert, score ≥ THRESHOLD)
  *
  * Designed to be called fire-and-forget (never throws).
@@ -45,8 +45,8 @@ export async function processWishForMatching(
     // Step 2 — Generate + store embedding
     const embedding = await generateAndStoreEmbedding(wishId, wishText)
 
-    // Step 3 — Find similar wishes by vector similarity
-    const candidates = await findSimilarWishes(wishId, embedding, 10)
+    // Step 3 — Find all public wishes by vector similarity (no limit)
+    const candidates = await findSimilarWishes(wishId, embedding)
     if (candidates.length === 0) return
 
     // Fetch enrichments for all candidate wishes in one query
