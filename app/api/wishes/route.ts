@@ -4,6 +4,9 @@ import { enrichWish } from '@/lib/claude'
 import { processWishForMatching } from '@/lib/matching'
 import type { CreateWishInput } from '@/lib/types'
 
+// Allow enough time for the matching pipeline (GPT-4o analysis + embedding + scoring)
+export const maxDuration = 60
+
 const REQUIRED_CONTACT_FIELDS = ['contact_name', 'contact_country', 'contact_city'] as const
 
 export async function POST(request: NextRequest) {
