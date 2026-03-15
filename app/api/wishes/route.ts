@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { createClient } from '@/lib/supabase/server'
 import { enrichWish } from '@/lib/claude'
 import { processWishForMatching } from '@/lib/matching'
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
     // 3. Fire-and-forget: deep analysis + embedding + matching (non-blocking)
     // Only runs for visible wishes — private wishes are never matched
     if (['anonymous', 'open'].includes(visibility)) {
-      processWishForMatching(wish.id, original_text.trim())
+      waitUntil(processWishForMatching(wish.id, original_text.trim()))
     }
 
     return NextResponse.json({ ...wish, ...enrichment, is_ai_enriched: true }, { status: 201 })
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
     // Return the wish even if enrichment failed — non-blocking
     // Still try to run matching even if basic enrichment failed
     if (['anonymous', 'open'].includes(visibility)) {
-      processWishForMatching(wish.id, original_text.trim())
+      waitUntil(processWishForMatching(wish.id, original_text.trim()))
     }
     return NextResponse.json(wish, { status: 201 })
   }
