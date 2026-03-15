@@ -120,8 +120,8 @@ export async function processWishForMatching(
       const complementarity = computeComplementarity(enrichment, candidateEnrichment)
 
       const intentCompat = computeIntentCompatibility(
-        enrichment.collaboration_type,
-        candidateEnrichment.collaboration_type
+        enrichment.collaboration_type ?? 'connect',
+        candidateEnrichment.collaboration_type ?? 'connect'
       )
 
       const freshness = computeFreshness(dateMap.get(candidate.wish_id) ?? new Date().toISOString())
@@ -147,8 +147,8 @@ export async function processWishForMatching(
       const explanation = buildExplanation(
         score,
         complementarity,
-        enrichment.collaboration_type,
-        candidateEnrichment.collaboration_type,
+        enrichment.collaboration_type ?? 'connect',
+        candidateEnrichment.collaboration_type ?? 'connect',
         enrichment.themes,
         candidateEnrichment.themes
       )
