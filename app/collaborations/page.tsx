@@ -189,17 +189,15 @@ export default async function CollaborationsPage() {
                     <p className="text-sm text-well-800 leading-relaxed line-clamp-4">
                       {mine.original_text || mine.ai_summary}
                     </p>
-                    {otherEmail && (
+                    {mineEmail && (
                       <div className="mt-3 pt-3 border-t border-sand-200">
-                        <p className="text-xs text-sand-400 mb-1">פרטי קשר של הצד השני</p>
+                        <p className="text-xs text-sand-400 mb-1">הפרטים שלך</p>
                         <p className="text-xs text-well-700 font-medium" dir="ltr">
-                          {other.contact_name && <span>{other.contact_name} · </span>}
-                          <a href={`mailto:${otherEmail}?subject=שיתוף פעולה — באר המשאלות`} className="underline hover:no-underline">
-                            {otherEmail}
-                          </a>
+                          {mine.contact_name && <span>{mine.contact_name} · </span>}
+                          {mineEmail}
                         </p>
-                        {other.contact_phone && (
-                          <p className="text-xs text-well-600 mt-0.5" dir="ltr">{other.contact_phone}</p>
+                        {mine.contact_phone && (
+                          <p className="text-xs text-well-600 mt-0.5" dir="ltr">{mine.contact_phone}</p>
                         )}
                       </div>
                     )}
@@ -211,15 +209,17 @@ export default async function CollaborationsPage() {
                     <p className="text-sm text-well-800 leading-relaxed line-clamp-4">
                       {other.original_text || other.ai_summary}
                     </p>
-                    {mineEmail && (
+                    {otherEmail && (
                       <div className="mt-3 pt-3 border-t border-well-200">
-                        <p className="text-xs text-well-400 mb-1">הפרטים שלך כפי שמוצגים לצד השני</p>
+                        <p className="text-xs text-well-400 mb-1">פרטי קשר של מבקש המשאלה</p>
                         <p className="text-xs text-well-700 font-medium" dir="ltr">
-                          {mine.contact_name && <span>{mine.contact_name} · </span>}
-                          {mineEmail}
+                          {other.contact_name && <span>{other.contact_name} · </span>}
+                          <a href={`mailto:${otherEmail}?subject=שיתוף פעולה — באר המשאלות`} className="underline hover:no-underline">
+                            {otherEmail}
+                          </a>
                         </p>
-                        {mine.contact_phone && (
-                          <p className="text-xs text-well-600 mt-0.5" dir="ltr">{mine.contact_phone}</p>
+                        {other.contact_phone && (
+                          <p className="text-xs text-well-600 mt-0.5" dir="ltr">{other.contact_phone}</p>
                         )}
                       </div>
                     )}
