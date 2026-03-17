@@ -83,8 +83,8 @@ describe('computeMatchScore', () => {
     expect(result.match_type).toBe('SIMILAR')
   })
 
-  test('MATCH_THRESHOLD is 0.25', () => {
-    expect(MATCH_THRESHOLD).toBe(0.25)
+  test('MATCH_THRESHOLD is 0.4', () => {
+    expect(MATCH_THRESHOLD).toBe(0.4)
   })
 
   test('score is capped at 1.0', () => {

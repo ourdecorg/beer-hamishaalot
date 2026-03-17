@@ -20,7 +20,7 @@ import type { MatchType } from '@/lib/types'
 import type { ComplementarityScore } from './complement'
 import type { CollaborationType } from './intent'
 
-export const MATCH_THRESHOLD = 0.25   // minimum score to persist a connection
+export const MATCH_THRESHOLD = 0.4    // minimum score to persist a connection
 export const MIN_SIMILARITY  = 0.1    // minimum cosine similarity to enter scoring
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24
