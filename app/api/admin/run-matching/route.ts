@@ -1,0 +1,59 @@
+import { NextResponse, type NextRequest } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { processWishForMatching } from '@/lib/matching'
+
+export const maxDuration = 60
+
+export async function POST(request: NextRequest) {
+  // Auth guard
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const adminEmail = process.env.ADMIN_EMAIL
+  if (adminEmail && user.email !== adminEmail) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const body = await request.json() as { wishIds?: string[] }
+  const admin = createAdminClient()
+
+  let wishIds: string[] = body.wishIds ?? []
+
+  // If no IDs provided, run for ALL public wishes
+  if (wishIds.length === 0) {
+    const { data: wishes } = await admin
+      .from('wishes')
+      .select('id')
+      .in('visibility', ['anonymous', 'open'])
+    wishIds = (wishes ?? []).map((w: { id: string }) => w.id)
+  }
+
+  if (wishIds.length === 0) {
+    return NextResponse.json({ message: 'No public wishes found', started: 0 })
+  }
+
+  // Fetch wish texts for all IDs
+  const { data: wishes } = await admin
+    .from('wishes')
+    .select('id, original_text')
+    .in('id', wishIds)
+
+  const wishMap = new Map((wishes ?? []).map((w: { id: string; original_text: string }) => [w.id, w.original_text]))
+
+  // Fire matching pipeline for each wish in the background (no await)
+  // Railway keeps the process alive so these will complete even after response
+  let started = 0
+  for (const id of wishIds) {
+    const text = wishMap.get(id)
+    if (!text) continue
+    processWishForMatching(id, text)   // fire-and-forget
+    started++
+  }
+
+  return NextResponse.json({
+    message: `Matching pipeline started for ${started} wishes. Results will appear in wish_connections as each completes.`,
+    started,
+  })
+}
