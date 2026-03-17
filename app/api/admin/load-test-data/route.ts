@@ -83,18 +83,27 @@ export async function POST(request: NextRequest) {
   const created: { wishId: string; wishText: string; email: string }[] = []
   const errors: { email: string; error: string }[] = []
 
+  // Build email → userId map once (handles pagination up to 10,000 users)
+  const emailToUserId = new Map<string, string>()
+  let page = 1
+  while (true) {
+    const { data } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
+    if (!data?.users?.length) break
+    for (const u of data.users) {
+      if (u.email) emailToUserId.set(u.email, u.id)
+    }
+    if (data.users.length < 1000) break
+    page++
+  }
+
   for (const row of rows) {
     if (!row.email || !row.wishText) continue
 
     try {
       // Find or create auth user
-      let userId: string
-      const { data: existingUsers } = await admin.auth.admin.listUsers()
-      const existing = existingUsers?.users.find(u => u.email === row.email)
+      let userId = emailToUserId.get(row.email)
 
-      if (existing) {
-        userId = existing.id
-      } else {
+      if (!userId) {
         const { data: newUser, error: createErr } = await admin.auth.admin.createUser({
           email: row.email,
           password: Math.random().toString(36).slice(-10) + 'A1!',
@@ -106,6 +115,7 @@ export async function POST(request: NextRequest) {
           continue
         }
         userId = newUser.user.id
+        emailToUserId.set(row.email, userId)
       }
 
       // Insert wish
