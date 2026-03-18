@@ -1,8 +1,14 @@
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
+import { createClient } from '@/lib/supabase/server'
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const adminEmail = process.env.ADMIN_EMAIL
+  const isAdmin = !!(user && adminEmail && user.email === adminEmail)
+
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
@@ -178,6 +184,17 @@ export default function HomePage() {
           </div>
         </section>
       </main>
+
+      {isAdmin && (
+        <div className="text-center py-4">
+          <Link
+            href="/admin/test-data"
+            className="text-xs text-well-400 hover:text-well-600 underline underline-offset-2"
+          >
+            ניהול — טעינת נתוני בדיקה
+          </Link>
+        </div>
+      )}
 
       <Footer />
     </div>
