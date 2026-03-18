@@ -1,24 +1,30 @@
 /**
  * Match Scoring Engine
  *
- * Combines semantic similarity, complementarity, intent compatibility,
- * theme overlap, and freshness into a single match_score.
+ * Combines semantic similarity, complementarity, object alignment, intent
+ * compatibility, theme overlap, and freshness into a single match_score.
  *
- * Formula (v2):
- *   match_score = 0.35 × semantic_similarity
- *               + 0.35 × complementarity       (pure bidirectional, no theme)
+ * Formula (v3):
+ *   match_score = 0.25 × semantic_similarity
+ *               + 0.25 × complementarity       (pure bidirectional, no theme)
+ *               + 0.20 × object_alignment       (NEW — concrete object/subject match)
  *               + 0.15 × intent_compatibility
  *               + 0.10 × theme_overlap
  *               + 0.05 × freshness_factor
  *
- * Changes from v1:
- *   - Theme overlap is no longer double-counted (was inside complementarity AND here).
- *   - Intent compatibility and freshness are now explicit scoring dimensions.
- *   - Weights shift: semantic+complementarity each 0.35, theme drops to 0.10.
+ * Changes from v2:
+ *   - Object alignment added as an explicit 0.20 weight.
+ *   - Semantic and complementarity each drop from 0.35 → 0.25 to make room.
+ *   - Intent, theme, and freshness weights are unchanged.
+ *
+ * Rationale: object alignment captures the concrete "what" of a wish (subject type,
+ * entity overlap, action compatibility). This catches high-quality matches that
+ * vector similarity alone misses (e.g. two Hebrew running-community wishes).
  */
 import type { MatchType } from '@/lib/types'
 import type { ComplementarityScore } from './complement'
 import type { CollaborationType } from './intent'
+import type { ObjectAlignmentResult } from './objectAlignment'
 
 export const MATCH_THRESHOLD = 0.4    // minimum score to persist a connection
 export const MIN_SIMILARITY  = 0.1    // minimum cosine similarity to enter scoring
@@ -46,6 +52,7 @@ export interface MatchScore {
   match_type: MatchType
   semantic_similarity: number
   complementarity: number
+  object_alignment: number
   theme_overlap: number
   intent_compatibility: number
   freshness_factor: number
@@ -54,16 +61,18 @@ export interface MatchScore {
 export function computeMatchScore(
   semanticSimilarity: number,
   complementarity: ComplementarityScore,
+  objectAlignmentScore: number,
   intentCompatibility: number,
   freshnessFactor: number
 ): MatchScore {
   const { score: complementScore, themeOverlap } = complementarity
 
   const match_score =
-    0.35 * semanticSimilarity +
-    0.35 * complementScore    +
+    0.25 * semanticSimilarity  +
+    0.25 * complementScore     +
+    0.20 * objectAlignmentScore +
     0.15 * intentCompatibility +
-    0.10 * themeOverlap       +
+    0.10 * themeOverlap        +
     0.05 * freshnessFactor
 
   let match_type: MatchType
@@ -80,6 +89,7 @@ export function computeMatchScore(
     match_type,
     semantic_similarity: semanticSimilarity,
     complementarity: complementScore,
+    object_alignment: objectAlignmentScore,
     theme_overlap: themeOverlap,
     intent_compatibility: intentCompatibility,
     freshness_factor: freshnessFactor,
@@ -92,6 +102,9 @@ export interface MatchExplanation {
   matched_canonical_concepts: string[]
   intent_compatibility: number
   freshness_factor: number
+  object_alignment_score: number
+  object_relation: string
+  object_explanation_he: string
 }
 
 /**
@@ -101,6 +114,7 @@ export interface MatchExplanation {
 export function buildExplanation(
   score: MatchScore,
   complementarity: ComplementarityScore,
+  objectAlignment: ObjectAlignmentResult,
   _intentA: CollaborationType | string,
   _intentB: CollaborationType | string,
   themesA: string[],
@@ -111,7 +125,11 @@ export function buildExplanation(
   )
 
   let short_reason: string
-  if (score.complementarity > 0.5) {
+  if (objectAlignment.relation === 'same_object') {
+    short_reason = objectAlignment.explanationHe
+  } else if (objectAlignment.relation === 'complementary_object') {
+    short_reason = objectAlignment.explanationHe
+  } else if (score.complementarity > 0.5) {
     short_reason = 'מציע מה שהצד השני צריך'
   } else if (score.theme_overlap > 0.4) {
     short_reason = 'נושאים משותפים חזקים'
@@ -129,6 +147,9 @@ export function buildExplanation(
     matched_canonical_concepts: complementarity.matchedConcepts,
     intent_compatibility: score.intent_compatibility,
     freshness_factor: score.freshness_factor,
+    object_alignment_score: score.object_alignment,
+    object_relation: objectAlignment.relation,
+    object_explanation_he: objectAlignment.explanationHe,
   }
 }
 

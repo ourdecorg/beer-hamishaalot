@@ -22,6 +22,13 @@ export interface WishAnalysisResult {
   skills_offered: string[]
   collaboration_type: 'build' | 'learn' | 'connect' | 'support' | 'share'
   emotional_tone: 'hopeful' | 'urgent' | 'reflective' | 'excited' | 'uncertain'
+  // Object-aware fields (migration 012)
+  subject_type: string | null
+  subject_entities: string[]
+  target_action: string | null
+  object_of_need: string[]
+  constraints: string[]
+  domain_entities: string[]
 }
 
 /**
@@ -51,7 +58,13 @@ Respond with this exact JSON shape:
   "needs": ["need1", "need2", ...],             // what they need FROM others (2-5 items)
   "skills_offered": ["skill1", "skill2", ...],  // what THEY can contribute (2-5 items)
   "collaboration_type": "build|learn|connect|support|share",
-  "emotional_tone": "hopeful|urgent|reflective|excited|uncertain"
+  "emotional_tone": "hopeful|urgent|reflective|excited|uncertain",
+  "subject_type": "community|partner|project|startup|group|event|job|resource|place|knowledge|platform|person|funding|mentor",
+  "subject_entities": ["short phrase 1", ...],  // 1-3 concrete noun phrases for the main subject (in original language)
+  "target_action": "build|join|find|offer|learn|teach|fund|support|host|create|collaborate",
+  "object_of_need": ["what they are specifically seeking", ...],  // 1-3 items (in original language)
+  "constraints": ["location", "time", "audience", ...],          // explicit qualifiers only (in original language, 0-3 items)
+  "domain_entities": ["domain noun 1", ...]     // 2-5 concrete domain nouns (in original language)
 }`,
       },
     ],
@@ -71,6 +84,12 @@ Respond with this exact JSON shape:
     skills_offered: Array.isArray(parsed.skills_offered) ? parsed.skills_offered.slice(0, 5) : [],
     collaboration_type: parsed.collaboration_type ?? 'connect',
     emotional_tone: parsed.emotional_tone ?? 'hopeful',
+    subject_type: typeof parsed.subject_type === 'string' ? parsed.subject_type : null,
+    subject_entities: Array.isArray(parsed.subject_entities) ? parsed.subject_entities.slice(0, 3) : [],
+    target_action: typeof parsed.target_action === 'string' ? parsed.target_action : null,
+    object_of_need: Array.isArray(parsed.object_of_need) ? parsed.object_of_need.slice(0, 3) : [],
+    constraints: Array.isArray(parsed.constraints) ? parsed.constraints.slice(0, 3) : [],
+    domain_entities: Array.isArray(parsed.domain_entities) ? parsed.domain_entities.slice(0, 5) : [],
   }
 }
 
@@ -94,6 +113,12 @@ export async function analyzeAndStoreWish(
     collaboration_type: result.collaboration_type,
     emotional_tone: result.emotional_tone,
     analyzed_at: new Date().toISOString(),
+    subject_type: result.subject_type,
+    subject_entities: result.subject_entities,
+    target_action: result.target_action,
+    object_of_need: result.object_of_need,
+    constraints: result.constraints,
+    domain_entities: result.domain_entities,
   }
 
   const { error } = await supabase

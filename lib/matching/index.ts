@@ -17,6 +17,7 @@ import { generateAndStoreEmbedding } from './embed'
 import { findSimilarWishes } from './similarity'
 import { computeComplementarity } from './complement'
 import { computeIntentCompatibility } from './intent'
+import { computeObjectAlignment } from './objectAlignment'
 import { computeMatchScore, computeFreshness, buildExplanation, MATCH_THRESHOLD } from './score'
 import type { WishEnrichment } from '@/lib/types'
 
@@ -108,6 +109,7 @@ export async function processWishForMatching(
       theme_overlap: number
       intent_compatibility: number
       freshness_factor: number
+      object_alignment: number
       match_score: number
       match_type: string | null
       passed_threshold: boolean
@@ -118,6 +120,7 @@ export async function processWishForMatching(
       if (!candidateEnrichment) continue  // no enrichment yet — skip
 
       const complementarity = computeComplementarity(enrichment, candidateEnrichment)
+      const objectAlignment = computeObjectAlignment(enrichment, candidateEnrichment)
 
       const intentCompat = computeIntentCompatibility(
         enrichment.collaboration_type ?? 'connect',
@@ -126,7 +129,7 @@ export async function processWishForMatching(
 
       const freshness = computeFreshness(dateMap.get(candidate.wish_id) ?? new Date().toISOString())
 
-      const score = computeMatchScore(candidate.similarity, complementarity, intentCompat, freshness)
+      const score = computeMatchScore(candidate.similarity, complementarity, objectAlignment.score, intentCompat, freshness)
       const passed = score.match_score >= MATCH_THRESHOLD
 
       logEntries.push({
@@ -135,8 +138,9 @@ export async function processWishForMatching(
         semantic_similarity:   Math.round(candidate.similarity     * 1000) / 1000,
         complementarity_score: Math.round(complementarity.score    * 1000) / 1000,
         theme_overlap:         Math.round(complementarity.themeOverlap * 1000) / 1000,
-        intent_compatibility:  Math.round(intentCompat             * 1000) / 1000,
-        freshness_factor:      Math.round(freshness                * 1000) / 1000,
+        intent_compatibility:  Math.round(intentCompat               * 1000) / 1000,
+        freshness_factor:      Math.round(freshness                  * 1000) / 1000,
+        object_alignment:      Math.round(objectAlignment.score      * 1000) / 1000,
         match_score:           Math.round(score.match_score        * 1000) / 1000,
         match_type: passed ? score.match_type : null,
         passed_threshold: passed,
@@ -147,6 +151,7 @@ export async function processWishForMatching(
       const explanation = buildExplanation(
         score,
         complementarity,
+        objectAlignment,
         enrichment.collaboration_type ?? 'connect',
         candidateEnrichment.collaboration_type ?? 'connect',
         enrichment.themes,

@@ -85,3 +85,78 @@ export function canonicalize(terms: string[]): CanonicalId[] {
   }
   return result
 }
+
+// ─── Object-aware canonicalization (migration 012) ───────────────────────────
+
+const SUBJECT_TYPE_MAP: Record<string, string[]> = {
+  community:    ['community', 'group', 'circle', 'club', 'network', 'קהילה', 'קבוצה', 'מועדון', 'חוג'],
+  tech_partner: ['cofounder', 'co-founder', 'technical partner', 'cto', 'שותף טכנולוגי', 'שותפ'],
+  funding:      ['investor', 'investment', 'seed', 'capital', 'משקיע', 'מימון', 'השקעה'],
+  mentor:       ['mentor', 'advisor', 'guide', 'coach', 'מנטור', 'יועץ', 'מאמן'],
+  project:      ['project', 'startup', 'venture', 'initiative', 'פרויקט', 'סטארטאפ', 'מיזם', 'יוזמה'],
+  event:        ['event', 'meetup', 'conference', 'workshop', 'אירוע', 'כנס', 'סדנה'],
+  job:          ['job', 'position', 'role', 'career', 'עבודה', 'תפקיד', 'קריירה'],
+  resource:     ['resource', 'tool', 'platform', 'software', 'כלי', 'פלטפורמה', 'משאב'],
+  place:        ['place', 'space', 'location', 'venue', 'מקום', 'אולם', 'חלל'],
+  knowledge:    ['knowledge', 'information', 'course', 'curriculum', 'ידע', 'מידע', 'קורס'],
+  product:      ['product', 'app', 'application', 'מוצר', 'אפליקציה', 'אפ'],
+  person:       ['person', 'people', 'someone', 'partner', 'colleague', 'אדם', 'אנשים'],
+}
+
+const ACTION_MAP: Record<string, string[]> = {
+  build:       ['build', 'create', 'establish', 'launch', 'develop', 'found', 'start', 'הקים', 'יצר', 'בנה', 'ייסד', 'להקים', 'לבנות'],
+  join:        ['join', 'participate', 'be part', 'become member', 'להצטרף', 'להשתתף', 'מצטרף', 'רוצה להצטרף'],
+  find:        ['find', 'looking for', 'seek', 'search', 'need', 'want', 'מחפש', 'מחפשת', 'רוצה', 'צריך', 'מבקש'],
+  offer:       ['offer', 'provide', 'share', 'give', 'contribute', 'מציע', 'מציעה', 'מספק', 'נותן'],
+  learn:       ['learn', 'study', 'understand', 'explore', 'לומד', 'ללמוד', 'רוצה ללמוד'],
+  teach:       ['teach', 'train', 'educate', 'instruct', 'guide', 'מלמד', 'מדריך', 'ללמד', 'מנחה'],
+  fund:        ['fund', 'invest', 'finance', 'back', 'להשקיע', 'לממן', 'לתמוך כלכלית'],
+  support:     ['support', 'help', 'assist', 'volunteer', 'לתמוך', 'לעזור', 'להתנדב'],
+  host:        ['host', 'organize', 'run', 'manage', 'לארח', 'לארגן', 'לנהל'],
+  collaborate: ['collaborate', 'partner', 'work together', 'לשתף פעולה', 'לעבוד ביחד'],
+}
+
+/** Generic map-based canonicalizer for single terms. */
+function canonicalizeFromMap(
+  raw: string | null | undefined,
+  map: Record<string, string[]>
+): string | null {
+  if (!raw) return null
+  const norm = raw.toLowerCase().trim()
+
+  // Build index lazily per call — small maps, fast enough
+  for (const [id, synonyms] of Object.entries(map)) {
+    for (const syn of synonyms) {
+      const synNorm = syn.toLowerCase().trim()
+      if (norm === synNorm) return id
+      if (norm.includes(synNorm) || synNorm.includes(norm)) return id
+    }
+  }
+
+  // Token overlap fallback
+  const tokens = norm.split(/\s+/).filter((t) => t.length > 2)
+  for (const [id, synonyms] of Object.entries(map)) {
+    for (const syn of synonyms) {
+      const synNorm = syn.toLowerCase().trim()
+      if (tokens.some((t) => synNorm.includes(t) || t.includes(synNorm))) return id
+    }
+  }
+
+  return norm  // no match — normalize only
+}
+
+/**
+ * Maps a raw subject_type string to a canonical id.
+ * Returns null if input is null/undefined.
+ */
+export function canonicalizeSubjectType(raw: string | null | undefined): string | null {
+  return canonicalizeFromMap(raw, SUBJECT_TYPE_MAP)
+}
+
+/**
+ * Maps a raw target_action string to a canonical id.
+ * Returns null if input is null/undefined.
+ */
+export function canonicalizeAction(raw: string | null | undefined): string | null {
+  return canonicalizeFromMap(raw, ACTION_MAP)
+}

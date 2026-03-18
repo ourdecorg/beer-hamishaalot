@@ -87,6 +87,14 @@ export interface WishEnrichment {
   collaboration_type: string | null
   emotional_tone: string | null
   analyzed_at: string
+  // Object-aware fields — null/empty on rows analyzed before migration 012.
+  // All matching code must handle these gracefully (treat missing as neutral).
+  subject_type?: string | null
+  subject_entities?: string[]
+  target_action?: string | null
+  object_of_need?: string[]
+  constraints?: string[]
+  domain_entities?: string[]
 }
 
 export type ConnectionStatus = 'suggested' | 'accepted_by_a' | 'connected' | 'rejected'
