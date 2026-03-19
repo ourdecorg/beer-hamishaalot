@@ -3,6 +3,10 @@
  *
  * Generates vector embeddings using OpenAI text-embedding-3-small (1536 dims)
  * and stores them in the wish_embeddings table via pgvector.
+ *
+ * The embedded text is enriched with structured domain context (primary_domain,
+ * domain_entities, intent) so that vector similarity reflects topic proximity,
+ * not just surface-level language similarity.
  */
 import OpenAI from 'openai'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -11,6 +15,46 @@ let _openai: OpenAI | null = null
 function getOpenAI() {
   if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
   return _openai
+}
+
+/**
+ * Builds the text that will be embedded.
+ * Appending structured domain fields focuses the vector on the topical "what"
+ * of the wish rather than surface phrasing.  All fields are optional so this
+ * is safe to call with partial enrichment or none at all.
+ */
+export function buildEmbeddingText(
+  wishText: string,
+  enrichment?: {
+    primary_domain?: string | null
+    themes?: string[]
+    domain_entities?: string[]
+    subject_entities?: string[]
+    intent?: string | null
+  }
+): string {
+  if (!enrichment) return wishText
+
+  const lines: string[] = [wishText]
+
+  if (enrichment.primary_domain) {
+    lines.push(`Domain: ${enrichment.primary_domain}`)
+  }
+  if (enrichment.themes?.length) {
+    lines.push(`Themes: ${enrichment.themes.join(', ')}`)
+  }
+  const entities = [
+    ...(enrichment.subject_entities ?? []),
+    ...(enrichment.domain_entities ?? []),
+  ]
+  if (entities.length) {
+    lines.push(`Topics: ${entities.join(', ')}`)
+  }
+  if (enrichment.intent) {
+    lines.push(`Intent: ${enrichment.intent}`)
+  }
+
+  return lines.join('\n')
 }
 
 /**
@@ -26,14 +70,17 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 
 /**
  * Generates an embedding and stores it in wish_embeddings.
+ * Pass enrichment to produce a topic-aware embedding (recommended).
  * Upserts so re-embedding is safe.
  */
 export async function generateAndStoreEmbedding(
   wishId: string,
-  wishText: string
+  wishText: string,
+  enrichment?: Parameters<typeof buildEmbeddingText>[1]
 ): Promise<number[]> {
   const supabase = createAdminClient()
-  const embedding = await generateEmbedding(wishText)
+  const text = buildEmbeddingText(wishText, enrichment)
+  const embedding = await generateEmbedding(text)
 
   // Supabase expects the vector as a plain JS array — pgvector handles the cast
   const { error } = await supabase

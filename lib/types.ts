@@ -87,6 +87,8 @@ export interface WishEnrichment {
   collaboration_type: string | null
   emotional_tone: string | null
   analyzed_at: string
+  // Primary domain label (migration 013) — null on rows analyzed before 013.
+  primary_domain?: string | null
   // Object-aware fields — null/empty on rows analyzed before migration 012.
   // All matching code must handle these gracefully (treat missing as neutral).
   subject_type?: string | null

@@ -18,6 +18,7 @@ import { findSimilarWishes } from './similarity'
 import { computeComplementarity } from './complement'
 import { computeIntentCompatibility } from './intent'
 import { computeObjectAlignment } from './objectAlignment'
+import { computeDomainMatch } from './domain'
 import { computeMatchScore, computeFreshness, buildExplanation, MATCH_THRESHOLD } from './score'
 import type { WishEnrichment } from '@/lib/types'
 
@@ -44,8 +45,8 @@ export async function processWishForMatching(
     // Step 1 — Deep analysis
     const enrichment = await analyzeAndStoreWish(wishId, wishText)
 
-    // Step 2 — Generate + store embedding
-    const embedding = await generateAndStoreEmbedding(wishId, wishText)
+    // Step 2 — Generate + store embedding (enriched with domain context)
+    const embedding = await generateAndStoreEmbedding(wishId, wishText, enrichment)
 
     // Step 3 — Find all public wishes by vector similarity (no limit)
     const candidates = await findSimilarWishes(wishId, embedding)
@@ -110,6 +111,7 @@ export async function processWishForMatching(
       intent_compatibility: number
       freshness_factor: number
       object_alignment: number
+      domain_match: number
       match_score: number
       match_type: string | null
       passed_threshold: boolean
@@ -121,6 +123,7 @@ export async function processWishForMatching(
 
       const complementarity = computeComplementarity(enrichment, candidateEnrichment)
       const objectAlignment = computeObjectAlignment(enrichment, candidateEnrichment)
+      const domainMatch = computeDomainMatch(enrichment.primary_domain, candidateEnrichment.primary_domain)
 
       const intentCompat = computeIntentCompatibility(
         enrichment.collaboration_type ?? 'connect',
@@ -129,7 +132,7 @@ export async function processWishForMatching(
 
       const freshness = computeFreshness(dateMap.get(candidate.wish_id) ?? new Date().toISOString())
 
-      const score = computeMatchScore(candidate.similarity, complementarity, objectAlignment.score, intentCompat, freshness)
+      const score = computeMatchScore(candidate.similarity, complementarity, objectAlignment.score, intentCompat, freshness, domainMatch)
       const passed = score.match_score >= MATCH_THRESHOLD
 
       logEntries.push({
@@ -141,6 +144,7 @@ export async function processWishForMatching(
         intent_compatibility:  Math.round(intentCompat               * 1000) / 1000,
         freshness_factor:      Math.round(freshness                  * 1000) / 1000,
         object_alignment:      Math.round(objectAlignment.score      * 1000) / 1000,
+        domain_match:          Math.round(domainMatch                * 1000) / 1000,
         match_score:           Math.round(score.match_score        * 1000) / 1000,
         match_type: passed ? score.match_type : null,
         passed_threshold: passed,

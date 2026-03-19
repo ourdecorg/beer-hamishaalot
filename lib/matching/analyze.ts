@@ -29,6 +29,8 @@ export interface WishAnalysisResult {
   object_of_need: string[]
   constraints: string[]
   domain_entities: string[]
+  // Primary domain (migration 013)
+  primary_domain: string | null
 }
 
 /**
@@ -64,7 +66,8 @@ Respond with this exact JSON shape:
   "target_action": "build|join|find|offer|learn|teach|fund|support|host|create|collaborate",
   "object_of_need": ["what they are specifically seeking", ...],  // 1-3 items (in original language)
   "constraints": ["location", "time", "audience", ...],          // explicit qualifiers only (in original language, 0-3 items)
-  "domain_entities": ["domain noun 1", ...]     // 2-5 concrete domain nouns (in original language)
+  "domain_entities": ["domain noun 1", ...],    // 2-5 concrete domain nouns (in original language)
+  "primary_domain": "health_wellness|technology|entrepreneurship|education|arts_culture|community_social|environment|spirituality|family_parenting|sports_recreation|food_lifestyle|finance|personal_development|professional_career|other"
 }`,
       },
     ],
@@ -90,6 +93,7 @@ Respond with this exact JSON shape:
     object_of_need: Array.isArray(parsed.object_of_need) ? parsed.object_of_need.slice(0, 3) : [],
     constraints: Array.isArray(parsed.constraints) ? parsed.constraints.slice(0, 3) : [],
     domain_entities: Array.isArray(parsed.domain_entities) ? parsed.domain_entities.slice(0, 5) : [],
+    primary_domain: typeof parsed.primary_domain === 'string' ? parsed.primary_domain : null,
   }
 }
 
@@ -119,6 +123,7 @@ export async function analyzeAndStoreWish(
     object_of_need: result.object_of_need,
     constraints: result.constraints,
     domain_entities: result.domain_entities,
+    primary_domain: result.primary_domain,
   }
 
   const { error } = await supabase

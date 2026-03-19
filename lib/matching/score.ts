@@ -1,25 +1,28 @@
 /**
  * Match Scoring Engine
  *
- * Combines semantic similarity, complementarity, object alignment, intent
- * compatibility, theme overlap, and freshness into a single match_score.
+ * Combines semantic similarity, complementarity, domain match, object alignment,
+ * intent compatibility, theme overlap, and freshness into a single match_score.
  *
- * Formula (v3):
- *   match_score = 0.25 × semantic_similarity
- *               + 0.25 × complementarity       (pure bidirectional, no theme)
- *               + 0.20 × object_alignment       (NEW — concrete object/subject match)
- *               + 0.15 × intent_compatibility
- *               + 0.10 × theme_overlap
- *               + 0.05 × freshness_factor
+ * Formula (v4):
+ *   match_score = 0.25 × semantic_similarity   (topic-aware embedding since v4)
+ *               + 0.20 × complementarity       (bidirectional needs↔skills)
+ *               + 0.20 × domain_match          (NEW — primary domain alignment)
+ *               + 0.15 × object_alignment      (concrete subject/entity overlap)
+ *               + 0.10 × intent_compatibility
+ *               + 0.07 × theme_overlap
+ *               + 0.03 × freshness_factor
  *
- * Changes from v2:
- *   - Object alignment added as an explicit 0.20 weight.
- *   - Semantic and complementarity each drop from 0.35 → 0.25 to make room.
- *   - Intent, theme, and freshness weights are unchanged.
+ * Changes from v3:
+ *   - domain_match added (0.20) — prevents cross-domain false positives.
+ *   - complementarity drops 0.25 → 0.20 to make room.
+ *   - object_alignment drops 0.20 → 0.15.
+ *   - intent drops 0.15 → 0.10; theme drops 0.10 → 0.07; freshness 0.05 → 0.03.
+ *   - Embedding text now includes primary_domain + entities (see embed.ts).
  *
- * Rationale: object alignment captures the concrete "what" of a wish (subject type,
- * entity overlap, action compatibility). This catches high-quality matches that
- * vector similarity alone misses (e.g. two Hebrew running-community wishes).
+ * Rationale: domain_match acts as a topic gate — two wishes in completely different
+ * domains (yoga vs. software startup) receive at most ~0.60 even with perfect
+ * complementarity, keeping the threshold at 0.40 meaningful.
  */
 import type { MatchType } from '@/lib/types'
 import type { ComplementarityScore } from './complement'
@@ -52,6 +55,7 @@ export interface MatchScore {
   match_type: MatchType
   semantic_similarity: number
   complementarity: number
+  domain_match: number
   object_alignment: number
   theme_overlap: number
   intent_compatibility: number
@@ -63,17 +67,19 @@ export function computeMatchScore(
   complementarity: ComplementarityScore,
   objectAlignmentScore: number,
   intentCompatibility: number,
-  freshnessFactor: number
+  freshnessFactor: number,
+  domainMatch: number = 0.5
 ): MatchScore {
   const { score: complementScore, themeOverlap } = complementarity
 
   const match_score =
     0.25 * semanticSimilarity  +
-    0.25 * complementScore     +
-    0.20 * objectAlignmentScore +
-    0.15 * intentCompatibility +
-    0.10 * themeOverlap        +
-    0.05 * freshnessFactor
+    0.20 * complementScore     +
+    0.20 * domainMatch         +
+    0.15 * objectAlignmentScore +
+    0.10 * intentCompatibility +
+    0.07 * themeOverlap        +
+    0.03 * freshnessFactor
 
   let match_type: MatchType
   if (match_score >= 0.80) {
@@ -89,6 +95,7 @@ export function computeMatchScore(
     match_type,
     semantic_similarity: semanticSimilarity,
     complementarity: complementScore,
+    domain_match: domainMatch,
     object_alignment: objectAlignmentScore,
     theme_overlap: themeOverlap,
     intent_compatibility: intentCompatibility,
