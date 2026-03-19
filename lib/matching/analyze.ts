@@ -15,6 +15,33 @@ function getOpenAI() {
   return _openai
 }
 
+/**
+ * Retries an async function on 429 (rate limit) errors with backoff.
+ * Parses OpenAI's "try again in Xs" message when present; falls back to
+ * exponential backoff (1s, 2s, 4s, …).
+ */
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 4): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (err: unknown) {
+      const status = (err as { status?: number }).status
+      if (status === 429 && attempt < maxRetries - 1) {
+        const msg = (err as { message?: string }).message ?? ''
+        const match = msg.match(/try again in (\d+(?:\.\d+)?)s/)
+        const waitMs = match
+          ? Math.ceil(parseFloat(match[1]) * 1000) + 200
+          : 1000 * Math.pow(2, attempt)
+        console.warn(`[analyze] 429 rate limit — retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries})`)
+        await new Promise((resolve) => setTimeout(resolve, waitMs))
+        continue
+      }
+      throw err
+    }
+  }
+  throw new Error('analyzeWishText: max retries exceeded')
+}
+
 export interface WishAnalysisResult {
   themes: string[]
   intent: string
@@ -37,7 +64,7 @@ export interface WishAnalysisResult {
  * Calls GPT-4o to extract structured enrichment from a wish.
  */
 export async function analyzeWishText(wishText: string): Promise<WishAnalysisResult> {
-  const completion = await getOpenAI().chat.completions.create({
+  const completion = await withRetry(() => getOpenAI().chat.completions.create({
     model: 'gpt-4o',
     max_tokens: 512,
     response_format: { type: 'json_object' },
@@ -71,7 +98,7 @@ Respond with this exact JSON shape:
 }`,
       },
     ],
-  })
+  }))
 
   const raw = completion.choices[0]?.message?.content ?? '{}'
   const cleaned = raw.replace(/```json\n?|\n?```/g, '').trim()

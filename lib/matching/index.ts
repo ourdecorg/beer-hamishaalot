@@ -82,14 +82,17 @@ export async function processWishForMatching(
         .select('id, original_text, ai_summary')
         .in('id', missingIds)
 
-      await Promise.allSettled(
-        (missingWishes ?? []).map(async (w) => {
-          const text = (w.original_text || w.ai_summary) as string | null
-          if (!text) return
+      // Sequential — avoids concurrent GPT-4o calls hitting the TPM rate limit
+      for (const w of missingWishes ?? []) {
+        const text = (w.original_text || w.ai_summary) as string | null
+        if (!text) continue
+        try {
           const enriched = await analyzeAndStoreWish(w.id, text)
           enrichmentMap.set(w.id, enriched)
-        })
-      )
+        } catch {
+          // skip — this candidate won't score but the pipeline continues
+        }
+      }
     }
 
     // Step 4 — Score each candidate, log every attempt, persist connections above threshold

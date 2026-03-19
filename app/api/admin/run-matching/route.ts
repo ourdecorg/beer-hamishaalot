@@ -42,13 +42,16 @@ export async function POST(request: NextRequest) {
 
   const wishMap = new Map((wishes ?? []).map((w: { id: string; original_text: string }) => [w.id, w.original_text]))
 
-  // Fire matching pipeline for each wish in the background (no await)
-  // Railway keeps the process alive so these will complete even after response
+  // Stagger wish processing to avoid OpenAI TPM rate limits.
+  // Each wish starts 3 seconds after the previous one — the response is
+  // returned immediately; Railway keeps the process alive so all complete.
+  const STAGGER_MS = 3000
   let started = 0
-  for (const id of wishIds) {
+  for (let i = 0; i < wishIds.length; i++) {
+    const id = wishIds[i]
     const text = wishMap.get(id)
     if (!text) continue
-    processWishForMatching(id, text)   // fire-and-forget
+    setTimeout(() => processWishForMatching(id, text), i * STAGGER_MS)
     started++
   }
 
