@@ -132,7 +132,7 @@ export async function processWishForMatching(
 
       const freshness = computeFreshness(dateMap.get(candidate.wish_id) ?? new Date().toISOString())
 
-      const score = computeMatchScore(candidate.similarity, complementarity, objectAlignment.score, intentCompat, freshness, domainMatch)
+      const score = computeMatchScore(candidate.similarity, complementarity, objectAlignment.score, intentCompat, freshness, domainMatch, objectAlignment.relation)
       const passed = score.match_score >= MATCH_THRESHOLD
 
       logEntries.push({

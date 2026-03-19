@@ -81,9 +81,17 @@ export function computeComplementarity(
   const themeOverlap = jaccard(a.themes, b.themes)
 
   // Pure bidirectional score — theme is intentionally excluded here
-  // to avoid double-counting with the theme_overlap term in score.ts
-  const bidirectional = (aOffersWhatBNeeds + bOffersWhatANeeds) / 2
-  const score = Math.min(1, bidirectional * 1.2)
+  // to avoid double-counting with the theme_overlap term in score.ts.
+  //
+  // Asymmetric boost: a pure provider↔seeker pair (one party offers, the other
+  // needs, neither reciprocates) is the *most* complementary pairing possible.
+  // Averaging the two directions punishes it (e.g. 0.7 + 0.0 → 0.35).
+  // Instead, when one direction dominates strongly, reward it directly.
+  const maxDir = Math.max(aOffersWhatBNeeds, bOffersWhatANeeds)
+  const minDir = Math.min(aOffersWhatBNeeds, bOffersWhatANeeds)
+  const score = (maxDir > 0.4 && minDir < 0.15)
+    ? Math.min(1, maxDir * 1.3)                        // asymmetric — pure offer/seek
+    : Math.min(1, ((maxDir + minDir) / 2) * 1.2)       // symmetric — both contribute
 
   // Matched concepts: canonical IDs that appear in both (needs or skills) sides
   const allA = new Set([...canonNeedsA, ...canonSkillsA])

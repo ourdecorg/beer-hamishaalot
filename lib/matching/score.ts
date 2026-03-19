@@ -68,7 +68,8 @@ export function computeMatchScore(
   objectAlignmentScore: number,
   intentCompatibility: number,
   freshnessFactor: number,
-  domainMatch: number = 0.5
+  domainMatch: number = 0.5,
+  objectRelation: string = 'similar_object'
 ): MatchScore {
   const { score: complementScore, themeOverlap } = complementarity
 
@@ -84,7 +85,9 @@ export function computeMatchScore(
   let match_type: MatchType
   if (match_score >= 0.80) {
     match_type = 'RESONANT'
-  } else if (complementScore > 0.60) {
+  } else if (complementScore > 0.60 || objectRelation === 'complementary_object') {
+    // 'complementary_object' means objectAlignment already detected a provider↔seeker
+    // action pair (find|offer, learn|teach, build|join, etc.) — always label as COMPLEMENTARY.
     match_type = 'COMPLEMENTARY'
   } else {
     match_type = 'SIMILAR'
