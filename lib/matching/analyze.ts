@@ -65,8 +65,8 @@ export interface WishAnalysisResult {
  */
 export async function analyzeWishText(wishText: string): Promise<WishAnalysisResult> {
   const completion = await withRetry(() => getOpenAI().chat.completions.create({
-    model: 'gpt-4o',
-    max_tokens: 512,
+    model: 'gpt-4o-mini',
+    max_tokens: 350,
     response_format: { type: 'json_object' },
     messages: [
       {
@@ -80,22 +80,24 @@ export async function analyzeWishText(wishText: string): Promise<WishAnalysisRes
         content: `Analyze this wish for collaboration potential:
 "${wishText}"
 
-Respond with this exact JSON shape:
+Return JSON:
 {
-  "themes": ["keyword1", "keyword2", ...],      // 5-7 core theme keywords
-  "intent": "one sentence: what they want to achieve",
-  "needs": ["need1", "need2", ...],             // what they need FROM others (2-5 items)
-  "skills_offered": ["skill1", "skill2", ...],  // what THEY can contribute (2-5 items)
+  "themes": [],
+  "intent": "",
+  "needs": [],
+  "skills_offered": [],
   "collaboration_type": "build|learn|connect|support|share",
   "emotional_tone": "hopeful|urgent|reflective|excited|uncertain",
   "subject_type": "community|partner|project|startup|group|event|job|resource|place|knowledge|platform|person|funding|mentor",
-  "subject_entities": ["short phrase 1", ...],  // 1-3 concrete noun phrases for the main subject (in original language)
+  "subject_entities": [],
   "target_action": "build|join|find|offer|learn|teach|fund|support|host|create|collaborate",
-  "object_of_need": ["what they are specifically seeking", ...],  // 1-3 items (in original language)
-  "constraints": ["location", "time", "audience", ...],          // explicit qualifiers only (in original language, 0-3 items)
-  "domain_entities": ["domain noun 1", ...],    // 2-5 concrete domain nouns (in original language)
+  "object_of_need": [],
+  "constraints": [],
+  "domain_entities": [],
   "primary_domain": "health_wellness|technology|entrepreneurship|education|arts_culture|community_social|environment|spirituality|family_parenting|sports_recreation|food_lifestyle|finance|personal_development|professional_career|other"
-}`,
+}
+
+Rules: themes=5-7 keywords; needs/skills_offered=2-5 items; subject_entities/object_of_need/constraints=1-3 items in original language; domain_entities=2-5 nouns in original language.`,
       },
     ],
   }))
