@@ -68,7 +68,7 @@ export interface WishAnalysisResult {
  */
 export async function analyzeWishText(wishText: string): Promise<WishAnalysisResult> {
   const completion = await withRetry(() => getOpenAI().chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-4o',
     max_tokens: 350,
     response_format: { type: 'json_object' },
     messages: [
