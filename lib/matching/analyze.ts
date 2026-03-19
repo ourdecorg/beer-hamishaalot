@@ -6,6 +6,7 @@
  */
 import OpenAI from 'openai'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { logOpenAICall } from './openaiLog'
 import type { WishEnrichment } from '@/lib/types'
 
 // Lazy singleton — mirrors the pattern in lib/claude.ts
@@ -67,20 +68,17 @@ export interface WishAnalysisResult {
  * Calls GPT-4o to extract structured enrichment from a wish.
  */
 export async function analyzeWishText(wishText: string): Promise<WishAnalysisResult> {
-  const completion = await withRetry(() => getOpenAI().chat.completions.create({
-    model: 'gpt-4o',
-    max_tokens: 350,
-    response_format: { type: 'json_object' },
-    messages: [
-      {
-        role: 'system',
-        content:
-          'You analyze wishes and intentions to identify collaboration potential. ' +
-          'Respond ONLY with valid JSON. Be concise and specific.',
-      },
-      {
-        role: 'user',
-        content: `Analyze this wish for collaboration potential:
+  const model = 'gpt-4o'
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    {
+      role: 'system',
+      content:
+        'You analyze wishes and intentions to identify collaboration potential. ' +
+        'Respond ONLY with valid JSON. Be concise and specific.',
+    },
+    {
+      role: 'user',
+      content: `Analyze this wish for collaboration potential:
 "${wishText}"
 
 Return JSON:
@@ -101,9 +99,38 @@ Return JSON:
 }
 
 Rules: themes=5-7 keywords; needs/skills_offered=2-5 items; subject_entities/object_of_need/constraints=1-3 items in original language; domain_entities=2-5 nouns in original language.`,
+    },
+  ]
+
+  const t0 = Date.now()
+  let completion: OpenAI.Chat.ChatCompletion
+  try {
+    completion = await withRetry(() => getOpenAI().chat.completions.create({
+      model,
+      max_tokens: 350,
+      response_format: { type: 'json_object' },
+      messages,
+    }))
+    logOpenAICall({
+      caller: 'analyzeWishText',
+      model,
+      request: { messages, max_tokens: 350 },
+      response: {
+        content: completion.choices[0]?.message?.content,
+        usage: completion.usage,
       },
-    ],
-  }))
+      elapsedMs: Date.now() - t0,
+    })
+  } catch (err) {
+    logOpenAICall({
+      caller: 'analyzeWishText',
+      model,
+      request: { messages, max_tokens: 350 },
+      error: (err as { message?: string }).message ?? String(err),
+      elapsedMs: Date.now() - t0,
+    })
+    throw err
+  }
 
   const raw = completion.choices[0]?.message?.content ?? '{}'
   const cleaned = raw.replace(/```json\n?|\n?```/g, '').trim()

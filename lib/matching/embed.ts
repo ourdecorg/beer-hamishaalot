@@ -10,6 +10,7 @@
  */
 import OpenAI from 'openai'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { logOpenAICall } from './openaiLog'
 
 let _openai: OpenAI | null = null
 function getOpenAI() {
@@ -61,10 +62,28 @@ export function buildEmbeddingText(
  * Generates a 1536-dimensional embedding for the given text.
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
-  const response = await getOpenAI().embeddings.create({
-    model: 'text-embedding-3-small',
-    input: text,
-  })
+  const model = 'text-embedding-3-small'
+  const t0 = Date.now()
+  let response: OpenAI.Embeddings.CreateEmbeddingResponse
+  try {
+    response = await getOpenAI().embeddings.create({ model, input: text })
+    logOpenAICall({
+      caller: 'generateEmbedding',
+      model,
+      request: { input: text },
+      response: { usage: response.usage },  // vector omitted — stored in wish_embeddings
+      elapsedMs: Date.now() - t0,
+    })
+  } catch (err) {
+    logOpenAICall({
+      caller: 'generateEmbedding',
+      model,
+      request: { input: text },
+      error: (err as { message?: string }).message ?? String(err),
+      elapsedMs: Date.now() - t0,
+    })
+    throw err
+  }
   return response.data[0].embedding
 }
 
