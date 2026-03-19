@@ -33,7 +33,7 @@ function freshnessScore(createdAt: string): number {
  * - up to 0.50 for resonance count (log-normalised, saturates at ~10)
  */
 function qualityScore(wish: WishWithResonance, hasEnrichment: boolean): number {
-  const enrichBonus = hasEnrichment ? 0.5 : wish.is_ai_enriched ? 0.25 : 0
+  const enrichBonus = hasEnrichment ? 0.5 : 0
   const engBonus = Math.min(0.5, Math.log1p(wish.resonance_count) / Math.log1p(10))
   return enrichBonus + engBonus
 }

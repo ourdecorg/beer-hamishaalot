@@ -103,55 +103,6 @@ export default async function WishPage({ params }: Props) {
           </p>
         </div>
 
-        {/* AI Enrichment */}
-        {wish.is_ai_enriched ? (
-          <div className="space-y-5">
-            {/* Summary */}
-            {wish.ai_summary && (
-              <div className="card p-8">
-                <p className="section-label mb-4">
-                  <span className="text-amber-500">✦</span> תמצית פיוטית
-                </p>
-                <p className="text-well-700 leading-relaxed text-lg italic">
-                  {wish.ai_summary}
-                </p>
-              </div>
-            )}
-
-            {/* Intention */}
-            {wish.intention_statement && (
-              <div className="card p-8 bg-gradient-to-br from-well-50 to-white">
-                <p className="section-label mb-4">
-                  <span className="text-well-500">◈</span> משפט הכוונה
-                </p>
-                <blockquote className="text-well-800 text-lg leading-relaxed border-r-4 border-amber-400 pr-4">
-                  {wish.intention_statement}
-                </blockquote>
-              </div>
-            )}
-
-            {/* Tags */}
-            {wish.ai_tags && wish.ai_tags.length > 0 && (
-              <div className="card p-6">
-                <p className="section-label mb-4">נושאים</p>
-                <div className="flex flex-wrap gap-2">
-                  {wish.ai_tags.map((tag: string) => (
-                    <span key={tag} className="tag-badge">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="card p-8 text-center text-sand-400">
-            <p className="text-sm">
-              ✦ הבינה המלאכותית עדיין מעבדת את המשאלה…
-            </p>
-          </div>
-        )}
-
         {/* Contact info — open wishes only */}
         {wish.visibility === 'open' && wish.contact_name && (
           <div className="card p-6 mt-6">

@@ -31,7 +31,7 @@ export default async function CollaborationsPage() {
   // Fetch all of the user's wishes
   const { data: myWishes } = await supabase
     .from('wishes')
-    .select('id, original_text, ai_summary, contact_name, contact_email, contact_phone, user_email, visibility')
+    .select('id, original_text, contact_name, contact_email, contact_phone, user_email, visibility')
     .eq('user_id', user.id)
     .in('visibility', ['anonymous', 'open'])
 
@@ -99,7 +99,7 @@ export default async function CollaborationsPage() {
   // Fetch wish details for all involved wishes
   const { data: allWishes } = await supabase
     .from('wishes')
-    .select('id, original_text, ai_summary, contact_name, contact_email, contact_phone, user_email, visibility, user_id')
+    .select('id, original_text, contact_name, contact_email, contact_phone, user_email, visibility, user_id')
     .in('id', allWishIds)
 
   const wishMap = new Map((allWishes ?? []).map((w) => [w.id, w]))
@@ -187,7 +187,7 @@ export default async function CollaborationsPage() {
                   <div className="bg-sand-50 rounded-xl p-4 border border-sand-200">
                     <p className="text-xs text-sand-400 mb-2 font-medium">המשאלה שלך</p>
                     <p className="text-sm text-well-800 leading-relaxed line-clamp-4">
-                      {mine.original_text || mine.ai_summary}
+                      {mine.original_text}
                     </p>
                     {mineEmail && (
                       <div className="mt-3 pt-3 border-t border-sand-200">
@@ -207,7 +207,7 @@ export default async function CollaborationsPage() {
                   <div className="bg-well-50 rounded-xl p-4 border border-well-200">
                     <p className="text-xs text-well-400 mb-2 font-medium">משאלה מהדהדת</p>
                     <p className="text-sm text-well-800 leading-relaxed line-clamp-4">
-                      {other.original_text || other.ai_summary}
+                      {other.original_text}
                     </p>
                     {otherEmail && (
                       <div className="mt-3 pt-3 border-t border-well-200">

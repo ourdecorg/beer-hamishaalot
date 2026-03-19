@@ -8,11 +8,7 @@ export interface Wish {
   id: string
   user_id: string
   original_text: string
-  ai_summary: string | null
-  ai_tags: string[] | null
-  intention_statement: string | null
   visibility: WishVisibility
-  is_ai_enriched: boolean
   created_at: string
   updated_at: string
   // Contact info — only for open wishes
@@ -61,12 +57,6 @@ export interface CreateWishInput {
   original_text: string
   visibility: WishVisibility
   contact?: WishContactInfo
-}
-
-export interface EnrichWishResult {
-  ai_summary: string
-  ai_tags: string[]
-  intention_statement: string
 }
 
 export interface ApiError {

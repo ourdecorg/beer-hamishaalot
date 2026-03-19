@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { waitUntil } from '@vercel/functions'
 import { createClient } from '@/lib/supabase/server'
-import { enrichWish } from '@/lib/claude'
 import { processWishForMatching } from '@/lib/matching'
 import type { CreateWishInput } from '@/lib/types'
 
@@ -46,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 1. Insert the wish first (so user has something immediately)
+  // 1. Insert the wish
   const { data: wish, error: insertError } = await supabase
     .from('wishes')
     .insert({
@@ -54,7 +53,6 @@ export async function POST(request: NextRequest) {
       user_email: user.email ?? null,
       original_text: original_text.trim(),
       visibility,
-      is_ai_enriched: false,
       ...(visibility === 'open' && contact ? {
         contact_name: contact.contact_name?.trim() || null,
         contact_country: contact.contact_country?.trim() || null,
@@ -74,37 +72,13 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 2. Enrich with Claude (fire-and-forget or awaited)
-  // We await it here so the wish page immediately shows enrichment
-  try {
-    const enrichment = await enrichWish(original_text.trim())
-
-    await supabase
-      .from('wishes')
-      .update({
-        ai_summary: enrichment.ai_summary,
-        ai_tags: enrichment.ai_tags,
-        intention_statement: enrichment.intention_statement,
-        is_ai_enriched: true,
-      })
-      .eq('id', wish.id)
-
-    // 3. Fire-and-forget: deep analysis + embedding + matching (non-blocking)
-    // Only runs for visible wishes — private wishes are never matched
-    if (['anonymous', 'open'].includes(visibility)) {
-      waitUntil(processWishForMatching(wish.id, original_text.trim()))
-    }
-
-    return NextResponse.json({ ...wish, ...enrichment, is_ai_enriched: true }, { status: 201 })
-  } catch (err) {
-    console.error('Claude enrichment error:', err)
-    // Return the wish even if enrichment failed — non-blocking
-    // Still try to run matching even if basic enrichment failed
-    if (['anonymous', 'open'].includes(visibility)) {
-      waitUntil(processWishForMatching(wish.id, original_text.trim()))
-    }
-    return NextResponse.json(wish, { status: 201 })
+  // 2. Fire-and-forget: deep analysis + embedding + matching (non-blocking)
+  // Only runs for visible wishes — private wishes are never matched
+  if (['anonymous', 'open'].includes(visibility)) {
+    waitUntil(processWishForMatching(wish.id, original_text.trim()))
   }
+
+  return NextResponse.json(wish, { status: 201 })
 }
 
 export async function GET(request: NextRequest) {

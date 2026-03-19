@@ -22,7 +22,7 @@ export default async function MyWishesPage() {
   // Fetch user's wishes newest first
   const { data: wishes } = await supabase
     .from('wishes')
-    .select('id, original_text, visibility, is_ai_enriched, created_at, ai_tags, intention_statement')
+    .select('id, original_text, visibility, created_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
@@ -92,7 +92,7 @@ export default async function MyWishesPage() {
               עדיין אין משאלות
             </h2>
             <p className="text-well-500 text-sm mb-6">
-              שתף משאלה ראשונה — ה-AI יעמיק אותה, והמנוע יחפש חיבורים.
+              שתף משאלה ראשונה — המנוע יחפש חיבורים.
             </p>
             <Link href="/wishes/new" className="btn-primary">
               <span>✦</span>
@@ -127,10 +127,6 @@ export default async function MyWishesPage() {
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="section-label text-xs">{date}</span>
                   <div className="flex items-center gap-2 flex-wrap">
-                    {/* AI status */}
-                    <span className={`text-xs ${wish.is_ai_enriched ? 'text-amber-500' : 'text-sand-300'}`}>
-                      {wish.is_ai_enriched ? '✦ מועשר' : '✦ בעיבוד…'}
-                    </span>
                     {/* Visibility */}
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${vis.cls}`}>
                       {vis.icon} {vis.label}
@@ -140,15 +136,6 @@ export default async function MyWishesPage() {
 
                 {/* Text */}
                 <p className="text-well-800 leading-relaxed">{truncated}</p>
-
-                {/* Tags */}
-                {wish.ai_tags && wish.ai_tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {wish.ai_tags.slice(0, 4).map((tag: string) => (
-                      <span key={tag} className="tag-badge text-xs">{tag}</span>
-                    ))}
-                  </div>
-                )}
 
                 {/* Bottom row — counts */}
                 <div className="flex items-center gap-3 pt-1 border-t border-sand-100 flex-wrap">

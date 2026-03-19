@@ -54,24 +54,6 @@ export default function WishCard({ wish, isAuthenticated, showFullText = false }
         {truncated}
       </p>
 
-      {/* Tags */}
-      {wish.ai_tags && wish.ai_tags.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {wish.ai_tags.slice(0, 5).map((tag) => (
-            <span key={tag} className="tag-badge text-xs">
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Intention */}
-      {wish.intention_statement && (
-        <blockquote className="border-r-2 border-amber-300 pr-3 text-sm text-well-600 italic">
-          {wish.intention_statement}
-        </blockquote>
-      )}
-
       {/* Footer */}
       <div className="flex items-center justify-between gap-3 pt-2 border-t border-sand-100">
         <ResonanceButton

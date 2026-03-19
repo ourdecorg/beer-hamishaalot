@@ -54,7 +54,7 @@ async function fetchWishDetails(
   const [wishesResult, enrichmentsResult, resonancesResult] = await Promise.all([
     supabase
       .from('wishes')
-      .select('id, user_id, original_text, ai_summary, ai_tags, intention_statement, visibility, is_ai_enriched, created_at, updated_at, user_email')
+      .select('id, user_id, original_text, visibility, created_at, updated_at, user_email')
       .in('id', wishIds)
       .neq('user_id', userId)                           // exclude own wishes
       .in('visibility', ['anonymous', 'open']),
@@ -165,7 +165,7 @@ async function getScoredViaThemes(
 async function getTrendingFeed(userId: string, supabase: SupabaseClient): Promise<FeedResult> {
   const { data: raw } = await supabase
     .from('wishes')
-    .select('id, user_id, original_text, ai_summary, ai_tags, intention_statement, visibility, is_ai_enriched, created_at, updated_at, user_email')
+    .select('id, user_id, original_text, visibility, created_at, updated_at, user_email')
     .in('visibility', ['anonymous', 'open'])
     .neq('user_id', userId)
     .order('created_at', { ascending: false })
@@ -190,7 +190,7 @@ async function getTrendingFeed(userId: string, supabase: SupabaseClient): Promis
     const hasEnrich = enrichedSet.has(w.id)
     const ageDays = (Date.now() - new Date(w.created_at).getTime()) / 86_400_000
     const freshness = Math.exp(-ageDays / 20)
-    const quality = (hasEnrich ? 0.5 : w.is_ai_enriched ? 0.25 : 0)
+    const quality = (hasEnrich ? 0.5 : 0)
       + Math.min(0.5, Math.log1p(resonance_count) / Math.log1p(10))
 
     return {

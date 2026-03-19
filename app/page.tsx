@@ -5,46 +5,18 @@ import { createClient } from '@/lib/supabase/server'
 
 type PreviewWish = {
   original_text: string
-  ai_tags: string[] | null
-  intention_statement: string | null
 }
 
 const FALLBACK_WISHES: PreviewWish[] = [
-  {
-    original_text: 'רוצה ללמוד ערבית בשיח אמיתי עם מישהו שמדבר ערבית בבית, ולתת בחזרה עברית או מוזיקה.',
-    ai_tags: ['שפה', 'חיבור', 'חינוך', 'תרבות'],
-    intention_statement: 'לגשר דרך שפה',
-  },
-  {
-    original_text: 'מחפש שותפה להקמת קבוצת ריצה קהילתית בשכונה, פעם בשבוע, לכל הגילאים.',
-    ai_tags: ['קהילה', 'ספורט', 'שכונה', 'שיתוף פעולה'],
-    intention_statement: 'לבנות קהילה דרך תנועה',
-  },
-  {
-    original_text: 'יש לי ניסיון בבניית MVPים לסטארטאפים, ואני מחפש מיזם חינוכי שאפשר לבנות יחד.',
-    ai_tags: ['יזמות', 'חינוך', 'טכנולוגיה', 'בנייה'],
-    intention_statement: 'לבנות משהו שמשנה',
-  },
+  { original_text: 'רוצה ללמוד ערבית בשיח אמיתי עם מישהו שמדבר ערבית בבית, ולתת בחזרה עברית או מוזיקה.' },
+  { original_text: 'מחפש שותפה להקמת קבוצת ריצה קהילתית בשכונה, פעם בשבוע, לכל הגילאים.' },
+  { original_text: 'יש לי ניסיון בבניית MVPים לסטארטאפים, ואני מחפש מיזם חינוכי שאפשר לבנות יחד.' },
 ]
 
-function WishPreviewCard({ text, tags, intention }: { text: string; tags: string[]; intention?: string | null }) {
+function WishPreviewCard({ text }: { text: string }) {
   return (
     <div className="card p-6 flex flex-col gap-3">
       <p className="text-well-800 leading-relaxed text-sm line-clamp-4">{text}</p>
-      {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {tags.slice(0, 4).map((t) => (
-            <span key={t} className="tag-badge text-xs">
-              {t}
-            </span>
-          ))}
-        </div>
-      )}
-      {intention && (
-        <blockquote className="border-r-2 border-amber-300 pr-3 text-xs text-well-600 italic">
-          {intention}
-        </blockquote>
-      )}
     </div>
   )
 }
@@ -62,9 +34,8 @@ export default async function HomePage() {
   try {
     const { data } = await supabase
       .from('wishes')
-      .select('original_text, ai_tags, intention_statement')
+      .select('original_text')
       .in('visibility', ['anonymous', 'open'])
-      .not('ai_tags', 'is', null)
       .order('resonance_count', { ascending: false })
       .limit(3)
     if (data && data.length >= 3) previewWishes = data
@@ -258,8 +229,6 @@ export default async function HomePage() {
                 <WishPreviewCard
                   key={i}
                   text={w.original_text}
-                  tags={w.ai_tags ?? []}
-                  intention={w.intention_statement}
                 />
               ))}
             </div>
@@ -335,8 +304,8 @@ const steps = [
   },
   {
     emoji: '✨',
-    title: 'ה-AI מאיר את המשאלה',
-    desc: 'מודל השפה מגלה את הכוונה העמוקה שמאחורי המשאלה, מנסח אותה מחדש ומוסיף תגיות — כדי שתהיה מובנת לעצמך ולאחרים.',
+    title: 'ה-AI מנתח את המשאלה',
+    desc: 'מודל השפה מזהה נושאים, צרכים ויכולות — כדי שמנוע ההתאמות יוכל לגלות חיבורים עם משאלות אחרות.',
   },
   {
     emoji: '🔗',
@@ -349,7 +318,7 @@ const outcomes = [
   {
     icon: '🔍',
     title: 'ניתוח AI מעמיק',
-    desc: 'סיכום פיוטי, כוונה מנוסחת מחדש, ותגיות שמאירות את עומק המשאלה — ומחזירות לך אותה ברורה יותר.',
+    desc: 'המערכת מזהה נושאים, צרכים, יכולות ותחום עניין — ומשתמשת בהם כדי לגלות התאמות מדויקות.',
   },
   {
     icon: '🎯',
