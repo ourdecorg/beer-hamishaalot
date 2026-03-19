@@ -28,10 +28,13 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 4): Promise<T> {
       const status = (err as { status?: number }).status
       if (status === 429 && attempt < maxRetries - 1) {
         const msg = (err as { message?: string }).message ?? ''
-        const match = msg.match(/try again in (\d+(?:\.\d+)?)s/)
-        const waitMs = match
-          ? Math.ceil(parseFloat(match[1]) * 1000) + 200
-          : 1000 * Math.pow(2, attempt)
+        const matchMs = msg.match(/try again in (\d+)ms/)
+        const matchS  = msg.match(/try again in (\d+(?:\.\d+)?)s(?!ec)/)
+        const waitMs = matchMs
+          ? parseInt(matchMs[1]) + 200
+          : matchS
+            ? Math.ceil(parseFloat(matchS[1]) * 1000) + 200
+            : 1000 * Math.pow(2, attempt)
         console.warn(`[analyze] 429 rate limit — retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries})`)
         await new Promise((resolve) => setTimeout(resolve, waitMs))
         continue
