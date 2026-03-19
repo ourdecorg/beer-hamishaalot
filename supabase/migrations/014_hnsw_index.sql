@@ -14,7 +14,7 @@ drop index if exists public.wish_embeddings_vec_idx;
 -- Create HNSW index
 -- m=16: connections per node (default, good balance of memory vs. speed)
 -- ef_construction=64: candidates considered during index build (quality)
-create index wish_embeddings_hnsw_idx
+create index if not exists wish_embeddings_hnsw_idx
   on public.wish_embeddings
   using hnsw (embedding vector_cosine_ops)
   with (m = 16, ef_construction = 64);
