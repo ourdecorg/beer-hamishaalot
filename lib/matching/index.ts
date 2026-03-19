@@ -73,28 +73,6 @@ export async function processWishForMatching(
       (candidateWishes ?? []).map((w) => [w.id, w.created_at as string])
     )
 
-    // Lazy enrichment: if a candidate's enrichment isn't ready yet (race condition),
-    // fetch its text and analyze it now so we don't miss the connection.
-    const missingIds = candidateIds.filter((id) => !enrichmentMap.has(id))
-    if (missingIds.length > 0) {
-      const { data: missingWishes } = await supabase
-        .from('wishes')
-        .select('id, original_text, ai_summary')
-        .in('id', missingIds)
-
-      // Sequential — avoids concurrent GPT-4o calls hitting the TPM rate limit
-      for (const w of missingWishes ?? []) {
-        const text = (w.original_text || w.ai_summary) as string | null
-        if (!text) continue
-        try {
-          const enriched = await analyzeAndStoreWish(w.id, text)
-          enrichmentMap.set(w.id, enriched)
-        } catch {
-          // skip — this candidate won't score but the pipeline continues
-        }
-      }
-    }
-
     // Step 4 — Score each candidate, log every attempt, persist connections above threshold
     const connections: Array<{
       wish_a: string

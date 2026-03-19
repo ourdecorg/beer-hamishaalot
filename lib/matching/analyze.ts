@@ -135,9 +135,21 @@ Rules: themes=5-7 keywords; needs/skills_offered=2-5 items; subject_entities/obj
  */
 export async function analyzeAndStoreWish(
   wishId: string,
-  wishText: string
+  wishText: string,
+  { force = false }: { force?: boolean } = {}
 ): Promise<WishEnrichment> {
   const supabase = createAdminClient()
+
+  // Skip GPT call if enrichment already exists (saves RPD quota during batch re-runs)
+  if (!force) {
+    const { data: existing } = await supabase
+      .from('wish_enrichment')
+      .select('*')
+      .eq('wish_id', wishId)
+      .maybeSingle()
+    if (existing) return existing as WishEnrichment
+  }
+
   const result = await analyzeWishText(wishText)
 
   const row = {
