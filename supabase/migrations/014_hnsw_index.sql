@@ -19,30 +19,26 @@ create index wish_embeddings_hnsw_idx
   using hnsw (embedding vector_cosine_ops)
   with (m = 16, ef_construction = 64);
 
--- Update match_wishes function to use plpgsql so we can SET LOCAL hnsw.ef_search.
--- ef_search=40 means 40 candidate nodes are evaluated per query — a good
--- accuracy/speed tradeoff for datasets up to ~10,000 wishes.
+-- Restore match_wishes as a plain sql stable function.
+-- hnsw.ef_search defaults to 40 in pgvector — no need to SET LOCAL,
+-- which is forbidden inside STABLE functions.
 create or replace function match_wishes(
   query_embedding vector(1536),
   match_wish_id   uuid,
   min_similarity  float default 0.1
 )
 returns table (wish_id uuid, similarity float)
-language plpgsql stable
+language sql stable
 security definer
 set search_path = public
 as $$
-begin
-  set local hnsw.ef_search = 40;
-  return query
-    select
-      e.wish_id,
-      1 - (e.embedding <=> query_embedding) as similarity
-    from public.wish_embeddings e
-    join public.wishes w on w.id = e.wish_id
-    where e.wish_id != match_wish_id
-      and w.visibility in ('anonymous', 'open')
-      and (1 - (e.embedding <=> query_embedding)) >= min_similarity
-    order by e.embedding <=> query_embedding;
-end;
+  select
+    e.wish_id,
+    1 - (e.embedding <=> query_embedding) as similarity
+  from public.wish_embeddings e
+  join public.wishes w on w.id = e.wish_id
+  where e.wish_id != match_wish_id
+    and w.visibility in ('anonymous', 'open')
+    and (1 - (e.embedding <=> query_embedding)) >= min_similarity
+  order by e.embedding <=> query_embedding;
 $$;
