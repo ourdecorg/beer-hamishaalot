@@ -119,7 +119,8 @@ export interface MatchResult {
   status: ConnectionStatus
   shared_themes: string[]      // intersection of themes
   match_summary: string        // human-readable e.g. "Complementary: they offer skills you need"
-  // Only present when status === 'connected'
+  matched_wish_text?: string   // original text of the matched wish
+  explanation_text?: string    // short_reason from explanation JSONB
   contact?: {
     name: string | null
     email: string | null

@@ -81,6 +81,14 @@ export default function Header() {
                     שיתופי פעולה
                   </Link>
                   <Link
+                    href="/wishes/my"
+                    className={`btn-ghost text-sm ${
+                      pathname === '/wishes/my' ? 'text-well-900 bg-sand-100' : ''
+                    }`}
+                  >
+                    המשאלות שלי
+                  </Link>
+                  <Link
                     href="/wishes/new"
                     className="btn-primary text-sm px-4 py-2"
                   >

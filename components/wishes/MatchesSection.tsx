@@ -3,21 +3,20 @@
 /**
  * MatchesSection — shown to wish owner below the wish detail.
  * Fetches matches from /api/wishes/[id]/matches and renders connection cards.
- * All matches are immediately connected — no approval required.
  */
 import { useEffect, useState } from 'react'
 import type { MatchResult, MatchType } from '@/lib/types'
 
 const matchTypeLabel: Record<MatchType, string> = {
-  RESONANT: '✦ הדהוד',
+  RESONANT:      '✦ הדהוד',
   COMPLEMENTARY: '◈ משלים',
-  SIMILAR: '◎ דומה',
+  SIMILAR:       '◎ דומה',
 }
 
 const matchTypeBg: Record<MatchType, string> = {
-  RESONANT: 'bg-amber-50 border-amber-200 text-amber-800',
+  RESONANT:      'bg-amber-50 border-amber-200 text-amber-800',
   COMPLEMENTARY: 'bg-well-50 border-well-200 text-well-800',
-  SIMILAR: 'bg-sand-100 border-sand-200 text-sand-700',
+  SIMILAR:       'bg-sand-100 border-sand-200 text-sand-700',
 }
 
 interface Props {
@@ -31,9 +30,7 @@ export default function MatchesSection({ wishId }: Props) {
   useEffect(() => {
     fetch(`/api/wishes/${wishId}/matches`)
       .then((r) => r.json())
-      .then((data) => {
-        setMatches(Array.isArray(data) ? data : [])
-      })
+      .then((data) => setMatches(Array.isArray(data) ? data : []))
       .catch(() => setMatches([]))
       .finally(() => setLoading(false))
   }, [wishId])
@@ -58,24 +55,38 @@ export default function MatchesSection({ wishId }: Props) {
   return (
     <div className="mt-10">
       <p className="section-label mb-4">
-        <span className="text-well-500">✦</span> הדהודים שנמצאו
+        <span className="text-well-500">✦</span> הדהודים שנמצאו ({matches.length})
       </p>
 
       <div className="space-y-4">
         {matches.map((match) => (
           <div key={match.connection_id} className="card p-5">
-            {/* Header row */}
+            {/* Header row: type badge + score */}
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
               <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${matchTypeBg[match.match_type]}`}>
                 {matchTypeLabel[match.match_type]}
               </span>
               <span className="text-xs text-sand-400">
-                התאמה: <strong className="text-well-700">{Math.round(match.match_score * 100)}%</strong>
+                ציון התאמה: <strong className="text-well-700">{Math.round(match.match_score * 100)}%</strong>
               </span>
             </div>
 
-            {/* Summary */}
-            <p className="text-sm text-well-700 mb-3">{match.match_summary}</p>
+            {/* Explanation text (AI-generated short_reason) */}
+            {match.explanation_text ? (
+              <p className="text-sm text-well-600 italic mb-3">{match.explanation_text}</p>
+            ) : (
+              <p className="text-sm text-well-600 mb-3">{match.match_summary}</p>
+            )}
+
+            {/* Matched wish text */}
+            {match.matched_wish_text && (
+              <blockquote className="bg-sand-50 border border-sand-200 rounded-xl px-4 py-3 text-sm text-well-700 leading-relaxed mb-3">
+                <p className="section-label text-xs mb-1.5">המשאלה התואמת</p>
+                {match.matched_wish_text.length > 280
+                  ? match.matched_wish_text.slice(0, 280) + '…'
+                  : match.matched_wish_text}
+              </blockquote>
+            )}
 
             {/* Shared themes */}
             {match.shared_themes.length > 0 && (
@@ -86,11 +97,13 @@ export default function MatchesSection({ wishId }: Props) {
               </div>
             )}
 
-            {/* Contact info — always visible */}
+            {/* Contact info */}
             {match.contact && (match.contact.name || match.contact.email || match.contact.phone) && (
               <div className="bg-well-50 border border-well-200 rounded-xl p-4 text-sm">
-                <p className="section-label mb-2">פרטי קשר לשיתוף פעולה</p>
-                {match.contact.name && <p className="text-well-800 font-medium">{match.contact.name}</p>}
+                <p className="section-label mb-2">פרטי מבקש המשאלה</p>
+                {match.contact.name && (
+                  <p className="text-well-800 font-medium">{match.contact.name}</p>
+                )}
                 {match.contact.email && (
                   <p className="text-well-700" dir="ltr">
                     <a href={`mailto:${match.contact.email}`} className="underline hover:no-underline">
@@ -98,7 +111,9 @@ export default function MatchesSection({ wishId }: Props) {
                     </a>
                   </p>
                 )}
-                {match.contact.phone && <p className="text-well-700" dir="ltr">{match.contact.phone}</p>}
+                {match.contact.phone && (
+                  <p className="text-well-700" dir="ltr">{match.contact.phone}</p>
+                )}
               </div>
             )}
           </div>

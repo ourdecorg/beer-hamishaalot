@@ -73,16 +73,16 @@ export async function GET(_req: NextRequest, { params }: Params) {
     (ownEnrichment?.themes ?? []).map((t: string) => t.toLowerCase().trim())
   )
 
-  // Fetch contact info for all matched wishes
+  // Fetch contact info + original text for all matched wishes
   const { data: contactWishes } = await supabase
     .from('wishes')
-    .select('id, contact_name, contact_email, contact_phone')
+    .select('id, original_text, contact_name, contact_email, contact_phone')
     .in('id', matchedWishIds)
 
   const contactMap = new Map(
     (contactWishes ?? []).map((w) => [
       w.id,
-      { name: w.contact_name, email: w.contact_email, phone: w.contact_phone },
+      { name: w.contact_name, email: w.contact_email, phone: w.contact_phone, original_text: w.original_text },
     ])
   )
 
@@ -110,7 +110,15 @@ export async function GET(_req: NextRequest, { params }: Params) {
       match_summary: matchSummaryMap[conn.match_type] ?? 'התאמה',
     }
 
-    result.contact = contactMap.get(matchedWishId) ?? { name: null, email: null, phone: null }
+    const wishData = contactMap.get(matchedWishId)
+    result.contact = wishData
+      ? { name: wishData.name, email: wishData.email, phone: wishData.phone }
+      : { name: null, email: null, phone: null }
+    result.matched_wish_text = wishData?.original_text ?? undefined
+
+    // Extract short_reason from explanation JSONB column (migration 011)
+    const explanation = (conn.explanation as { short_reason?: string } | null)
+    result.explanation_text = explanation?.short_reason ?? undefined
 
     return result
   })
