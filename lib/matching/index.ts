@@ -176,9 +176,11 @@ export async function processWishForMatching(
       })
     }
 
-    // Write log entries (best-effort, non-blocking)
-    if (logEntries.length > 0) {
-      supabase.from('match_attempts_log').insert(logEntries).then(({ error }) => {
+    // Write log entries — only passed matches to keep write pressure low.
+    // Failed pairings (vast majority) are intentionally skipped.
+    const passedEntries = logEntries.filter((e) => e.passed_threshold)
+    if (passedEntries.length > 0) {
+      supabase.from('match_attempts_log').insert(passedEntries).then(({ error }) => {
         if (error) console.error('[ResonanceEngine] log insert failed:', error.message)
       })
     }
