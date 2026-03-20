@@ -73,9 +73,14 @@ export default function TestDataPage() {
 
         {/* Header */}
         <div className="mb-8">
-          <Link href="/" className="text-sm text-well-500 hover:text-well-700 underline">
-            ← חזרה לדף הבית
-          </Link>
+          <div className="flex items-center gap-4 flex-wrap">
+            <Link href="/" className="text-sm text-well-500 hover:text-well-700 underline">
+              ← חזרה לדף הבית
+            </Link>
+            <Link href="/admin/connections" className="text-sm text-well-600 hover:text-well-800 underline font-medium">
+              🔍 תחקור חיבורים
+            </Link>
+          </div>
           <h1 className="text-2xl font-bold text-well-900 mt-4" style={{ fontFamily: 'var(--font-frank-ruhl)' }}>
             טעינת נתוני בדיקה
           </h1>
