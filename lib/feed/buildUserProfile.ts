@@ -30,7 +30,7 @@ export async function buildUserProfile(
     .from('wishes')
     .select('id')
     .eq('user_id', userId)
-    .in('visibility', ['anonymous', 'open'])
+    .eq('visibility', 'open')
 
   const wishIds = wishes?.map(w => w.id) ?? []
 

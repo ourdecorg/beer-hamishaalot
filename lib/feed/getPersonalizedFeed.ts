@@ -57,7 +57,7 @@ async function fetchWishDetails(
       .select('id, user_id, original_text, visibility, created_at, updated_at, user_email')
       .in('id', wishIds)
       .neq('user_id', userId)                           // exclude own wishes
-      .in('visibility', ['anonymous', 'open']),
+      .eq('visibility', 'open'),
 
     supabase
       .from('wish_enrichment')
@@ -139,7 +139,7 @@ async function getScoredViaThemes(
   const { data: recentIds } = await supabase
     .from('wishes')
     .select('id')
-    .in('visibility', ['anonymous', 'open'])
+    .eq('visibility', 'open')
     .neq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(CANDIDATE_LIMIT)
@@ -166,7 +166,7 @@ async function getTrendingFeed(userId: string, supabase: SupabaseClient): Promis
   const { data: raw } = await supabase
     .from('wishes')
     .select('id, user_id, original_text, visibility, created_at, updated_at, user_email')
-    .in('visibility', ['anonymous', 'open'])
+    .eq('visibility', 'open')
     .neq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(50)

@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import ResonanceButton from '@/components/wishes/ResonanceButton'
@@ -11,7 +10,7 @@ interface Props {
   params: { id: string }
 }
 
-export async function generateMetadata({ params }: Props) {
+export async function generateMetadata(_: Props) {
   return {
     title: 'משאלה — באר המשאלות',
   }
@@ -29,11 +28,6 @@ export default async function WishPage({ params }: Props) {
     .single()
 
   if (error || !wish) notFound()
-
-  // Access control: private wishes only visible to owner
-  if (wish.visibility === 'private' && wish.user_id !== user?.id) {
-    notFound()
-  }
 
   // Get resonance count
   const { count: resonanceCount } = await supabase
@@ -60,19 +54,13 @@ export default async function WishPage({ params }: Props) {
   }
 
   const isOwner = user?.id === wish.user_id
-  const canResonate = ['anonymous', 'open'].includes(wish.visibility) && !isOwner
+  const canResonate = !isOwner
 
   const formattedDate = new Date(wish.created_at).toLocaleDateString('he-IL', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
   })
-
-  const visibilityLabel: Record<string, string> = {
-    open: '✦ פתוח',
-    anonymous: '🎭 אנונימי',
-    private: '🔒 פרטי',
-  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -82,7 +70,6 @@ export default async function WishPage({ params }: Props) {
         {/* Wish Header */}
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
           <p className="section-label">{formattedDate}</p>
-          <span className="tag-badge text-sm">{visibilityLabel[wish.visibility]}</span>
         </div>
 
         {/* Original Text */}
@@ -167,8 +154,8 @@ export default async function WishPage({ params }: Props) {
           </div>
         )}
 
-        {/* Resonance Engine matches — owner only, non-private wishes */}
-        {isOwner && wish.visibility !== 'private' && (
+        {/* Resonance Engine matches — owner only */}
+        {isOwner && (
           <MatchesSection wishId={wish.id} />
         )}
       </main>

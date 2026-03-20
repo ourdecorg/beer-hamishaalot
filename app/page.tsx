@@ -35,7 +35,7 @@ export default async function HomePage() {
     const { data } = await supabase
       .from('wishes')
       .select('original_text')
-      .in('visibility', ['anonymous', 'open'])
+      .eq('visibility', 'open')
       .order('resonance_count', { ascending: false })
       .limit(3)
     if (data && data.length >= 3) previewWishes = data

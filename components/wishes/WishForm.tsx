@@ -2,33 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { WishVisibility, WishContactInfo } from '@/lib/types'
-
-const visibilityOptions: {
-  value: WishVisibility
-  label: string
-  sublabel: string
-  icon: string
-}[] = [
-  {
-    value: 'private',
-    label: 'פרטי',
-    sublabel: 'רק אתה רואה את זה',
-    icon: '🔒',
-  },
-  {
-    value: 'anonymous',
-    label: 'אנונימי',
-    sublabel: 'גלוי לכולם, ללא שמך',
-    icon: '🎭',
-  },
-  {
-    value: 'open',
-    label: 'פתוח',
-    sublabel: 'גלוי עם פרטי קשר',
-    icon: '✦',
-  },
-]
+import type { WishContactInfo } from '@/lib/types'
 
 const emptyContact: WishContactInfo = {
   contact_name: '',
@@ -40,7 +14,6 @@ const emptyContact: WishContactInfo = {
 
 export default function WishForm() {
   const [text, setText] = useState('')
-  const [visibility, setVisibility] = useState<WishVisibility>('anonymous')
   const [contact, setContact] = useState<WishContactInfo>(emptyContact)
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
@@ -57,10 +30,7 @@ export default function WishForm() {
     setStatus('loading')
     setErrorMsg('')
 
-    const body: Record<string, unknown> = { original_text: text.trim(), visibility }
-    if (visibility === 'open') {
-      body.contact = contact
-    }
+    const body: Record<string, unknown> = { original_text: text.trim(), visibility: 'open', contact }
 
     const res = await fetch('/api/wishes', {
       method: 'POST',
@@ -125,46 +95,8 @@ export default function WishForm() {
         </div>
       </div>
 
-      {/* Visibility selector */}
-      <div>
-        <p className="block text-sm font-medium text-well-700 mb-3">
-          מי יראה את המשאלה?
-        </p>
-        <div className="grid grid-cols-3 gap-3">
-          {visibilityOptions.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setVisibility(opt.value)}
-              disabled={status === 'loading'}
-              className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 text-center
-                ${
-                  visibility === opt.value
-                    ? 'border-well-500 bg-well-50 shadow-sm'
-                    : 'border-sand-200 bg-white hover:border-sand-300 hover:bg-sand-50'
-                }
-              `}
-            >
-              <span className="text-2xl">{opt.icon}</span>
-              <span
-                className={`text-sm font-medium ${
-                  visibility === opt.value ? 'text-well-800' : 'text-well-600'
-                }`}
-              >
-                {opt.label}
-              </span>
-              <span className="text-xs text-sand-400 leading-tight">{opt.sublabel}</span>
-              {visibility === opt.value && (
-                <span className="absolute top-2 left-2 text-well-500 text-xs">✓</span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Contact info — only for open wishes */}
-      {visibility === 'open' && (
-        <div className="card p-6 space-y-4 border-well-200 bg-well-50/40">
+      {/* Contact info */}
+      <div className="card p-6 space-y-4 border-well-200 bg-well-50/40">
           <p className="text-sm font-medium text-well-700">
             ✦ פרטי קשר — יוצגו עם המשאלה
           </p>
@@ -250,7 +182,6 @@ export default function WishForm() {
             </div>
           </div>
         </div>
-      )}
 
       {/* Error */}
       {status === 'error' && (

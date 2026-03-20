@@ -2,7 +2,7 @@
 // באר המשאלות — Core Domain Types
 // ============================================================
 
-export type WishVisibility = 'private' | 'anonymous' | 'open'
+export type WishVisibility = 'open'
 
 export interface Wish {
   id: string

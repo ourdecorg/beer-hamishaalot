@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const { data: wishes } = await admin
       .from('wishes')
       .select('id')
-      .in('visibility', ['anonymous', 'open'])
+      .eq('visibility', 'open')
     wishIds = (wishes ?? []).map((w: { id: string }) => w.id)
   }
 

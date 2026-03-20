@@ -8,12 +8,6 @@ interface Props {
   showFullText?: boolean
 }
 
-const visibilityLabel: Record<string, string> = {
-  open: 'פתוח',
-  anonymous: 'אנונימי',
-  private: 'פרטי',
-}
-
 export default function WishCard({ wish, isAuthenticated, showFullText = false }: Props) {
   const displayText = wish.original_text
 
@@ -34,10 +28,6 @@ export default function WishCard({ wish, isAuthenticated, showFullText = false }
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <span className="section-label text-xs">
           {formattedDate}
-        </span>
-        <span className="tag-badge text-xs">
-          {wish.visibility === 'anonymous' ? '🎭' : '✦'}{' '}
-          {visibilityLabel[wish.visibility]}
         </span>
       </div>
 

@@ -32,16 +32,14 @@ export async function POST(request: NextRequest) {
   if (original_text.length > 1000) {
     return NextResponse.json({ error: 'Wish text is too long (max 1000 chars)' }, { status: 400 })
   }
-  if (!['private', 'anonymous', 'open'].includes(visibility)) {
+  if (visibility !== 'open') {
     return NextResponse.json({ error: 'Invalid visibility value' }, { status: 400 })
   }
 
-  // Validate contact info for open wishes
-  if (visibility === 'open') {
-    for (const field of REQUIRED_CONTACT_FIELDS) {
-      if (!contact?.[field]?.trim()) {
-        return NextResponse.json({ error: `שדה ${field} הוא חובה עבור משאלה פתוחה` }, { status: 400 })
-      }
+  // Validate contact info
+  for (const field of REQUIRED_CONTACT_FIELDS) {
+    if (!contact?.[field]?.trim()) {
+      return NextResponse.json({ error: `שדה ${field} הוא חובה` }, { status: 400 })
     }
   }
 
@@ -53,13 +51,11 @@ export async function POST(request: NextRequest) {
       user_email: user.email ?? null,
       original_text: original_text.trim(),
       visibility,
-      ...(visibility === 'open' && contact ? {
-        contact_name: contact.contact_name?.trim() || null,
-        contact_country: contact.contact_country?.trim() || null,
-        contact_city: contact.contact_city?.trim() || null,
-        contact_address: contact.contact_address?.trim() || null,
-        contact_phone: contact.contact_phone?.trim() || null,
-      } : {}),
+      contact_name: contact?.contact_name?.trim() || null,
+      contact_country: contact?.contact_country?.trim() || null,
+      contact_city: contact?.contact_city?.trim() || null,
+      contact_address: contact?.contact_address?.trim() || null,
+      contact_phone: contact?.contact_phone?.trim() || null,
     })
     .select()
     .single()
@@ -73,15 +69,12 @@ export async function POST(request: NextRequest) {
   }
 
   // 2. Fire-and-forget: deep analysis + embedding + matching (non-blocking)
-  // Only runs for visible wishes — private wishes are never matched
-  if (['anonymous', 'open'].includes(visibility)) {
-    waitUntil(processWishForMatching(wish.id, original_text.trim()))
-  }
+  waitUntil(processWishForMatching(wish.id, original_text.trim()))
 
   return NextResponse.json(wish, { status: 201 })
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 

@@ -21,7 +21,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     .eq('id', params.id)
     .single()
 
-  if (!wish || !['anonymous', 'open'].includes(wish.visibility)) {
+  if (!wish || wish.visibility !== 'open') {
     return NextResponse.json({ error: 'Wish not found or not resonatable' }, { status: 404 })
   }
 

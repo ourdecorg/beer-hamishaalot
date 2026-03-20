@@ -7,8 +7,6 @@ interface Params {
 
 export async function GET(_req: NextRequest, { params }: Params) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
   const { data: wish, error } = await supabase
     .from('wishes')
     .select('*')
@@ -16,11 +14,6 @@ export async function GET(_req: NextRequest, { params }: Params) {
     .single()
 
   if (error || !wish) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  }
-
-  // Private wishes only visible to owner
-  if (wish.visibility === 'private' && wish.user_id !== user?.id) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
