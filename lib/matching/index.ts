@@ -21,6 +21,7 @@ import { computeObjectAlignment } from './objectAlignment'
 import { computeDomainMatch } from './domain'
 import { computeMatchScore, computeFreshness, buildExplanation, MATCH_THRESHOLD } from './score'
 import { haversineKm, MAX_DISTANCE_KM } from './geo'
+import { dateRangesOverlap } from './timeRange'
 import type { WishEnrichment } from '@/lib/types'
 
 /**
@@ -99,6 +100,7 @@ export async function processWishForMatching(
       passed_threshold: boolean
       distance_km: number | null
       failed_distance: boolean
+      failed_date_range: boolean
     }> = []
 
     for (const candidate of candidates) {
@@ -129,7 +131,13 @@ export async function processWishForMatching(
         if (distance_km > MAX_DISTANCE_KM) failed_distance = true
       }
 
-      const shouldLog = passed || failed_distance
+      // Date-range overlap filter
+      const failed_date_range = !dateRangesOverlap(
+        enrichment.date_range_start, enrichment.date_range_end,
+        candidateEnrichment.date_range_start, candidateEnrichment.date_range_end,
+      )
+
+      const shouldLog = passed || failed_distance || failed_date_range
       if (shouldLog) {
         logEntries.push({
           wish_id: wishId,
@@ -146,10 +154,11 @@ export async function processWishForMatching(
           passed_threshold: passed,
           distance_km,
           failed_distance,
+          failed_date_range,
         })
       }
 
-      if (!passed || failed_distance) continue
+      if (!passed || failed_distance || failed_date_range) continue
 
       const explanation = buildExplanation(
         score,
