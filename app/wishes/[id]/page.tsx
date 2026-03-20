@@ -80,8 +80,8 @@ export default async function WishPage({ params }: Props) {
           </p>
         </div>
 
-        {/* Contact info — open wishes only */}
-        {wish.visibility === 'open' && wish.contact_name && (
+        {/* Contact info */}
+        {wish.contact_name && (
           <div className="card p-6 mt-6">
             <p className="section-label mb-4">
               <span className="text-well-500">◎</span> פרטי קשר

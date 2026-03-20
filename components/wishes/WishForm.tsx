@@ -199,7 +199,7 @@ export default function WishForm() {
         {status === 'loading' ? (
           <>
             <span className="animate-spin">⟳</span>
-            <span>שולח ומעשיר עם AI...</span>
+            <span>שולח...</span>
           </>
         ) : (
           <>
@@ -210,7 +210,7 @@ export default function WishForm() {
       </button>
 
       <p className="text-xs text-center text-sand-400">
-        לאחר השליחה, הבינה המלאכותית תעמיק ותעשיר את משאלתך
+        לאחר השליחה, המנוע יחפש התאמות ויעדכן אותך בדף המשאלה
       </p>
     </form>
   )

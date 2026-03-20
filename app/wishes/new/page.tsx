@@ -45,7 +45,7 @@ export default async function NewWishPage() {
         <div className="mt-6 flex gap-3 items-start bg-well-50 border border-well-200 rounded-xl p-4">
           <span className="text-well-400 flex-shrink-0 mt-0.5">ℹ</span>
           <p className="text-sm text-well-600 leading-relaxed">
-            לאחר השליחה, קלוד יעצב עבורך סיכום פיוטי, תגיות, ומשפט כוונה — כדי לסייע לך להבין את עומק משאלתך.
+            לאחר השליחה, מנוע ה-AI ינתח את המשאלה ויחפש חיבורים עם משאלות אחרות. התאמות יופיעו בדף המשאלה.
           </p>
         </div>
       </main>
