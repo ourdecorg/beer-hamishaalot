@@ -9,7 +9,9 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'המשאלות שלי — באר המשאלות' }
 
 const visibilityLabel: Record<string, { label: string; icon: string; cls: string }> = {
-  open: { label: 'פתוח', icon: '✦', cls: 'bg-well-50 border-well-200 text-well-700' },
+  open:      { label: 'פתוח',    icon: '✦',  cls: 'bg-well-50 border-well-200 text-well-700' },
+  anonymous: { label: 'אנונימי', icon: '🎭', cls: 'bg-sand-100 border-sand-200 text-sand-600' },
+  private:   { label: 'פרטי',   icon: '🔒', cls: 'bg-sand-50 border-sand-200 text-sand-500' },
 }
 
 export default async function MyWishesPage() {
