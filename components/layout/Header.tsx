@@ -41,14 +41,14 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 bg-sand-50/90 backdrop-blur-md border-b border-sand-200">
+    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-sand-200/60 shadow-sm">
       <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
         <Link
           href="/"
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
-          <span className="text-2xl select-none">✦</span>
+          <span className="text-2xl select-none text-well-800">✦</span>
           <span
             className="text-xl font-serif text-well-800 hidden sm:block"
             style={{ fontFamily: 'var(--font-frank-ruhl)' }}
@@ -66,24 +66,24 @@ export default function Header() {
                   <Link
                     href="/wishes/my"
                     className={`btn-ghost text-sm ${
-                      pathname === '/wishes/my' ? 'text-well-900 bg-sand-100' : ''
+                      pathname === '/wishes/my' ? 'text-well-900 bg-well-50 font-semibold' : ''
                     }`}
                   >
                     המשאלות שלי
                   </Link>
                   <Link
                     href="/wishes/new"
-                    className="btn-primary text-sm px-4 py-2"
+                    className="btn-primary text-sm px-4 py-2 shadow-md"
                   >
                     <span>✦</span>
                     <span>משאלה חדשה</span>
                   </Link>
-                  <span className="hidden sm:block text-xs text-sand-400 max-w-[140px] truncate" dir="ltr">
+                  <span className="hidden sm:block text-xs text-sand-400 max-w-[120px] truncate" dir="ltr">
                     {user.email}
                   </span>
                   <button
                     onClick={handleSignOut}
-                    className="btn-ghost text-sm text-sand-500"
+                    className="btn-ghost text-xs text-sand-500"
                   >
                     יציאה
                   </button>

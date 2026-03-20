@@ -76,6 +76,7 @@ export default async function MyWishesPage() {
               <span>משאלה חדשה</span>
             </Link>
           </div>
+          <div className="h-px mt-4 bg-gradient-to-l from-transparent via-sand-300 to-transparent" />
           {wishList.length > 0 && (
             <p className="text-sand-400 text-sm mt-2">{wishList.length} משאלות</p>
           )}
@@ -83,7 +84,7 @@ export default async function MyWishesPage() {
 
         {/* Empty state */}
         {wishList.length === 0 && (
-          <div className="card p-12 text-center">
+          <div className="card-featured p-12 text-center">
             <div className="text-5xl mb-4">✦</div>
             <h2
               className="text-xl text-well-700 mb-3"
@@ -121,7 +122,7 @@ export default async function MyWishesPage() {
               <Link
                 key={wish.id}
                 href={`/wishes/${wish.id}`}
-                className="card p-6 flex flex-col gap-3 hover:shadow-md transition-shadow block"
+                className="card-hover p-6 flex flex-col gap-3 block"
               >
                 {/* Top row */}
                 <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -151,7 +152,7 @@ export default async function MyWishesPage() {
                       💫 {resonanceCount} {resonanceCount === 1 ? 'הדהוד' : 'הדהודים'}
                     </span>
                   )}
-                  <span className="text-xs text-sand-400 mr-auto">לחץ לפרטים ←</span>
+                  <span className="text-xs text-well-600 font-medium mr-auto">לחץ לפרטים ←</span>
                 </div>
               </Link>
             )

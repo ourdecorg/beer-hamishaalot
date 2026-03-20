@@ -23,16 +23,17 @@ export default function WishCard({ wish, isAuthenticated, showFullText = false }
   })
 
   return (
-    <article className="card p-6 flex flex-col gap-4 hover:shadow-md transition-shadow">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <span className="section-label text-xs">
-          {formattedDate}
-        </span>
+    <article className="card-hover p-6 flex flex-col gap-4">
+      {/* Accent bar */}
+      <div className="w-6 h-0.5 bg-amber-400 rounded-full" />
+
+      {/* Date */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="section-label text-xs">{formattedDate}</span>
       </div>
 
-      {/* Author email — only for open wishes */}
-      {wish.visibility === 'open' && wish.user_email && (
+      {/* Author email */}
+      {wish.user_email && (
         <div className="flex items-center gap-1.5 text-xs text-well-500">
           <span>✉</span>
           <span dir="ltr">{wish.user_email}</span>
@@ -40,12 +41,10 @@ export default function WishCard({ wish, isAuthenticated, showFullText = false }
       )}
 
       {/* Text */}
-      <p className="text-well-800 leading-relaxed text-base">
-        {truncated}
-      </p>
+      <p className="text-well-800 leading-relaxed text-base flex-1">{truncated}</p>
 
       {/* Footer */}
-      <div className="flex items-center justify-between gap-3 pt-2 border-t border-sand-100">
+      <div className="flex items-center justify-between gap-3 pt-3 border-t border-sand-100">
         <ResonanceButton
           wishId={wish.id}
           initialCount={wish.resonance_count}
@@ -54,9 +53,10 @@ export default function WishCard({ wish, isAuthenticated, showFullText = false }
         />
         <Link
           href={`/wishes/${wish.id}`}
-          className="text-sm text-well-500 hover:text-well-700 transition-colors"
+          className="text-sm font-medium text-well-500 hover:text-well-700 transition-colors inline-flex items-center gap-1"
         >
-          קרא עוד ←
+          <span>קרא עוד</span>
+          <span>←</span>
         </Link>
       </div>
     </article>

@@ -1,9 +1,5 @@
 'use client'
 
-/**
- * MatchesSection — shown to wish owner below the wish detail.
- * Fetches matches from /api/wishes/[id]/matches and renders connection cards.
- */
 import { useEffect, useState } from 'react'
 import type { MatchResult, MatchType } from '@/lib/types'
 
@@ -37,88 +33,118 @@ export default function MatchesSection({ wishId }: Props) {
 
   if (loading) {
     return (
-      <div className="mt-10 card p-6 text-center text-sand-400 text-sm animate-pulse">
-        ✦ מחפש הדהודים…
+      <div className="mt-10 card p-8 text-center">
+        <div className="flex justify-center gap-1.5 mb-3">
+          {[0,1,2].map(i => (
+            <div key={i} className="w-2 h-2 rounded-full bg-well-400" style={{ animation: `pulse-soft 1.2s ease-in-out ${i*0.2}s infinite` }} />
+          ))}
+        </div>
+        <p className="text-sand-500 text-sm">מחפש הדהודים…</p>
       </div>
     )
   }
 
   if (matches.length === 0) {
     return (
-      <div className="mt-10 card p-6 text-center text-sand-400 text-sm">
-        <p>טרם נמצאו משאלות מהדהדות.</p>
-        <p className="text-xs mt-1 text-sand-300">המנוע פועל ברקע — חזור מאוחר יותר</p>
+      <div className="mt-10 card p-10 text-center">
+        <div className="text-3xl mb-3 opacity-40">✦</div>
+        <p className="text-well-600 text-sm font-medium mb-1">טרם נמצאו משאלות מהדהדות</p>
+        <p className="text-sand-400 text-xs">המנוע פועל ברקע — חזור מאוחר יותר</p>
       </div>
     )
   }
 
   return (
-    <div className="mt-10">
-      <p className="section-label mb-4">
-        <span className="text-well-500">✦</span> הדהודים שנמצאו ({matches.length})
-      </p>
+    <div className="mt-10 space-y-3">
+      {/* Section header */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="h-px flex-1 bg-sand-200" />
+        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-well-50 border border-well-200">
+          <span className="text-well-600 text-sm">✦</span>
+          <span className="text-xs font-semibold text-well-700">הדהודים שנמצאו</span>
+          <span className="text-xs font-bold text-well-800 bg-well-100 px-2 py-0.5 rounded-full">
+            {matches.length}
+          </span>
+        </div>
+        <div className="h-px flex-1 bg-sand-200" />
+      </div>
 
-      <div className="space-y-4">
-        {matches.map((match) => (
-          <div key={match.connection_id} className="card p-5">
-            {/* Header row: type badge + score */}
-            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-              <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${matchTypeBg[match.match_type]}`}>
-                {matchTypeLabel[match.match_type]}
-              </span>
-              <span className="text-xs text-sand-400">
-                ציון התאמה: <strong className="text-well-700">{Math.round(match.match_score * 100)}%</strong>
+      {matches.map((match) => (
+        <div key={match.connection_id} className="card p-6 space-y-4">
+          {/* Header: type + score */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${matchTypeBg[match.match_type]}`}>
+              {matchTypeLabel[match.match_type]}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-sand-400">ציון התאמה</span>
+              <span
+                className="text-sm font-bold px-2.5 py-0.5 rounded-full"
+                style={{
+                  background: 'linear-gradient(135deg, #edf5f8, #d3e8f0)',
+                  color: '#154963',
+                }}
+              >
+                {Math.round(match.match_score * 100)}%
               </span>
             </div>
+          </div>
 
-            {/* Explanation text (AI-generated short_reason) */}
-            {match.explanation_text ? (
-              <p className="text-sm text-well-600 italic mb-3">{match.explanation_text}</p>
-            ) : (
-              <p className="text-sm text-well-600 mb-3">{match.match_summary}</p>
-            )}
+          {/* Explanation */}
+          {(match.explanation_text || match.match_summary) && (
+            <p className="text-sm text-well-600 italic leading-relaxed">
+              {match.explanation_text ?? match.match_summary}
+            </p>
+          )}
 
-            {/* Matched wish text */}
-            {match.matched_wish_text && (
-              <blockquote className="bg-sand-50 border border-sand-200 rounded-xl px-4 py-3 text-sm text-well-700 leading-relaxed mb-3">
-                <p className="section-label text-xs mb-1.5">המשאלה התואמת</p>
+          {/* Matched wish text */}
+          {match.matched_wish_text && (
+            <div className="bg-sand-50 border border-sand-200 rounded-xl px-5 py-4">
+              <p className="section-label text-xs mb-2">המשאלה התואמת</p>
+              <p className="text-sm text-well-700 leading-relaxed">
                 {match.matched_wish_text.length > 280
                   ? match.matched_wish_text.slice(0, 280) + '…'
                   : match.matched_wish_text}
-              </blockquote>
-            )}
+              </p>
+            </div>
+          )}
 
-            {/* Shared themes */}
-            {match.shared_themes.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-4">
-                {match.shared_themes.map((theme) => (
-                  <span key={theme} className="tag-badge text-xs">{theme}</span>
-                ))}
-              </div>
-            )}
+          {/* Shared themes */}
+          {match.shared_themes.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {match.shared_themes.map((theme) => (
+                <span key={theme} className="tag-badge text-xs">{theme}</span>
+              ))}
+            </div>
+          )}
 
-            {/* Contact info */}
-            {match.contact && (match.contact.name || match.contact.email || match.contact.phone) && (
-              <div className="bg-well-50 border border-well-200 rounded-xl p-4 text-sm">
-                <p className="section-label mb-2">פרטי מבקש המשאלה</p>
-                {match.contact.name && (
-                  <p className="text-well-800 font-medium">{match.contact.name}</p>
-                )}
-                {match.contact.email && (
-                  <p className="text-well-700" dir="ltr">
-                    <a href={`mailto:${match.contact.email}`} className="underline hover:no-underline">
-                      {match.contact.email}
-                    </a>
-                  </p>
-                )}
-                {match.contact.phone && (
-                  <p className="text-well-700" dir="ltr">{match.contact.phone}</p>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+          {/* Contact info */}
+          {match.contact && (match.contact.name || match.contact.email || match.contact.phone) && (
+            <div
+              className="rounded-xl p-5 space-y-2"
+              style={{ background: 'linear-gradient(145deg, #edf5f8, #d3e8f0)' }}
+            >
+              <p className="section-label mb-3">פרטי מבקש המשאלה</p>
+              {match.contact.name && (
+                <p className="text-well-800 font-semibold text-sm">{match.contact.name}</p>
+              )}
+              {match.contact.email && (
+                <p className="text-sm" dir="ltr">
+                  <a
+                    href={`mailto:${match.contact.email}?subject=שיתוף פעולה — באר המשאלות`}
+                    className="text-well-700 underline underline-offset-2 hover:text-well-500 font-medium"
+                  >
+                    {match.contact.email}
+                  </a>
+                </p>
+              )}
+              {match.contact.phone && (
+                <p className="text-well-700 text-sm font-medium" dir="ltr">{match.contact.phone}</p>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   )
 }

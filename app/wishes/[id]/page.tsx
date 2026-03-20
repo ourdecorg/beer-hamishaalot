@@ -73,16 +73,19 @@ export default async function WishPage({ params }: Props) {
         </div>
 
         {/* Original Text */}
-        <div className="card p-8 mb-6">
+        <div className="card-featured p-10 mb-8">
           <p className="section-label mb-4">המשאלה המקורית</p>
-          <p className="text-well-800 text-xl leading-relaxed whitespace-pre-wrap">
+          <p
+            className="text-well-800 text-xl leading-relaxed whitespace-pre-wrap"
+            style={{ fontFamily: 'var(--font-frank-ruhl)' }}
+          >
             {wish.original_text}
           </p>
         </div>
 
         {/* Contact info */}
         {wish.contact_name && (
-          <div className="card p-6 mt-6">
+          <div className="card p-6 mt-6" style={{ background: 'linear-gradient(145deg, #edf5f8, #f5f9fb)' }}>
             <p className="section-label mb-4">
               <span className="text-well-500">◎</span> פרטי קשר
             </p>
@@ -121,8 +124,11 @@ export default async function WishPage({ params }: Props) {
 
         {/* Resonance */}
         {canResonate && (
-          <div className="mt-8 card p-6 text-center">
-            <p className="text-well-600 mb-4 text-sm">
+          <div
+            className="mt-8 card p-8 text-center"
+            style={{ background: 'linear-gradient(145deg, #fdfaf5, #f9f3e7)' }}
+          >
+            <p className="text-well-600 mb-4 text-sm font-medium">
               משאלה זו נוגעת בך?
             </p>
             <ResonanceButton

@@ -15,21 +15,19 @@ const FALLBACK_WISHES: PreviewWish[] = [
 
 function WishPreviewCard({ text }: { text: string }) {
   return (
-    <div className="card p-6 flex flex-col gap-3">
-      <p className="text-well-800 leading-relaxed text-sm line-clamp-4">{text}</p>
+    <div className="card-hover p-6 flex flex-col gap-3 cursor-default">
+      <div className="w-6 h-0.5 bg-amber-400 rounded-full" />
+      <p className="text-well-800 leading-relaxed text-sm">{text}</p>
     </div>
   )
 }
 
 export default async function HomePage() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   const adminEmail = process.env.ADMIN_EMAIL
   const isAdmin = !!(user && adminEmail && user.email === adminEmail)
 
-  // Fetch top public wishes for preview — fall back to static examples
   let previewWishes: PreviewWish[] = FALLBACK_WISHES
   try {
     const { data } = await supabase
@@ -48,85 +46,120 @@ export default async function HomePage() {
       <Header />
 
       <main className="flex-1">
-        {/* ── Hero ─────────────────────────────────────────── */}
-        <section className="relative overflow-hidden py-20 sm:py-32 px-4">
+
+        {/* ── Hero ──────────────────────────────────────── */}
+        <section className="relative overflow-hidden pt-20 pb-28 sm:pt-32 sm:pb-40 px-4">
+          {/* Atmospheric background */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              background:
-                'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(42,120,153,0.08) 0%, transparent 70%)',
+              background: [
+                'radial-gradient(ellipse 70% 50% at 50% -5%, rgba(21,73,99,0.12) 0%, transparent 60%)',
+                'radial-gradient(ellipse 40% 30% at 80% 80%, rgba(201,155,85,0.06) 0%, transparent 50%)',
+              ].join(', '),
             }}
           />
 
-          <div className="max-w-3xl mx-auto text-center relative">
+          <div className="max-w-4xl mx-auto text-center relative">
             {/* Well illustration */}
-            <div className="relative mx-auto mb-10 w-32 h-32 flex items-center justify-center">
+            <div className="relative mx-auto mb-12 w-40 h-40 flex items-center justify-center">
+              {/* Ripple rings */}
+              {[0, 1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="absolute rounded-full border border-well-400/20"
+                  style={{
+                    width: `${80 + i * 36}px`,
+                    height: `${80 + i * 36}px`,
+                    animation: `ripple 4s ease-out ${i * 0.9}s infinite`,
+                  }}
+                />
+              ))}
+              {/* Core */}
               <div
-                className="absolute rounded-full border-2 border-well-300/40 w-32 h-32"
-                style={{ animation: 'ripple 3s ease-out infinite' }}
-              />
-              <div
-                className="absolute rounded-full border-2 border-well-300/30 w-32 h-32"
-                style={{ animation: 'ripple 3s ease-out infinite', animationDelay: '1s' }}
-              />
-              <div
-                className="absolute rounded-full border-2 border-well-300/20 w-32 h-32"
-                style={{ animation: 'ripple 3s ease-out infinite', animationDelay: '2s' }}
-              />
-              <div className="relative z-10 w-20 h-20 rounded-full bg-gradient-to-br from-well-700 to-well-900 shadow-lg flex items-center justify-center">
-                <span className="text-3xl text-amber-300" style={{ animation: 'float 3s ease-in-out infinite' }}>
+                className="relative z-10 w-20 h-20 rounded-full flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(145deg, #1c5f7a 0%, #0b2d41 100%)',
+                  boxShadow: '0 8px 32px rgba(21,73,99,0.35), 0 0 0 1px rgba(255,255,255,0.1) inset',
+                }}
+              >
+                <span
+                  className="text-3xl text-amber-300"
+                  style={{ animation: 'float 3.5s ease-in-out infinite' }}
+                >
                   ✦
                 </span>
               </div>
             </div>
 
-            <p className="section-label mb-4">באר המשאלות</p>
+            <p className="section-label mb-5 tracking-[0.2em]">באר המשאלות</p>
 
             <h1
-              className="text-4xl sm:text-6xl font-black text-well-900 mb-6 leading-tight"
+              className="text-5xl sm:text-7xl font-black text-well-900 mb-7 leading-tight"
               style={{ fontFamily: 'var(--font-frank-ruhl)' }}
             >
               שתף משאלה שבלב —
               <br />
-              ומצא את מי שיכול לעזור
+              <span className="text-well-600">ומצא את מי שיכול לעזור</span>
             </h1>
 
-            <p className="text-lg sm:text-xl text-well-600 leading-relaxed mb-10 max-w-2xl mx-auto">
-              פלטפורמה לחיבור בין אנשים על בסיס משאלות. ה-AI מנתח כל משאלה ומוצא התאמות — אנשים שיכולים לסייע, לשתף פעולה, או להצטרף אליך.
+            <p className="text-lg sm:text-xl text-well-600 leading-relaxed mb-12 max-w-2xl mx-auto">
+              פלטפורמה לחיבור בין אנשים על בסיס משאלות. ה-AI מנתח כל משאלה ומוצא התאמות —
+              אנשים שיכולים לסייע, לשתף פעולה, או להצטרף אליך.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-4">
-              <Link href="/wishes/new" className="btn-primary text-lg px-8 py-4">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Link href={user ? '/wishes/new' : '/login'} className="btn-amber text-base">
                 <span>✦</span>
                 <span>כתוב את משאלתך</span>
               </Link>
+              {user && (
+                <Link href="/wishes/my" className="btn-secondary text-base">
+                  <span>המשאלות שלי</span>
+                  <span>←</span>
+                </Link>
+              )}
             </div>
 
-            <p className="text-sm text-sand-400">
-              בחינם · ללא מחויבות
-            </p>
+            <p className="text-sm text-sand-400 mt-6">בחינם · ללא מחויבות</p>
           </div>
         </section>
 
-        {/* ── How it works ─────────────────────────────────── */}
-        <section className="py-20 px-4 bg-white/50">
+        {/* ── How it works ──────────────────────────────── */}
+        <section className="py-24 px-4 bg-white/70">
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-12">
+            <div className="text-center mb-16">
               <p className="section-label mb-3">איך זה עובד</p>
               <h2
                 className="text-3xl sm:text-4xl text-well-900"
                 style={{ fontFamily: 'var(--font-frank-ruhl)' }}
               >
-                שלושה צעדים
+                שלושה צעדים לחיבור
               </h2>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 relative">
+              {/* Connector lines — desktop only */}
+              <div className="hidden sm:block absolute top-10 right-[33%] left-[33%] h-px bg-gradient-to-l from-sand-300 via-sand-200 to-sand-300 pointer-events-none" />
+
               {steps.map((step, i) => (
-                <div key={i} className="card p-8 text-center fade-in">
-                  <div className="text-4xl mb-4">{step.emoji}</div>
+                <div key={i} className="card-featured p-8 text-center relative fade-in" style={{ animationDelay: `${i * 0.1}s` }}>
+                  <div className="flex justify-center mb-5">
+                    <div
+                      className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl"
+                      style={{
+                        background: 'linear-gradient(145deg, #edf5f8 0%, #d3e8f0 100%)',
+                        boxShadow: '0 2px 8px rgba(21,73,99,0.12)',
+                      }}
+                    >
+                      {step.emoji}
+                    </div>
+                  </div>
+                  <div className="absolute top-5 left-5 w-6 h-6 rounded-full bg-well-700 text-white text-xs font-bold flex items-center justify-center">
+                    {i + 1}
+                  </div>
                   <h3
-                    className="text-xl font-bold text-well-800 mb-3"
+                    className="text-lg font-bold text-well-800 mb-3"
                     style={{ fontFamily: 'var(--font-frank-ruhl)' }}
                   >
                     {step.title}
@@ -138,23 +171,31 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* ── What you get ─────────────────────────────────── */}
-        <section className="py-20 px-4">
+        {/* ── What you get ──────────────────────────────── */}
+        <section className="py-24 px-4">
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-12">
+            <div className="text-center mb-16">
               <p className="section-label mb-3">מה מקבלים</p>
               <h2
                 className="text-3xl sm:text-4xl text-well-900"
                 style={{ fontFamily: 'var(--font-frank-ruhl)' }}
               >
-                מה מקבלים
+                יותר ממקום לשמור משאלות
               </h2>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               {outcomes.map((o, i) => (
-                <div key={i} className="card p-8 text-center hover:shadow-md transition-shadow">
-                  <div className="text-4xl mb-4">{o.icon}</div>
+                <div key={i} className="card-hover p-8 text-center">
+                  <div
+                    className="mx-auto mb-5 w-14 h-14 rounded-2xl flex items-center justify-center text-2xl"
+                    style={{
+                      background: o.bg,
+                      boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
+                    }}
+                  >
+                    {o.icon}
+                  </div>
                   <h3
                     className="text-lg font-bold text-well-800 mb-3"
                     style={{ fontFamily: 'var(--font-frank-ruhl)' }}
@@ -168,10 +209,10 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* ── Features ─────────────────────────────────────── */}
-        <section className="py-20 px-4 bg-white/50">
+        {/* ── Features ──────────────────────────────────── */}
+        <section className="py-24 px-4 bg-white/70">
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-12">
+            <div className="text-center mb-16">
               <p className="section-label mb-3">מה מיוחד כאן</p>
               <h2
                 className="text-3xl sm:text-4xl text-well-900"
@@ -181,16 +222,21 @@ export default async function HomePage() {
               </h2>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               {features.map((f, i) => (
-                <div
-                  key={i}
-                  className="card p-8 flex gap-5 items-start hover:shadow-md transition-shadow"
-                >
-                  <div className="text-3xl flex-shrink-0">{f.icon}</div>
+                <div key={i} className="card-hover p-7 flex gap-5 items-start">
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                    style={{
+                      background: f.bg,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    }}
+                  >
+                    {f.icon}
+                  </div>
                   <div>
                     <h3
-                      className="text-lg font-bold text-well-800 mb-2"
+                      className="text-base font-bold text-well-800 mb-2"
                       style={{ fontFamily: 'var(--font-frank-ruhl)' }}
                     >
                       {f.title}
@@ -203,8 +249,8 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* ── Public well preview ───────────────────────────── */}
-        <section className="py-20 px-4">
+        {/* ── Well preview ──────────────────────────────── */}
+        <section className="py-24 px-4">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-12">
               <p className="section-label mb-3">הצצה לבאר</p>
@@ -214,48 +260,46 @@ export default async function HomePage() {
               >
                 מה כבר נמצא כאן
               </h2>
-              <p className="text-well-500 mt-3 text-sm">
-                משאלות אמיתיות מהבאר
-              </p>
+              <p className="text-well-500 mt-3 text-sm">משאלות אמיתיות מהבאר</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-10">
               {previewWishes.map((w, i) => (
-                <WishPreviewCard
-                  key={i}
-                  text={w.original_text}
-                />
+                <WishPreviewCard key={i} text={w.original_text} />
               ))}
             </div>
-
           </div>
         </section>
 
-        {/* ── CTA ──────────────────────────────────────────── */}
-        <section className="py-20 px-4">
+        {/* ── CTA ───────────────────────────────────────── */}
+        <section className="py-24 px-4">
           <div className="max-w-2xl mx-auto text-center">
             <div
-              className="rounded-3xl p-12 text-white relative overflow-hidden"
+              className="rounded-3xl p-14 text-white relative overflow-hidden"
               style={{
-                background: 'linear-gradient(135deg, #154963 0%, #0b2d41 100%)',
+                background: 'linear-gradient(145deg, #154963 0%, #0b2d41 100%)',
+                boxShadow: '0 20px 60px rgba(11,45,65,0.3), 0 0 0 1px rgba(255,255,255,0.06) inset',
               }}
             >
-              <div className="absolute top-6 left-8 text-amber-300/40 text-4xl select-none">✦</div>
-              <div className="absolute bottom-8 right-10 text-amber-300/20 text-6xl select-none">✦</div>
+              {/* Decorative stars */}
+              <div className="absolute top-8 left-10 text-amber-300/30 text-5xl select-none pointer-events-none">✦</div>
+              <div className="absolute bottom-10 right-12 text-amber-300/15 text-7xl select-none pointer-events-none">✦</div>
+              <div className="absolute top-1/2 left-6 text-amber-300/10 text-3xl select-none pointer-events-none">✦</div>
 
+              <p className="section-label text-well-400 mb-4 relative z-10">הצטרף לבאר</p>
               <h2
-                className="text-3xl sm:text-4xl font-bold mb-4 relative z-10"
+                className="text-3xl sm:text-5xl font-bold mb-5 relative z-10 leading-tight"
                 style={{ fontFamily: 'var(--font-frank-ruhl)' }}
               >
                 מוכן לשלח את משאלתך?
               </h2>
-              <p className="text-well-200 mb-8 text-lg relative z-10">
-                המנוע ממתין. הבאר פתוחה.
+              <p className="text-well-300 mb-10 text-base leading-relaxed relative z-10 max-w-md mx-auto">
+                המנוע ממתין. הבאר פתוחה. אולי מישהו שם בחוץ מחכה בדיוק למשאלה שלך.
               </p>
-              <div className="flex gap-4 justify-center relative z-10">
+              <div className="flex gap-4 justify-center relative z-10 flex-wrap">
                 <Link
                   href={user ? '/wishes/new' : '/login'}
-                  className="inline-flex items-center gap-2 px-8 py-4 bg-amber-400 hover:bg-amber-300 text-well-900 font-bold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
+                  className="btn-amber"
                 >
                   <span>✦</span>
                   <span>שלח משאלה</span>
@@ -264,13 +308,14 @@ export default async function HomePage() {
             </div>
           </div>
         </section>
+
       </main>
 
       {isAdmin && (
-        <div className="text-center py-4">
+        <div className="text-center py-4 border-t border-sand-200">
           <Link
             href="/admin/test-data"
-            className="text-xs text-well-400 hover:text-well-600 underline underline-offset-2"
+            className="text-xs text-sand-400 hover:text-well-600 underline underline-offset-2 transition-colors"
           >
             ניהול — טעינת נתוני בדיקה
           </Link>
@@ -303,16 +348,19 @@ const steps = [
 const outcomes = [
   {
     icon: '🎯',
+    bg: 'linear-gradient(145deg, #fff7ed, #fef3c7)',
     title: 'התאמות מדויקות',
     desc: 'המנוע מנתח נושא, צרכים, יכולות, מיקום וזמינות — ומחבר בין משאלות שיכולות באמת להיפגש.',
   },
   {
     icon: '🤝',
+    bg: 'linear-gradient(145deg, #edf5f8, #d3e8f0)',
     title: 'חיבור ישיר',
     desc: 'כשנמצאת התאמה, פרטי הקשר של שני הצדדים מוצגים — ניתן ליצור קשר מיידית.',
   },
   {
     icon: '💫',
+    bg: 'linear-gradient(145deg, #fdfaf5, #f9f3e7)',
     title: 'הדהוד קהילתי',
     desc: 'כשמשאלתך נוגעת למישהו, הם יכולים להדהד — ולהראות לך שאתה לא לבד.',
   },
@@ -321,21 +369,25 @@ const outcomes = [
 const features = [
   {
     icon: '🎯',
+    bg: 'linear-gradient(145deg, #fff7ed, #fef3c7)',
     title: 'התאמות חכמות',
     desc: 'המנוע מזהה משאלות דומות ומשלימות — בין אם מישהו מחפש בדיוק מה שיש לך לתת, ובין אם חולקים אתך אותה שאיפה.',
   },
   {
     icon: '📍',
+    bg: 'linear-gradient(145deg, #edf5f8, #d3e8f0)',
     title: 'מודע למיקום ולזמן',
     desc: 'אם ציינת מיקום או טווח זמן, המנוע מוודא שהמשאלות שמופגשות רלוונטיות גם גיאוגרפית וגם לוח-זמנית.',
   },
   {
     icon: '✨',
+    bg: 'linear-gradient(145deg, #fdfaf5, #f2e5cd)',
     title: 'AI שמבין הקשר',
     desc: 'הניתוח מזהה את תחום העניין, הכוונה וסוג האובייקט — כדי להימנע מחיבורים מוטעים בין נושאים שונים.',
   },
   {
     icon: '📬',
+    bg: 'linear-gradient(145deg, #edf5f8, #a9d2e2)',
     title: 'יצירת קשר ישירה',
     desc: 'כל משאלה כוללת פרטי קשר. כשנמצאת התאמה — אפשר לפנות ישירות, ללא מתווכים.',
   },

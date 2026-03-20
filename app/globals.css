@@ -12,10 +12,12 @@
     @apply bg-sand-50 text-well-900 antialiased;
     font-family: var(--font-heebo), system-ui, sans-serif;
     min-height: 100dvh;
+    background-image: radial-gradient(ellipse 100% 40% at 50% 0%, rgba(21,73,99,0.07) 0%, transparent 70%);
   }
 
-  h1, h2, h3 {
+  h1, h2, h3, h4 {
     font-family: var(--font-frank-ruhl), Georgia, serif;
+    line-height: 1.2;
   }
 
   ::selection {
@@ -23,52 +25,111 @@
   }
 
   :focus-visible {
-    @apply outline-2 outline-well-400 outline-offset-2;
+    @apply outline-2 outline-well-400 outline-offset-2 rounded-md;
   }
 }
 
 @layer components {
+
+  /* ── Cards ──────────────────────────────── */
+
   .card {
-    @apply bg-white/80 backdrop-blur-sm rounded-2xl border border-sand-200 shadow-sm;
+    @apply bg-white/90 backdrop-blur-sm rounded-2xl border border-sand-200 shadow-sm;
   }
 
+  .card-hover {
+    @apply bg-white/90 backdrop-blur-sm rounded-2xl border border-sand-200 shadow-sm
+           transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 hover:border-sand-300;
+  }
+
+  .card-featured {
+    @apply bg-white rounded-3xl border border-sand-200 shadow-md;
+  }
+
+  .card-glass {
+    @apply bg-white/50 backdrop-blur-md rounded-2xl border border-white/70 shadow-lg;
+  }
+
+  /* ── Buttons ────────────────────────────── */
+
   .btn-primary {
-    @apply inline-flex items-center gap-2 px-6 py-3 bg-well-700 hover:bg-well-800
-           text-white font-medium rounded-xl transition-all duration-200
-           shadow-md hover:shadow-lg active:scale-95;
+    @apply inline-flex items-center gap-2 px-6 py-3
+           bg-well-700 hover:bg-well-600
+           text-white font-medium rounded-xl
+           transition-all duration-200
+           shadow-md hover:shadow-lg
+           active:scale-95;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center gap-2 px-6 py-3 bg-sand-100 hover:bg-sand-200
-           text-well-800 font-medium rounded-xl transition-all duration-200 border border-sand-300
+    @apply inline-flex items-center gap-2 px-6 py-3
+           bg-white hover:bg-sand-50
+           text-well-800 font-medium rounded-xl
+           transition-all duration-200
+           border border-sand-300 hover:border-sand-400
+           shadow-sm hover:shadow-md
            active:scale-95;
   }
 
   .btn-ghost {
-    @apply inline-flex items-center gap-2 px-4 py-2 hover:bg-sand-100
-           text-well-700 font-medium rounded-lg transition-all duration-200;
-  }
-
-  .input-base {
-    @apply w-full px-4 py-3 rounded-xl border border-sand-300 bg-white/70
-           text-well-900 placeholder:text-sand-400
-           focus:outline-none focus:ring-2 focus:ring-well-400 focus:border-transparent
+    @apply inline-flex items-center gap-2 px-4 py-2
+           hover:bg-sand-100
+           text-well-700 font-medium rounded-lg
            transition-all duration-200;
   }
 
+  .btn-amber {
+    @apply inline-flex items-center gap-2 px-7 py-4
+           bg-amber-400 hover:bg-amber-300
+           text-well-900 font-bold rounded-xl
+           transition-all duration-200
+           shadow-lg shadow-amber-400/30 hover:shadow-xl hover:shadow-amber-300/40
+           active:scale-95;
+  }
+
+  /* ── Inputs ─────────────────────────────── */
+
+  .input-base {
+    @apply w-full px-4 py-3 rounded-xl
+           border border-sand-300 bg-white/80
+           text-well-900 placeholder:text-sand-400
+           focus:outline-none focus:ring-2 focus:ring-well-400/40 focus:border-well-400
+           transition-all duration-200;
+  }
+
+  /* ── Badges ─────────────────────────────── */
+
   .tag-badge {
-    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+    @apply inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium
            bg-sand-100 text-well-700 border border-sand-200;
   }
 
+  .tag-badge-well {
+    @apply inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium
+           bg-well-50 text-well-700 border border-well-200;
+  }
+
+  /* ── Labels ─────────────────────────────── */
+
   .section-label {
     @apply text-xs font-semibold uppercase tracking-widest text-sand-500;
+  }
+
+  /* ── Step number (homepage) ─────────────── */
+
+  .step-number {
+    @apply w-10 h-10 rounded-full bg-well-700 text-white text-base font-bold
+           flex items-center justify-center flex-shrink-0 shadow-md;
   }
 }
 
 @layer utilities {
   .fade-in {
-    animation: fadeIn 0.4s ease-out;
+    animation: fadeIn 0.5s ease-out both;
+  }
+
+  .fade-in-up {
+    animation: fadeInUp 0.6s ease-out both;
   }
 
   @keyframes fadeIn {
@@ -76,13 +137,23 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
   @keyframes ripple {
-    0%   { transform: scale(1); opacity: 0.6; }
-    100% { transform: scale(1.8); opacity: 0; }
+    0%   { transform: scale(1); opacity: 0.5; }
+    100% { transform: scale(2.2); opacity: 0; }
   }
 
   @keyframes float {
     0%, 100% { transform: translateY(0px); }
-    50%       { transform: translateY(-8px); }
+    50%       { transform: translateY(-10px); }
+  }
+
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
   }
 }
