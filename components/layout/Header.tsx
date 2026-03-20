@@ -59,27 +59,10 @@ export default function Header() {
 
         {/* Nav */}
         <nav className="flex items-center gap-1 sm:gap-2">
-          <Link
-            href="/wishes/feed"
-            className={`btn-ghost text-sm ${
-              pathname === '/wishes/feed' ? 'text-well-900 bg-sand-100' : ''
-            }`}
-          >
-            הבאר
-          </Link>
-
           {!loading && (
             <>
               {user ? (
                 <>
-                  <Link
-                    href="/collaborations"
-                    className={`btn-ghost text-sm ${
-                      pathname === '/collaborations' ? 'text-well-900 bg-sand-100' : ''
-                    }`}
-                  >
-                    שיתופי פעולה
-                  </Link>
                   <Link
                     href="/wishes/my"
                     className={`btn-ghost text-sm ${

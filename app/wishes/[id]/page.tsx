@@ -79,16 +79,6 @@ export default async function WishPage({ params }: Props) {
       <Header />
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-12 fade-in">
-        {/* Breadcrumb */}
-        <div className="mb-8">
-          <Link
-            href="/wishes/feed"
-            className="text-sm text-sand-400 hover:text-well-600 transition-colors inline-flex items-center gap-1"
-          >
-            → חזרה לבאר
-          </Link>
-        </div>
-
         {/* Wish Header */}
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
           <p className="section-label">{formattedDate}</p>

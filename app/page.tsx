@@ -101,10 +101,6 @@ export default async function HomePage() {
                 <span>✦</span>
                 <span>כתוב את משאלתך</span>
               </Link>
-              <Link href="/wishes/feed" className="btn-secondary text-lg px-8 py-4">
-                <span>צפה במשאלות ציבוריות</span>
-                <span>→</span>
-              </Link>
             </div>
 
             <p className="text-sm text-sand-400">
@@ -233,12 +229,6 @@ export default async function HomePage() {
               ))}
             </div>
 
-            <div className="text-center">
-              <Link href="/wishes/feed" className="btn-secondary px-6 py-3">
-                <span>לכל המשאלות</span>
-                <span>→</span>
-              </Link>
-            </div>
           </div>
         </section>
 
@@ -270,9 +260,6 @@ export default async function HomePage() {
                 >
                   <span>✦</span>
                   <span>שלח משאלה</span>
-                </Link>
-                <Link href="/wishes/feed" className="btn-ghost text-well-200 hover:bg-well-800">
-                  צפה בבאר
                 </Link>
               </div>
             </div>

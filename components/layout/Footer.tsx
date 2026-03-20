@@ -12,9 +12,6 @@ export default function Footer() {
         </div>
 
         <div className="flex items-center gap-6">
-          <Link href="/wishes/feed" className="hover:text-well-600 transition-colors">
-            הבאר
-          </Link>
           <Link href="/wishes/new" className="hover:text-well-600 transition-colors">
             שלח משאלה
           </Link>
