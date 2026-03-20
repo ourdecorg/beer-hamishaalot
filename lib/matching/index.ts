@@ -20,6 +20,7 @@ import { computeIntentCompatibility } from './intent'
 import { computeObjectAlignment } from './objectAlignment'
 import { computeDomainMatch } from './domain'
 import { computeMatchScore, computeFreshness, buildExplanation, MATCH_THRESHOLD } from './score'
+import { haversineKm, MAX_DISTANCE_KM } from './geo'
 import type { WishEnrichment } from '@/lib/types'
 
 /**
@@ -96,6 +97,8 @@ export async function processWishForMatching(
       match_score: number
       match_type: string | null
       passed_threshold: boolean
+      distance_km: number | null
+      failed_distance: boolean
     }> = []
 
     for (const candidate of candidates) {
@@ -116,22 +119,37 @@ export async function processWishForMatching(
       const score = computeMatchScore(candidate.similarity, complementarity, objectAlignment.score, intentCompat, freshness, domainMatch, objectAlignment.relation)
       const passed = score.match_score >= MATCH_THRESHOLD
 
-      logEntries.push({
-        wish_id: wishId,
-        candidate_wish_id: candidate.wish_id,
-        semantic_similarity:   Math.round(candidate.similarity     * 1000) / 1000,
-        complementarity_score: Math.round(complementarity.score    * 1000) / 1000,
-        theme_overlap:         Math.round(complementarity.themeOverlap * 1000) / 1000,
-        intent_compatibility:  Math.round(intentCompat               * 1000) / 1000,
-        freshness_factor:      Math.round(freshness                  * 1000) / 1000,
-        object_alignment:      Math.round(objectAlignment.score      * 1000) / 1000,
-        domain_match:          Math.round(domainMatch                * 1000) / 1000,
-        match_score:           Math.round(score.match_score        * 1000) / 1000,
-        match_type: passed ? score.match_type : null,
-        passed_threshold: passed,
-      })
+      // Distance filter — only when both wishes have location coordinates
+      let distance_km: number | null = null
+      let failed_distance = false
+      const aLat = enrichment.location_lat, aLng = enrichment.location_lng
+      const bLat = candidateEnrichment.location_lat, bLng = candidateEnrichment.location_lng
+      if (aLat != null && aLng != null && bLat != null && bLng != null) {
+        distance_km = Math.round(haversineKm(aLat, aLng, bLat, bLng) * 10) / 10
+        if (distance_km > MAX_DISTANCE_KM) failed_distance = true
+      }
 
-      if (!passed) continue
+      const shouldLog = passed || failed_distance
+      if (shouldLog) {
+        logEntries.push({
+          wish_id: wishId,
+          candidate_wish_id: candidate.wish_id,
+          semantic_similarity:   Math.round(candidate.similarity        * 1000) / 1000,
+          complementarity_score: Math.round(complementarity.score       * 1000) / 1000,
+          theme_overlap:         Math.round(complementarity.themeOverlap * 1000) / 1000,
+          intent_compatibility:  Math.round(intentCompat                * 1000) / 1000,
+          freshness_factor:      Math.round(freshness                   * 1000) / 1000,
+          object_alignment:      Math.round(objectAlignment.score       * 1000) / 1000,
+          domain_match:          Math.round(domainMatch                 * 1000) / 1000,
+          match_score:           Math.round(score.match_score           * 1000) / 1000,
+          match_type: passed ? score.match_type : null,
+          passed_threshold: passed,
+          distance_km,
+          failed_distance,
+        })
+      }
+
+      if (!passed || failed_distance) continue
 
       const explanation = buildExplanation(
         score,
@@ -154,11 +172,9 @@ export async function processWishForMatching(
       })
     }
 
-    // Write log entries — only passed matches to keep write pressure low.
-    // Failed pairings (vast majority) are intentionally skipped.
-    const passedEntries = logEntries.filter((e) => e.passed_threshold)
-    if (passedEntries.length > 0) {
-      supabase.from('match_attempts_log').insert(passedEntries).then(({ error }) => {
+    // Write log entries — passed matches and distance-rejected entries.
+    if (logEntries.length > 0) {
+      supabase.from('match_attempts_log').insert(logEntries).then(({ error }) => {
         if (error) console.error('[ResonanceEngine] log insert failed:', error.message)
       })
     }
