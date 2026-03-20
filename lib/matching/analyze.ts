@@ -62,6 +62,13 @@ export interface WishAnalysisResult {
   domain_entities: string[]
   // Primary domain (migration 013)
   primary_domain: string | null
+  // Location (migration 016) — null when no place mentioned
+  location_lat: number | null
+  location_lng: number | null
+  location_name: string | null
+  // Date range (migration 016) — null when no time constraint mentioned
+  date_range_start: string | null   // ISO YYYY-MM-DD
+  date_range_end: string | null     // ISO YYYY-MM-DD
 }
 
 /**
@@ -69,6 +76,7 @@ export interface WishAnalysisResult {
  */
 export async function analyzeWishText(wishText: string): Promise<WishAnalysisResult> {
   const model = 'gpt-4o'
+  const today = new Date().toISOString().slice(0, 10)
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     {
       role: 'system',
@@ -80,6 +88,8 @@ export async function analyzeWishText(wishText: string): Promise<WishAnalysisRes
       role: 'user',
       content: `Analyze this wish for collaboration potential:
 "${wishText}"
+
+Today's date: ${today}
 
 Return JSON:
 {
@@ -95,10 +105,12 @@ Return JSON:
   "object_of_need": [],
   "constraints": [],
   "domain_entities": [],
-  "primary_domain": "health_wellness|technology|entrepreneurship|education|arts_culture|community_social|environment|spirituality|family_parenting|sports_recreation|food_lifestyle|finance|personal_development|professional_career|other"
+  "primary_domain": "health_wellness|technology|entrepreneurship|education|arts_culture|community_social|environment|spirituality|family_parenting|sports_recreation|food_lifestyle|finance|personal_development|professional_career|other",
+  "location": {"lat": null, "lng": null, "name": null},
+  "date_range": {"start": null, "end": null}
 }
 
-Rules: themes=5-7 keywords; needs/skills_offered=2-5 items; subject_entities/object_of_need/constraints=1-3 items in original language; domain_entities=2-5 nouns in original language.`,
+Rules: themes=5-7 keywords; needs/skills_offered=2-5 items; subject_entities/object_of_need/constraints=1-3 items in original language; domain_entities=2-5 nouns in original language. location: fill lat/lng/name only if a specific place is mentioned (city/country/venue/neighborhood) — use approximate WGS-84 coordinates; null otherwise. date_range: fill start/end as ISO dates (YYYY-MM-DD) if a time period is mentioned, resolving relative expressions using today's date; null otherwise.`,
     },
   ]
 
@@ -139,6 +151,9 @@ Rules: themes=5-7 keywords; needs/skills_offered=2-5 items; subject_entities/obj
 
   const parsed = JSON.parse(jsonMatch[0])
 
+  const loc = parsed.location ?? {}
+  const dr  = parsed.date_range ?? {}
+
   return {
     themes: Array.isArray(parsed.themes) ? parsed.themes.slice(0, 7) : [],
     intent: parsed.intent ?? '',
@@ -153,6 +168,11 @@ Rules: themes=5-7 keywords; needs/skills_offered=2-5 items; subject_entities/obj
     constraints: Array.isArray(parsed.constraints) ? parsed.constraints.slice(0, 3) : [],
     domain_entities: Array.isArray(parsed.domain_entities) ? parsed.domain_entities.slice(0, 5) : [],
     primary_domain: typeof parsed.primary_domain === 'string' ? parsed.primary_domain : null,
+    location_lat:  typeof loc.lat === 'number' ? loc.lat : null,
+    location_lng:  typeof loc.lng === 'number' ? loc.lng : null,
+    location_name: typeof loc.name === 'string' && loc.name ? loc.name : null,
+    date_range_start: typeof dr.start === 'string' && dr.start ? dr.start : null,
+    date_range_end:   typeof dr.end   === 'string' && dr.end   ? dr.end   : null,
   }
 }
 
@@ -195,6 +215,11 @@ export async function analyzeAndStoreWish(
     constraints: result.constraints,
     domain_entities: result.domain_entities,
     primary_domain: result.primary_domain,
+    location_lat: result.location_lat,
+    location_lng: result.location_lng,
+    location_name: result.location_name,
+    date_range_start: result.date_range_start,
+    date_range_end: result.date_range_end,
   }
 
   const { error } = await supabase

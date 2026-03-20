@@ -87,6 +87,13 @@ export interface WishEnrichment {
   object_of_need?: string[]
   constraints?: string[]
   domain_entities?: string[]
+  // Location (migration 016) — null when no place mentioned.
+  location_lat?: number | null
+  location_lng?: number | null
+  location_name?: string | null
+  // Date range (migration 016) — null when no time constraint mentioned.
+  date_range_start?: string | null   // ISO date YYYY-MM-DD
+  date_range_end?: string | null     // ISO date YYYY-MM-DD
 }
 
 export type ConnectionStatus = 'suggested' | 'accepted_by_a' | 'connected' | 'rejected'
