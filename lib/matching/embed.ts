@@ -133,7 +133,7 @@ export async function generateAndStoreEmbedding(
 
   // Supabase expects the vector as a plain JS array — pgvector handles the cast
   await withDbRetry(
-    () => supabase
+    async () => supabase
       .from('wish_embeddings')
       .upsert(
         { wish_id: wishId, embedding, created_at: new Date().toISOString() },
