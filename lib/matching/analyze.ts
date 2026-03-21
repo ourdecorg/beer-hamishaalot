@@ -147,9 +147,15 @@ Strict interpretation rules:
 - Do NOT infer time unless explicitly mentioned
 - Prefer empty arrays over guessing
 
-location:
-- Fill only if a real place is explicitly mentioned
-- name should be in the original language of the wish
+Location rules (VERY IMPORTANT):
+- If a specific place is explicitly mentioned (city, town, village, neighborhood, country, venue, street+city), you MUST fill:
+  - location.name
+  - location.lat
+  - location.lng
+- Coordinates should be approximate WGS-84 coordinates for the center of the mentioned place.
+- If multiple places are mentioned, choose the main place most relevant to the wish.
+- Use null only if NO explicit place is mentioned at all.
+- Do not leave coordinates null when a clear city/town/place is explicitly written.
 
 date_range:
 - Resolve relative expressions using today's date
