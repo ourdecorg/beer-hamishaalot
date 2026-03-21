@@ -175,14 +175,14 @@ ambiguity_flag:
   try {
     completion = await withRetry(() => getOpenAI().chat.completions.create({
       model,
-      max_completion_tokens: 350,
+      max_completion_tokens: 1024,
       response_format: { type: 'json_object' },
       messages,
     }))
     logOpenAICall({
       caller: 'analyzeWishText',
       model,
-      request: { messages, max_completion_tokens: 350 },
+      request: { messages, max_completion_tokens: 1024 },
       response: {
         content: completion.choices[0]?.message?.content,
         usage: completion.usage,
@@ -193,7 +193,7 @@ ambiguity_flag:
     logOpenAICall({
       caller: 'analyzeWishText',
       model,
-      request: { messages, max_completion_tokens: 350 },
+      request: { messages, max_completion_tokens: 1024 },
       error: (err as { message?: string }).message ?? String(err),
       elapsedMs: Date.now() - t0,
     })
@@ -203,7 +203,10 @@ ambiguity_flag:
   const raw = completion.choices[0]?.message?.content ?? '{}'
   const cleaned = raw.replace(/```json\n?|\n?```/g, '').trim()
   const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) throw new Error('No valid JSON in analysis response')
+  if (!jsonMatch) {
+    console.error('[analyze] raw response (no JSON found):', raw.slice(0, 500))
+    throw new Error('No valid JSON in analysis response')
+  }
 
   const parsed = JSON.parse(jsonMatch[0])
 
