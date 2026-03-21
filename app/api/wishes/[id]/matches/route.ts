@@ -95,9 +95,13 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const sharedThemes = matchedThemes.filter((t) => ownThemes.has(t.toLowerCase().trim()))
 
     const matchSummaryMap: Record<string, string> = {
-      RESONANT: 'הדהוד עמוק — חלומות ויכולות משלימים ברמה גבוהה',
+      strong:        'הדהוד עמוק — חלומות ויכולות משלימים ברמה גבוהה',
+      complementary: 'משלים — אחד מציע מה שהשני צריך',
+      similar:       'דומה — שאיפות וערכים משותפים',
+      // legacy
+      RESONANT:      'הדהוד עמוק — חלומות ויכולות משלימים ברמה גבוהה',
       COMPLEMENTARY: 'משלים — אחד מציע מה שהשני צריך',
-      SIMILAR: 'דומה — שאיפות וערכים משותפים',
+      SIMILAR:       'דומה — שאיפות וערכים משותפים',
     }
 
     const result: MatchResult = {

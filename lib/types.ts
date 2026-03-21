@@ -100,7 +100,7 @@ export interface WishEnrichment {
 }
 
 export type ConnectionStatus = 'suggested' | 'accepted_by_a' | 'connected' | 'rejected'
-export type MatchType = 'SIMILAR' | 'COMPLEMENTARY' | 'RESONANT'
+export type MatchType = 'strong' | 'complementary' | 'similar'
 
 export interface WishConnection {
   id: string

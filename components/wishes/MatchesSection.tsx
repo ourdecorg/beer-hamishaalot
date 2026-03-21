@@ -4,15 +4,15 @@ import { useEffect, useState } from 'react'
 import type { MatchResult, MatchType } from '@/lib/types'
 
 const matchTypeLabel: Record<MatchType, string> = {
-  RESONANT:      '✦ הדהוד',
-  COMPLEMENTARY: '◈ משלים',
-  SIMILAR:       '◎ דומה',
+  strong:        '✦ הדהוד',
+  complementary: '◈ משלים',
+  similar:       '◎ דומה',
 }
 
 const matchTypeBg: Record<MatchType, string> = {
-  RESONANT:      'bg-amber-50 border-amber-200 text-amber-800',
-  COMPLEMENTARY: 'bg-well-50 border-well-200 text-well-800',
-  SIMILAR:       'bg-sand-100 border-sand-200 text-sand-700',
+  strong:        'bg-amber-50 border-amber-200 text-amber-800',
+  complementary: 'bg-well-50 border-well-200 text-well-800',
+  similar:       'bg-sand-100 border-sand-200 text-sand-700',
 }
 
 interface Props {

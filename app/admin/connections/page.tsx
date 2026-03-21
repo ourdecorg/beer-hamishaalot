@@ -94,6 +94,10 @@ function truncate(s: string, n = 90) {
 }
 
 const matchTypeBg: Record<string, string> = {
+  strong:        'bg-amber-100 text-amber-800 border-amber-300',
+  complementary: 'bg-well-100 text-well-800 border-well-300',
+  similar:       'bg-sand-100 text-sand-700 border-sand-300',
+  // legacy values from before v5
   RESONANT:      'bg-amber-100 text-amber-800 border-amber-300',
   COMPLEMENTARY: 'bg-well-100 text-well-800 border-well-300',
   SIMILAR:       'bg-sand-100 text-sand-700 border-sand-300',
