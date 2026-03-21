@@ -250,6 +250,45 @@ final_score = match_score × exp(-distance_km / 50)
 | `complementary` | complementarity > 0.50 |
 | `similar` | כל השאר |
 
+### חישוב Complementarity (`lib/matching/complement.ts`)
+
+ללא קריאת AI — השוואה טהורה של `needs` ↔ `skills_offered`.
+
+**שלב 1 — קנוניזציה:** שני הצדדים עוברים `canonicalize()` — מיפוי מילים נרדפות ("investment"→"funding" וכו').
+
+**שלב 2 — ציון דו-כיווני:**
+```
+aOffersWhatBNeeds = max(jaccard(skillsA, needsB), softOverlap(skillsA, needsB))
+bOffersWhatANeeds = max(jaccard(skillsB, needsA), softOverlap(skillsB, needsA))
+```
+- `jaccard` — חיתוך/איחוד קבוצות (exact match לאחר lowercase+trim)
+- `softOverlap` — token substring match (טוקנים > 3 תווים) לטיפול בהתאמות חלקיות כמו "technical help" ↔ "technical skills"
+
+**שלב 3 — ציון סופי:**
+
+| מצב | נוסחה |
+|-----|-------|
+| פרק↔מבקש טהור (`maxDir > 0.4` ו-`minDir < 0.15`) | `min(1, maxDir × 1.3)` |
+| שניהם תורמים | `min(1, avg(max, min) × 1.2)` |
+
+הגיון: כשרק כיוון אחד חזק זו ההשלמה הטובה ביותר — לכן מתוגמלת ישירות במקום להידלל בממוצע.
+
+### חישוב Intent Compatibility (`lib/matching/intent.ts`)
+
+Lookup בטבלת ציונים סימטרית לפי `collaboration_type` של שתי המשאלות:
+
+| | build | learn | connect | support | share |
+|---|---|---|---|---|---|
+| **build** | 0.60 | 0.35 | 0.40 | 0.40 | 0.30 |
+| **learn** | | 0.40 | 0.35 | **0.85** | 0.50 |
+| **connect** | | | **0.75** | 0.40 | 0.65 |
+| **support** | | | | 0.40 | 0.40 |
+| **share** | | | | | 0.60 |
+
+- `learn ↔ support` = 0.85 — המשלים ביותר (אחד רוצה ללמוד, השני מציע הדרכה)
+- `connect ↔ connect` = 0.75 — שניהם מחפשים קשרים
+- Fallback לערך לא מוכר: 0.40
+
 ### סינונים
 
 | סינון | סוג | תנאי |
