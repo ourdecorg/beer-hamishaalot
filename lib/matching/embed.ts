@@ -92,6 +92,24 @@ export async function generateEmbedding(text: string): Promise<number[]> {
  * Pass enrichment to produce a topic-aware embedding (recommended).
  * Upserts so re-embedding is safe.
  */
+async function withDbRetry<T>(fn: () => Promise<T>, label: string, maxRetries = 3): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const result = await fn()
+    // Supabase returns { error } — if no error, return
+    if (!(result as { error?: { message?: string } }).error) return result
+    const msg = (result as { error?: { message?: string } }).error?.message ?? ''
+    const isTimeout = msg.includes('timeout') || msg.includes('upstream')
+    if (isTimeout && attempt < maxRetries - 1) {
+      const waitMs = 2000 * (attempt + 1)
+      console.warn(`[embed] ${label} timeout — retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries})`)
+      await new Promise((resolve) => setTimeout(resolve, waitMs))
+      continue
+    }
+    throw new Error(`${label}: ${msg}`)
+  }
+  throw new Error(`${label}: max retries exceeded`)
+}
+
 export async function generateAndStoreEmbedding(
   wishId: string,
   wishText: string,
@@ -102,14 +120,15 @@ export async function generateAndStoreEmbedding(
   const embedding = await generateEmbedding(text)
 
   // Supabase expects the vector as a plain JS array — pgvector handles the cast
-  const { error } = await supabase
-    .from('wish_embeddings')
-    .upsert(
-      { wish_id: wishId, embedding, created_at: new Date().toISOString() },
-      { onConflict: 'wish_id' }
-    )
-
-  if (error) throw new Error(`Failed to store embedding: ${error.message}`)
+  await withDbRetry(
+    () => supabase
+      .from('wish_embeddings')
+      .upsert(
+        { wish_id: wishId, embedding, created_at: new Date().toISOString() },
+        { onConflict: 'wish_id' }
+      ),
+    'Failed to store embedding'
+  )
 
   return embedding
 }

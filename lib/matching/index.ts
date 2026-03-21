@@ -180,9 +180,20 @@ export async function processWishForMatching(
 
     // Write log entries — passed matches and distance-rejected entries.
     if (logEntries.length > 0) {
-      supabase.from('match_attempts_log').insert(logEntries).then(({ error }) => {
-        if (error) console.error('[ResonanceEngine] log insert failed:', error.message)
-      })
+      // Insert log entries with retry on timeout — fire-and-forget (no await)
+      ;(async () => {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const { error } = await supabase.from('match_attempts_log').insert(logEntries)
+          if (!error) break
+          const isTimeout = error.message.includes('timeout') || error.message.includes('upstream')
+          if (isTimeout && attempt < 2) {
+            await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)))
+            continue
+          }
+          console.error('[ResonanceEngine] log insert failed:', error.message)
+          break
+        }
+      })()
     }
 
     if (connections.length === 0) return
