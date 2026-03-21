@@ -175,14 +175,14 @@ ambiguity_flag:
   try {
     completion = await withRetry(() => getOpenAI().chat.completions.create({
       model,
-      max_tokens: 350,
+      max_completion_tokens: 350,
       response_format: { type: 'json_object' },
       messages,
     }))
     logOpenAICall({
       caller: 'analyzeWishText',
       model,
-      request: { messages, max_tokens: 350 },
+      request: { messages, max_completion_tokens: 350 },
       response: {
         content: completion.choices[0]?.message?.content,
         usage: completion.usage,
@@ -193,7 +193,7 @@ ambiguity_flag:
     logOpenAICall({
       caller: 'analyzeWishText',
       model,
-      request: { messages, max_tokens: 350 },
+      request: { messages, max_completion_tokens: 350 },
       error: (err as { message?: string }).message ?? String(err),
       elapsedMs: Date.now() - t0,
     })
