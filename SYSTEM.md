@@ -152,9 +152,8 @@ id          uuid PK
 wish_a      uuid FK→wishes (תמיד wish_a < wish_b — UUID lex order)
 wish_b      uuid FK→wishes
 match_score float (0–1)
-match_type  'SIMILAR'|'COMPLEMENTARY'|'RESONANT'
+match_type  'strong'|'complementary'|'similar'
 status      'suggested'|'accepted_by_a'|'connected'|'rejected'
-explanation jsonb
 created_at  timestamptz
 UNIQUE(wish_a, wish_b), CHECK(wish_a < wish_b)
 ```
@@ -164,22 +163,18 @@ UNIQUE(wish_a, wish_b), CHECK(wish_a < wish_b)
 id                    uuid PK
 wish_id               uuid
 candidate_wish_id     uuid
-semantic_similarity   float
-complementarity_score float
-theme_overlap         float
+semantic_similarity   float NOT NULL
+complementarity_score float NOT NULL
+theme_overlap         float NOT NULL  ← תמיד 0 (הוסר מהניקוד, NOT NULL legacy)
 intent_compatibility  float
-freshness_factor      float
-object_alignment      float
-domain_match          numeric(6,3)
-match_score           float
+match_score           float NOT NULL
 match_type            text (null אם לא עבר)
-passed_threshold      boolean
-distance_km           float (null אם אחת חסרת מיקום)
-failed_distance       boolean
-failed_date_range     boolean
+passed_threshold      boolean NOT NULL
 created_at            timestamptz
 ```
-**מה נרשם:** כל ניסיון ללא יוצא מן הכלל
+*עמודות נוספות בטבלה (לא נכתבות יותר):* freshness_factor, object_alignment, domain_match, distance_km, failed_distance, failed_date_range
+
+**מה נרשם:** כל ניסיון שעבר את סינון טווח התאריכים
 
 #### `openai_api_log`
 ```
@@ -217,67 +212,51 @@ UNIQUE(wish_id, user_id)
   └── text-embedding-3-small → vector(1536) → wish_embeddings (upsert, מדלג אם קיים)
 
 שלב 3: findSimilarWishes()
-  └── match_wishes() RPC → HNSW ANN search → candidates (similarity ≥ 0.20)
+  └── match_wishes() RPC → HNSW ANN search → candidates (similarity ≥ 0.30)
   └── onlyLowerId=true בbatch: רק מועמדים עם id < wishId
 
 שלב 4: ניקוד וסינון
-  └── לכל מועמד עם enrichment:
-      ├── computeComplementarity()
-      ├── computeObjectAlignment()
-      ├── computeDomainMatch()
-      ├── computeIntentCompatibility()
-      ├── computeFreshness()
-      ├── computeMatchScore() → match_score
-      ├── [filter] haversineKm() ≤ 30 km (אם לשני יש מיקום)
-      └── [filter] dateRangesOverlap()
+  ├── [filter קשה] dateRangesOverlap() — אם אין חפיפה → דלג
+  ├── אם יש enrichment למועמד:
+  │     ├── computeComplementarity() → complementarity
+  │     └── computeIntentCompatibility() → intent
+  ├── אם אין enrichment → fallback: match_score = semantic_similarity
+  ├── computeMatchScore(semantic, complementarity, intent)
+  └── geo soft penalty: finalScore × exp(-distance_km / 50)
 
 שלב 5: persistance
-  ├── match_attempts_log INSERT (כל הניסיונות)
-  └── wish_connections UPSERT (match_score ≥ 0.5, ignoreDuplicates)
+  ├── match_attempts_log INSERT (כל הניסיונות שעברו date filter)
+  └── wish_connections UPSERT (finalScore ≥ 0.55, ignoreDuplicates)
 ```
 
-### נוסחת הציון (v4)
+### נוסחת הציון (v5)
 
 ```
-match_score = 0.25 × semantic_similarity
-            + 0.20 × complementarity
-            + 0.20 × domain_match
-            + 0.15 × object_alignment
-            + 0.10 × intent_compatibility
-            + 0.07 × theme_overlap
-            + 0.03 × freshness_factor
+match_score = 0.60 × semantic_similarity
+            + 0.25 × complementarity
+            + 0.15 × intent_compatibility
+
+final_score = match_score × exp(-distance_km / 50)
+            (= match_score כשאין מיקום לאחת המשאלות)
 ```
 
-**ציון סף:** ≥ 0.5 ליצירת חיבור · **כניסה לניקוד:** similarity ≥ 0.20
+**ציון סף:** ≥ 0.55 · **כניסה לניקוד:** similarity ≥ 0.30
 
 ### סיווג סוג ההתאמה
 
 | match_type | תנאי |
 |---|---|
-| RESONANT | match_score ≥ 0.80 |
-| COMPLEMENTARY | complementarity > 0.60 OR object_relation = 'complementary_object' |
-| SIMILAR | כל השאר |
+| `strong` | final_score ≥ 0.75 |
+| `complementary` | complementarity > 0.50 |
+| `similar` | כל השאר |
 
-### freshness decay
+### סינונים
 
-| גיל | ציון |
-|-----|------|
-| 0–30 ימים | 1.00 |
-| 31–90 ימים | 0.85 |
-| 91–180 ימים | 0.65 |
-| 180+ ימים | 0.40 |
-
-### primary_domain (15 ערכים)
-
-`health_wellness` · `technology` · `entrepreneurship` · `education` · `arts_culture` · `community_social` · `environment` · `spirituality` · `family_parenting` · `sports_recreation` · `food_lifestyle` · `finance` · `personal_development` · `professional_career` · `other`
-
-### סינונים קשים (hard gates)
-
-| סינון | תנאי |
-|-------|------|
-| מרחק גיאוגרפי | Haversine > 30 ק"מ → דחייה (רק כשלשתיהן יש קואורדינטות) |
-| חפיפת תאריכים | אין חפיפה בין date_range_start/end → דחייה |
-| enrichment חסר | מועמד ללא enrichment → מדולג |
+| סינון | סוג | תנאי |
+|-------|-----|------|
+| טווח תאריכים | קשה (hard) | אין חפיפה → דחייה |
+| מרחק גיאוגרפי | רך (soft) | `final_score × exp(-km/50)` |
+| enrichment חסר | fallback | match_score = semantic_similarity |
 
 ---
 
@@ -465,12 +444,12 @@ ORDER BY embedding <=> query_embedding
 | analyze.ts | `analyzeWishText()`, `analyzeAndStoreWish()` |
 | embed.ts | `buildEmbeddingText()`, `generateEmbedding()`, `generateAndStoreEmbedding()` |
 | similarity.ts | `findSimilarWishes()` |
-| score.ts | `computeMatchScore()`, `computeFreshness()`, `buildExplanation()` |
+| score.ts | `computeMatchScore()` — 3 signals only |
 | complement.ts | `computeComplementarity()` |
 | intent.ts | `computeIntentCompatibility()` |
-| objectAlignment.ts | `computeObjectAlignment()` |
-| domain.ts | `computeDomainMatch()` |
-| geo.ts | `haversineKm()` (MAX=30km) |
+| objectAlignment.ts | `computeObjectAlignment()` — unused in pipeline (kept) |
+| domain.ts | `computeDomainMatch()` — unused in pipeline (kept) |
+| geo.ts | `haversineKm()` — soft penalty exp(-km/50) |
 | timeRange.ts | `dateRangesOverlap()` |
 | canonicalize.ts | `canonicalize()`, `canonicalizeSubjectType()`, `canonicalizeAction()` |
 | openaiLog.ts | `logOpenAICall()` |
