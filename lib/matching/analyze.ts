@@ -78,7 +78,7 @@ export interface WishAnalysisResult {
  * Calls GPT-4o to extract structured enrichment from a wish.
  */
 export async function analyzeWishText(wishText: string): Promise<WishAnalysisResult> {
-  const model = 'gpt-4o'
+  const model = 'gpt-4.1'
   const today = new Date().toISOString().slice(0, 10)
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     {
