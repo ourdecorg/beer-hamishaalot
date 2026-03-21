@@ -232,10 +232,11 @@ UNIQUE(wish_id, user_id)
 ### נוסחת הציון (v6)
 
 ```
-match_score = 0.45 × semantic_similarity
+match_score = 0.35 × semantic_similarity
             + 0.25 × complementarity
             + 0.15 × intent_compatibility
-            + 0.15 × domain_match  (1 אם primary_domain זהה, 0 אחרת)
+            + 0.15 × domain_match    (1 אם primary_domain זהה, 0 אחרת)
+            + 0.15 × anchor_overlap  (0 / 0.5 / 1 — ראה anchor.ts)
 
 final_score = match_score × exp(-distance_km / 50)
             (= match_score כשאין מיקום לאחת המשאלות)

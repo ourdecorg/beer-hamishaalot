@@ -24,6 +24,7 @@ type LogEntry = {
   complementarity_score: number
   intent_compatibility: number | null
   domain_match: number | null
+  anchor_overlap: number | null
   geo_penalty: number | null
   match_score: number
   match_type: string | null
@@ -427,13 +428,14 @@ export default function ConnectionsDebugPage() {
                         </div>
                       )}
 
-                      {/* Score breakdown — v6: 4 signals + geo penalty */}
+                      {/* Score breakdown — v7: 5 signals + geo penalty */}
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         <Pill label="ציון כולל" value={<span className="text-base font-black text-well-700">{pct(log.match_score)}</span>} />
-                        <Pill label="סמנטי (×0.45)" value={pct(log.semantic_similarity)} />
+                        <Pill label="סמנטי (×0.35)" value={pct(log.semantic_similarity)} />
                         <Pill label="משלימות (×0.25)" value={pct(log.complementarity_score)} />
                         <Pill label="כוונה (×0.15)" value={log.intent_compatibility != null ? pct(log.intent_compatibility) : '—'} />
                         <Pill label="תחום (×0.15)" value={log.domain_match != null ? (log.domain_match === 1 ? '✓ זהה' : '✗ שונה') : '—'} />
+                        <Pill label="עוגנים (×0.15)" value={log.anchor_overlap != null ? pct(log.anchor_overlap) : '—'} />
                         <Pill
                           label="עונש מרחק"
                           value={

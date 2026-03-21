@@ -71,6 +71,8 @@ export interface WishAnalysisResult {
   date_range_end: string | null     // ISO YYYY-MM-DD
   // Keywords — verbatim/near-verbatim terms from the wish text in original language
   keywords: string[]
+  // Anchor entities — max 3 concrete nouns useful for matching (original language)
+  anchor_entities: string[]
   // Extraction quality signals
   confidence: number        // 0.0–1.0
   ambiguity_flag: boolean   // true if wish is vague/unclear for matching
@@ -115,6 +117,7 @@ Return JSON:
   "location": {"lat": null, "lng": null, "name": null},
   "date_range": {"start": null, "end": null},
   "keywords": [],
+  "anchor_entities": [],
   "confidence": 0.0,
   "ambiguity_flag": false
 }
@@ -144,6 +147,7 @@ Rules:
 - constraints: only verifiable constraints (location, time, format, budget)
 - domain_entities: 2-5 nouns in original language
 - keywords: 3-8 important terms extracted verbatim or near-verbatim from the wish text (in the original language)
+- anchor_entities: max 3 concrete nouns/short noun phrases explicitly mentioned in the wish that are useful for matching (original language). Only specific, concrete items — no abstract themes, emotions, or broad motivational words. Empty array if none.
 
 Strict interpretation rules:
 - Do NOT infer skills if not stated
@@ -236,7 +240,8 @@ ambiguity_flag:
     location_name: typeof loc.name === 'string' && loc.name ? loc.name : null,
     date_range_start: typeof dr.start === 'string' && dr.start ? dr.start : null,
     date_range_end:   typeof dr.end   === 'string' && dr.end   ? dr.end   : null,
-    keywords:       Array.isArray(parsed.keywords) ? parsed.keywords.slice(0, 8) : [],
+    keywords:         Array.isArray(parsed.keywords)        ? parsed.keywords.slice(0, 8)        : [],
+    anchor_entities:  Array.isArray(parsed.anchor_entities) ? parsed.anchor_entities.slice(0, 3) : [],
     confidence:     typeof parsed.confidence === 'number' ? Math.min(1, Math.max(0, parsed.confidence)) : 0.5,
     ambiguity_flag: parsed.ambiguity_flag === true,
   }
@@ -287,6 +292,7 @@ export async function analyzeAndStoreWish(
     date_range_start: result.date_range_start,
     date_range_end: result.date_range_end,
     keywords: result.keywords,
+    anchor_entities: result.anchor_entities,
     confidence: result.confidence,
     ambiguity_flag: result.ambiguity_flag,
   }

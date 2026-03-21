@@ -19,6 +19,7 @@ import { generateAndStoreEmbedding } from './embed'
 import { findSimilarWishes } from './similarity'
 import { computeComplementarity } from './complement'
 import { computeIntentCompatibility } from './intent'
+import { computeAnchorOverlap } from './anchor'
 import { computeMatchScore, MATCH_THRESHOLD } from './score'
 import { haversineKm } from './geo'
 import { dateRangesOverlap } from './timeRange'
@@ -84,6 +85,7 @@ export async function processWishForMatching(
       theme_overlap: number          // NOT NULL in DB — always 0 (removed from scoring)
       intent_compatibility: number
       domain_match: number
+      anchor_overlap: number
       geo_penalty: number
       match_score: number
       match_type: string | null
@@ -103,16 +105,18 @@ export async function processWishForMatching(
       let intentCompatibility = 0
 
       let domainMatch = 0
+      let anchorOverlap = 0
       if (candidateEnrichment) {
         complementarityScore = computeComplementarity(enrichment, candidateEnrichment).score
         intentCompatibility  = computeIntentCompatibility(
           enrichment.collaboration_type ?? 'connect',
           candidateEnrichment.collaboration_type ?? 'connect',
         )
-        domainMatch = (enrichment.primary_domain && enrichment.primary_domain === candidateEnrichment.primary_domain) ? 1 : 0
+        domainMatch   = (enrichment.primary_domain && enrichment.primary_domain === candidateEnrichment.primary_domain) ? 1 : 0
+        anchorOverlap = computeAnchorOverlap(enrichment.anchor_entities, candidateEnrichment.anchor_entities)
       }
       // Fallback: no enrichment → pure semantic match
-      const score = computeMatchScore(candidate.similarity, complementarityScore, intentCompatibility, domainMatch)
+      const score = computeMatchScore(candidate.similarity, complementarityScore, intentCompatibility, domainMatch, anchorOverlap)
 
       // Soft geo penalty
       const geoPenalty = candidateEnrichment ? distanceScore(enrichment, candidateEnrichment) : 1
@@ -127,6 +131,7 @@ export async function processWishForMatching(
         theme_overlap:         0,   // removed from scoring; NOT NULL so must pass
         intent_compatibility:  Math.round(intentCompatibility        * 1000) / 1000,
         domain_match:          domainMatch,
+        anchor_overlap:        anchorOverlap,
         geo_penalty:           Math.round(geoPenalty                 * 1000) / 1000,
         match_score:           finalScore,
         match_type:            passed ? score.match_type : null,
