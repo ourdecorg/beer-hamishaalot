@@ -113,9 +113,21 @@ async function withDbRetry<T>(fn: () => Promise<T>, label: string, maxRetries = 
 export async function generateAndStoreEmbedding(
   wishId: string,
   wishText: string,
-  enrichment?: Parameters<typeof buildEmbeddingText>[1]
+  enrichment?: Parameters<typeof buildEmbeddingText>[1],
+  { force = false }: { force?: boolean } = {}
 ): Promise<number[]> {
   const supabase = createAdminClient()
+
+  // Skip generation if embedding already exists (mirrors analyzeAndStoreWish behaviour)
+  if (!force) {
+    const { data: existing } = await supabase
+      .from('wish_embeddings')
+      .select('embedding')
+      .eq('wish_id', wishId)
+      .maybeSingle()
+    if (existing?.embedding) return existing.embedding as number[]
+  }
+
   const text = buildEmbeddingText(wishText, enrichment)
   const embedding = await generateEmbedding(text)
 
