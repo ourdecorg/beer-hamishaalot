@@ -22,13 +22,10 @@ type LogEntry = {
   _direction: string
   semantic_similarity: number
   complementarity_score: number
-  theme_overlap: number
-  domain_match: number | null
+  intent_compatibility: number | null
   match_score: number
   match_type: string | null
   passed_threshold: boolean
-  distance_km: number | null
-  failed_distance: boolean
   failed_date_range: boolean
   created_at: string
 }
@@ -420,29 +417,20 @@ export default function ConnectionsDebugPage() {
                       </div>
 
                       {/* Failure reasons */}
-                      {(log.failed_distance || log.failed_date_range) && (
+                      {log.failed_date_range && (
                         <div className="flex gap-2 flex-wrap">
-                          {log.failed_distance && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200">
-                              📍 נכשל — מרחק ({log.distance_km != null ? `${log.distance_km.toFixed(1)} ק"מ` : '?'})
-                            </span>
-                          )}
-                          {log.failed_date_range && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-                              📅 נכשל — אין חפיפת זמן
-                            </span>
-                          )}
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                            📅 נכשל — אין חפיפת זמן
+                          </span>
                         </div>
                       )}
 
-                      {/* Score breakdown */}
-                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                      {/* Score breakdown — v5: 3 signals */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <Pill label="ציון כולל" value={<span className="text-base font-black text-well-700">{pct(log.match_score)}</span>} />
-                        <Pill label="סמנטי" value={pct(log.semantic_similarity)} />
-                        <Pill label="משלימות" value={pct(log.complementarity_score)} />
-                        <Pill label="חפיפת נושאים" value={pct(log.theme_overlap)} />
-                        <Pill label="תחום" value={log.domain_match != null ? pct(log.domain_match) : '—'} />
-                        <Pill label="מרחק" value={log.distance_km != null ? `${log.distance_km.toFixed(1)} ק"מ` : '—'} />
+                        <Pill label="סמנטי (×0.60)" value={pct(log.semantic_similarity)} />
+                        <Pill label="משלימות (×0.25)" value={pct(log.complementarity_score)} />
+                        <Pill label="כוונה (×0.15)" value={log.intent_compatibility != null ? pct(log.intent_compatibility) : '—'} />
                       </div>
 
                       {/* Log ID */}
