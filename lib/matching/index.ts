@@ -83,6 +83,7 @@ export async function processWishForMatching(
       complementarity_score: number
       theme_overlap: number          // NOT NULL in DB — always 0 (removed from scoring)
       intent_compatibility: number
+      geo_penalty: number
       match_score: number
       match_type: string | null
       passed_threshold: boolean
@@ -122,6 +123,7 @@ export async function processWishForMatching(
         complementarity_score: Math.round(complementarityScore       * 1000) / 1000,
         theme_overlap:         0,   // removed from scoring; NOT NULL so must pass
         intent_compatibility:  Math.round(intentCompatibility        * 1000) / 1000,
+        geo_penalty:           Math.round(geoPenalty                 * 1000) / 1000,
         match_score:           finalScore,
         match_type:            passed ? score.match_type : null,
         passed_threshold:      passed,

@@ -23,6 +23,7 @@ type LogEntry = {
   semantic_similarity: number
   complementarity_score: number
   intent_compatibility: number | null
+  geo_penalty: number | null
   match_score: number
   match_type: string | null
   passed_threshold: boolean
@@ -425,12 +426,20 @@ export default function ConnectionsDebugPage() {
                         </div>
                       )}
 
-                      {/* Score breakdown — v5: 3 signals */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {/* Score breakdown — v5: 3 signals + geo penalty */}
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                         <Pill label="ציון כולל" value={<span className="text-base font-black text-well-700">{pct(log.match_score)}</span>} />
                         <Pill label="סמנטי (×0.60)" value={pct(log.semantic_similarity)} />
                         <Pill label="משלימות (×0.25)" value={pct(log.complementarity_score)} />
                         <Pill label="כוונה (×0.15)" value={log.intent_compatibility != null ? pct(log.intent_compatibility) : '—'} />
+                        <Pill
+                          label="עונש מרחק"
+                          value={
+                            log.geo_penalty != null && log.geo_penalty < 1
+                              ? <span className="text-orange-600 font-semibold">{num(log.geo_penalty, 3)}</span>
+                              : <span className="text-sand-400">1.000</span>
+                          }
+                        />
                       </div>
 
                       {/* Log ID */}
