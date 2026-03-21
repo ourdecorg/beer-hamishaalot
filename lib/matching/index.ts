@@ -158,9 +158,12 @@ export async function processWishForMatching(
 
     if (connections.length === 0) return
 
-    await supabase
+    const { error: upsertError } = await supabase
       .from('wish_connections')
       .upsert(connections, { onConflict: 'wish_a,wish_b', ignoreDuplicates: true })
+    if (upsertError) {
+      console.error('[ResonanceEngine] upsert failed:', upsertError.message)
+    }
 
   } catch (err) {
     console.error('[ResonanceEngine] processWishForMatching failed:', err)
