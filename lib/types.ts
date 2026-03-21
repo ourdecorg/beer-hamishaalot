@@ -94,6 +94,9 @@ export interface WishEnrichment {
   // Date range (migration 016) — null when no time constraint mentioned.
   date_range_start?: string | null   // ISO date YYYY-MM-DD
   date_range_end?: string | null     // ISO date YYYY-MM-DD
+  // Extraction quality (migration 019) — null on rows analyzed before 019.
+  confidence?: number | null         // 0.0–1.0
+  ambiguity_flag?: boolean | null
 }
 
 export type ConnectionStatus = 'suggested' | 'accepted_by_a' | 'connected' | 'rejected'

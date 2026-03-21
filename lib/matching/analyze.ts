@@ -69,6 +69,9 @@ export interface WishAnalysisResult {
   // Date range (migration 016) — null when no time constraint mentioned
   date_range_start: string | null   // ISO YYYY-MM-DD
   date_range_end: string | null     // ISO YYYY-MM-DD
+  // Extraction quality signals
+  confidence: number        // 0.0–1.0
+  ambiguity_flag: boolean   // true if wish is vague/unclear for matching
 }
 
 /**
@@ -82,7 +85,8 @@ export async function analyzeWishText(wishText: string): Promise<WishAnalysisRes
       role: 'system',
       content:
         'You analyze wishes and intentions to identify collaboration potential. ' +
-        'Respond ONLY with valid JSON. Be concise and specific.',
+        'Extract only information explicitly or strongly implied by the text. ' +
+        'Do NOT invent details. Respond ONLY with valid JSON.',
     },
     {
       role: 'user',
@@ -107,10 +111,56 @@ Return JSON:
   "domain_entities": [],
   "primary_domain": "health_wellness|technology|entrepreneurship|education|arts_culture|community_social|environment|spirituality|family_parenting|sports_recreation|food_lifestyle|finance|personal_development|professional_career|other",
   "location": {"lat": null, "lng": null, "name": null},
-  "date_range": {"start": null, "end": null}
+  "date_range": {"start": null, "end": null},
+  "confidence": 0.0,
+  "ambiguity_flag": false
 }
 
-Rules: themes=5-7 keywords; needs/skills_offered=2-5 items; subject_entities/object_of_need/constraints=1-3 items in original language; domain_entities=2-5 nouns in original language. location: fill lat/lng/name only if a specific place is mentioned (city/country/venue/neighborhood) — use approximate WGS-84 coordinates; null otherwise. date_range: fill start/end as ISO dates (YYYY-MM-DD) if a time period is mentioned, resolving relative expressions using today's date; null otherwise.`,
+Language Rules (CRITICAL):
+- Detect the original language of the wish.
+- ALL free-text fields MUST be returned in the SAME language as the original wish:
+  themes, needs, skills_offered, subject_entities, object_of_need, constraints, domain_entities
+- DO NOT translate or normalize to English.
+- Keep wording natural and concise in the original language.
+
+Enum Fields (always in English):
+- intent
+- collaboration_type
+- emotional_tone
+- subject_type
+- target_action
+- primary_domain
+
+Rules:
+- themes: 5-7 concise keywords
+- intent: short verb phrase
+- needs: 2-5 explicit needs (what the user lacks)
+- skills_offered: 2-5 explicit contributions (what the user brings)
+- subject_entities: 1-3 concrete, specific entities (no abstractions)
+- object_of_need: 1-3 concrete items the user seeks
+- constraints: only verifiable constraints (location, time, format, budget)
+- domain_entities: 2-5 nouns in original language
+
+Strict interpretation rules:
+- Do NOT infer skills if not stated
+- Do NOT infer location unless explicitly mentioned
+- Do NOT infer time unless explicitly mentioned
+- Prefer empty arrays over guessing
+
+location:
+- Fill only if a real place is explicitly mentioned
+- name should be in the original language of the wish
+
+date_range:
+- Resolve relative expressions using today's date
+- Format: YYYY-MM-DD
+
+confidence:
+- 0.0-1.0 score of extraction confidence
+
+ambiguity_flag:
+- true if the wish is vague or unclear for matching
+- false otherwise`,
     },
   ]
 
@@ -173,6 +223,8 @@ Rules: themes=5-7 keywords; needs/skills_offered=2-5 items; subject_entities/obj
     location_name: typeof loc.name === 'string' && loc.name ? loc.name : null,
     date_range_start: typeof dr.start === 'string' && dr.start ? dr.start : null,
     date_range_end:   typeof dr.end   === 'string' && dr.end   ? dr.end   : null,
+    confidence:     typeof parsed.confidence === 'number' ? Math.min(1, Math.max(0, parsed.confidence)) : 0.5,
+    ambiguity_flag: parsed.ambiguity_flag === true,
   }
 }
 
@@ -220,6 +272,8 @@ export async function analyzeAndStoreWish(
     location_name: result.location_name,
     date_range_start: result.date_range_start,
     date_range_end: result.date_range_end,
+    confidence: result.confidence,
+    ambiguity_flag: result.ambiguity_flag,
   }
 
   const { error } = await supabase
