@@ -137,9 +137,7 @@ export async function processWishForMatching(
         candidateEnrichment.date_range_start, candidateEnrichment.date_range_end,
       )
 
-      const shouldLog = passed || failed_distance || failed_date_range
-      if (shouldLog) {
-        logEntries.push({
+      logEntries.push({
           wish_id: wishId,
           candidate_wish_id: candidate.wish_id,
           semantic_similarity:   Math.round(candidate.similarity        * 1000) / 1000,
@@ -156,7 +154,6 @@ export async function processWishForMatching(
           failed_distance,
           failed_date_range,
         })
-      }
 
       if (!passed || failed_distance || failed_date_range) continue
 
