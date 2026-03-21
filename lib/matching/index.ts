@@ -29,6 +29,16 @@ function canonicalPair(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a]
 }
 
+/** Jaccard similarity between two keyword arrays (case-insensitive). */
+function computeKeywordsJaccard(a: string[] | null | undefined, b: string[] | null | undefined): number {
+  if (!a?.length || !b?.length) return 0
+  const setA = new Set(a.map(s => s.toLowerCase().trim()))
+  const setB = new Set(b.map(s => s.toLowerCase().trim()))
+  const inter = [...setA].filter(x => setB.has(x)).length
+  const union = setA.size + setB.size - inter
+  return union === 0 ? 0 : inter / union
+}
+
 /** Soft geo penalty: exp(-distance_km / 50). Returns 1 if no location on either side. */
 function distanceScore(a: WishEnrichment, b: WishEnrichment): number {
   const { location_lat: aLat, location_lng: aLng } = a
@@ -83,6 +93,7 @@ export async function processWishForMatching(
       complementarity_score: number
       theme_overlap: number          // NOT NULL in DB — always 0 (removed from scoring)
       intent_compatibility: number
+      keywords_jaccard: number
       geo_penalty: number
       match_score: number
       match_type: string | null
@@ -101,15 +112,17 @@ export async function processWishForMatching(
       let complementarityScore = 0
       let intentCompatibility = 0
 
+      let keywordsJaccard = 0
       if (candidateEnrichment) {
         complementarityScore = computeComplementarity(enrichment, candidateEnrichment).score
         intentCompatibility  = computeIntentCompatibility(
           enrichment.collaboration_type ?? 'connect',
           candidateEnrichment.collaboration_type ?? 'connect',
         )
+        keywordsJaccard = computeKeywordsJaccard(enrichment.keywords, candidateEnrichment.keywords)
       }
       // Fallback: no enrichment → pure semantic match
-      const score = computeMatchScore(candidate.similarity, complementarityScore, intentCompatibility)
+      const score = computeMatchScore(candidate.similarity, complementarityScore, intentCompatibility, keywordsJaccard)
 
       // Soft geo penalty
       const geoPenalty = candidateEnrichment ? distanceScore(enrichment, candidateEnrichment) : 1
@@ -123,6 +136,7 @@ export async function processWishForMatching(
         complementarity_score: Math.round(complementarityScore       * 1000) / 1000,
         theme_overlap:         0,   // removed from scoring; NOT NULL so must pass
         intent_compatibility:  Math.round(intentCompatibility        * 1000) / 1000,
+        keywords_jaccard:      Math.round(keywordsJaccard            * 1000) / 1000,
         geo_penalty:           Math.round(geoPenalty                 * 1000) / 1000,
         match_score:           finalScore,
         match_type:            passed ? score.match_type : null,

@@ -69,6 +69,8 @@ export interface WishAnalysisResult {
   // Date range (migration 016) — null when no time constraint mentioned
   date_range_start: string | null   // ISO YYYY-MM-DD
   date_range_end: string | null     // ISO YYYY-MM-DD
+  // Keywords — verbatim/near-verbatim terms from the wish text in original language
+  keywords: string[]
   // Extraction quality signals
   confidence: number        // 0.0–1.0
   ambiguity_flag: boolean   // true if wish is vague/unclear for matching
@@ -112,6 +114,7 @@ Return JSON:
   "primary_domain": "health_wellness|technology|entrepreneurship|education|arts_culture|community_social|environment|spirituality|family_parenting|sports_recreation|food_lifestyle|finance|personal_development|professional_career|other",
   "location": {"lat": null, "lng": null, "name": null},
   "date_range": {"start": null, "end": null},
+  "keywords": [],
   "confidence": 0.0,
   "ambiguity_flag": false
 }
@@ -119,7 +122,7 @@ Return JSON:
 Language Rules (CRITICAL):
 - Detect the original language of the wish.
 - ALL free-text fields MUST be returned in the SAME language as the original wish:
-  themes, needs, skills_offered, subject_entities, object_of_need, constraints, domain_entities
+  themes, needs, skills_offered, subject_offered, object_of_need, constraints, domain_entities, keywords
 - DO NOT translate or normalize to English.
 - Keep wording natural and concise in the original language.
 
@@ -140,6 +143,7 @@ Rules:
 - object_of_need: 1-3 concrete items the user seeks
 - constraints: only verifiable constraints (location, time, format, budget)
 - domain_entities: 2-5 nouns in original language
+- keywords: 3-8 important terms extracted verbatim or near-verbatim from the wish text (in the original language)
 
 Strict interpretation rules:
 - Do NOT infer skills if not stated
@@ -232,6 +236,7 @@ ambiguity_flag:
     location_name: typeof loc.name === 'string' && loc.name ? loc.name : null,
     date_range_start: typeof dr.start === 'string' && dr.start ? dr.start : null,
     date_range_end:   typeof dr.end   === 'string' && dr.end   ? dr.end   : null,
+    keywords:       Array.isArray(parsed.keywords) ? parsed.keywords.slice(0, 8) : [],
     confidence:     typeof parsed.confidence === 'number' ? Math.min(1, Math.max(0, parsed.confidence)) : 0.5,
     ambiguity_flag: parsed.ambiguity_flag === true,
   }
@@ -281,6 +286,7 @@ export async function analyzeAndStoreWish(
     location_name: result.location_name,
     date_range_start: result.date_range_start,
     date_range_end: result.date_range_end,
+    keywords: result.keywords,
     confidence: result.confidence,
     ambiguity_flag: result.ambiguity_flag,
   }

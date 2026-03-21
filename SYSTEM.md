@@ -229,18 +229,19 @@ UNIQUE(wish_id, user_id)
   └── wish_connections UPSERT (finalScore ≥ 0.55, ignoreDuplicates)
 ```
 
-### נוסחת הציון (v5)
+### נוסחת הציון (v6)
 
 ```
-match_score = 0.60 × semantic_similarity
+match_score = 0.45 × semantic_similarity
             + 0.25 × complementarity
             + 0.15 × intent_compatibility
+            + 0.15 × keywords_jaccard
 
 final_score = match_score × exp(-distance_km / 50)
             (= match_score כשאין מיקום לאחת המשאלות)
 ```
 
-**ציון סף:** ≥ 0.55 · **כניסה לניקוד:** similarity ≥ 0.30
+**ציון סף:** ≥ 0.48 · **כניסה לניקוד:** similarity ≥ 0.30
 
 ### סיווג סוג ההתאמה
 
