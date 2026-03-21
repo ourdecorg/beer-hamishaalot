@@ -39,7 +39,8 @@ function canonicalPair(a: string, b: string): [string, string] {
  */
 export async function processWishForMatching(
   wishId: string,
-  wishText: string
+  wishText: string,
+  { onlyLowerId = false }: { onlyLowerId?: boolean } = {}
 ): Promise<void> {
   try {
     const supabase = createAdminClient()
@@ -51,7 +52,7 @@ export async function processWishForMatching(
     const embedding = await generateAndStoreEmbedding(wishId, wishText, enrichment)
 
     // Step 3 — Find all public wishes by vector similarity (no limit)
-    const candidates = await findSimilarWishes(wishId, embedding)
+    const candidates = await findSimilarWishes(wishId, embedding, { onlyLowerId })
     if (candidates.length === 0) return
 
     // Fetch enrichments for all candidate wishes in one query

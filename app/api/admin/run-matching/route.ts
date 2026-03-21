@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     const id = wishIds[i]
     const text = wishMap.get(id)
     if (!text) continue
-    setTimeout(() => processWishForMatching(id, text), i * STAGGER_MS)
+    setTimeout(() => processWishForMatching(id, text, { onlyLowerId: true }), i * STAGGER_MS)
     started++
   }
 

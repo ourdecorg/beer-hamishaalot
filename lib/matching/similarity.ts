@@ -40,7 +40,8 @@ async function withSimilarityRetry<T>(fn: () => Promise<T>, maxRetries = 3): Pro
 
 export async function findSimilarWishes(
   wishId: string,
-  queryEmbedding: number[]
+  queryEmbedding: number[],
+  { onlyLowerId = false }: { onlyLowerId?: boolean } = {}
 ): Promise<SimilarWish[]> {
   const supabase = createAdminClient()
 
@@ -49,6 +50,7 @@ export async function findSimilarWishes(
       query_embedding: queryEmbedding,
       match_wish_id: wishId,
       min_similarity: MIN_SIMILARITY,
+      only_lower_id: onlyLowerId,
     })
     if (error) throw new Error(`Similarity search failed: ${error.message}`)
     return (data ?? []) as SimilarWish[]
