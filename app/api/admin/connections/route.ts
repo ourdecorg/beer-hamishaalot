@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 async function checkAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -15,10 +16,13 @@ async function checkAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
  *   → { logs, connection, enrichment_a, enrichment_b, wish_a, wish_b }
  */
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
-  if (!(await checkAdmin(supabase))) {
+  const authClient = await createClient()
+  if (!(await checkAdmin(authClient))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
+
+  // Use admin client for all data queries — bypasses RLS on internal tables
+  const supabase = createAdminClient()
 
   const { searchParams } = new URL(request.url)
   const wishA = searchParams.get('a')
