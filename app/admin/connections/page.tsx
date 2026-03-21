@@ -23,7 +23,7 @@ type LogEntry = {
   semantic_similarity: number
   complementarity_score: number
   intent_compatibility: number | null
-  keywords_jaccard: number | null
+  domain_match: number | null
   geo_penalty: number | null
   match_score: number
   match_type: string | null
@@ -433,7 +433,7 @@ export default function ConnectionsDebugPage() {
                         <Pill label="סמנטי (×0.45)" value={pct(log.semantic_similarity)} />
                         <Pill label="משלימות (×0.25)" value={pct(log.complementarity_score)} />
                         <Pill label="כוונה (×0.15)" value={log.intent_compatibility != null ? pct(log.intent_compatibility) : '—'} />
-                        <Pill label="מילות מפתח (×0.15)" value={log.keywords_jaccard != null ? pct(log.keywords_jaccard) : '—'} />
+                        <Pill label="תחום (×0.15)" value={log.domain_match != null ? (log.domain_match === 1 ? '✓ זהה' : '✗ שונה') : '—'} />
                         <Pill
                           label="עונש מרחק"
                           value={

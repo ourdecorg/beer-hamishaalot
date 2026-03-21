@@ -35,7 +35,7 @@ describe('computeMatchScore', () => {
     expect(result.match_score).toBeLessThanOrEqual(1)
   })
 
-  test('formula weights: 0.45×semantic + 0.25×comp + 0.15×intent + 0.15×keywords', () => {
+  test('formula weights: 0.45×semantic + 0.25×comp + 0.15×intent + 0.15×domain', () => {
     const result = computeMatchScore(1, 0, 0, 0)
     expect(result.match_score).toBeCloseTo(0.45, 5)
 

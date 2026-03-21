@@ -235,7 +235,7 @@ UNIQUE(wish_id, user_id)
 match_score = 0.45 × semantic_similarity
             + 0.25 × complementarity
             + 0.15 × intent_compatibility
-            + 0.15 × keywords_jaccard
+            + 0.15 × domain_match  (1 אם primary_domain זהה, 0 אחרת)
 
 final_score = match_score × exp(-distance_km / 50)
             (= match_score כשאין מיקום לאחת המשאלות)
