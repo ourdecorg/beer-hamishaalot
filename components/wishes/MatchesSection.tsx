@@ -17,9 +17,10 @@ const matchTypeBg: Record<MatchType, string> = {
 
 interface Props {
   wishId: string
+  isAdmin?: boolean
 }
 
-export default function MatchesSection({ wishId }: Props) {
+export default function MatchesSection({ wishId, isAdmin = false }: Props) {
   const [matches, setMatches] = useState<MatchResult[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -76,17 +77,28 @@ export default function MatchesSection({ wishId }: Props) {
             <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${matchTypeBg[match.match_type]}`}>
               {matchTypeLabel[match.match_type]}
             </span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-sand-400">ציון התאמה</span>
-              <span
-                className="text-sm font-bold px-2.5 py-0.5 rounded-full"
-                style={{
-                  background: 'linear-gradient(135deg, #edf5f8, #d3e8f0)',
-                  color: '#154963',
-                }}
-              >
-                {Math.round(match.match_score * 100)}%
-              </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-sand-400">ציון התאמה</span>
+                <span
+                  className="text-sm font-bold px-2.5 py-0.5 rounded-full"
+                  style={{
+                    background: 'linear-gradient(135deg, #edf5f8, #d3e8f0)',
+                    color: '#154963',
+                  }}
+                >
+                  {Math.round(match.match_score * 100)}%
+                </span>
+              </div>
+              {isAdmin && (
+                <a
+                  href={`/admin/connections?a=${wishId}&b=${match.matched_wish_id}`}
+                  className="text-[10px] font-mono px-2 py-0.5 rounded border border-violet-200 bg-violet-50 text-violet-600 hover:bg-violet-100 transition-colors"
+                  title="תחקור חיבור (admin)"
+                >
+                  debug
+                </a>
+              )}
             </div>
           </div>
 

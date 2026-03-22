@@ -54,6 +54,7 @@ export default async function WishPage({ params }: Props) {
   }
 
   const isOwner = user?.id === wish.user_id
+  const isAdmin = !!(user?.email && user.email === process.env.ADMIN_EMAIL)
   const canResonate = !isOwner
 
   const formattedDate = new Date(wish.created_at).toLocaleDateString('he-IL', {
@@ -162,7 +163,7 @@ export default async function WishPage({ params }: Props) {
 
         {/* Resonance Engine matches — owner only */}
         {isOwner && (
-          <MatchesSection wishId={wish.id} />
+          <MatchesSection wishId={wish.id} isAdmin={isAdmin} />
         )}
       </main>
 

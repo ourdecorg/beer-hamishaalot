@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 // ── Types ─────────────────────────────────────────────────────
@@ -193,9 +194,10 @@ function EnrichmentCard({ enrichment, label }: { enrichment: Enrichment | null; 
 // ── Main page ─────────────────────────────────────────────────
 
 export default function ConnectionsDebugPage() {
+  const searchParams = useSearchParams()
   const [wishes, setWishes] = useState<Wish[]>([])
-  const [wishA, setWishA] = useState('')
-  const [wishB, setWishB] = useState('')
+  const [wishA, setWishA] = useState(searchParams.get('a') ?? '')
+  const [wishB, setWishB] = useState(searchParams.get('b') ?? '')
   const [filterA, setFilterA] = useState('')
   const [filterB, setFilterB] = useState('')
   const [result, setResult] = useState<DebugResult | null>(null)
@@ -228,6 +230,14 @@ export default function ConnectionsDebugPage() {
       setLoading(false)
     }
   }, [wishA, wishB])
+
+  // Auto-fetch when arriving from a debug link (?a=&b=)
+  useEffect(() => {
+    if (!wishListLoading && wishA && wishB && wishA !== wishB) {
+      fetchDebug()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wishListLoading])
 
   const filteredWishes = (filter: string) =>
     wishes.filter(w =>
