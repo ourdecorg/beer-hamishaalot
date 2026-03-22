@@ -64,6 +64,14 @@ export default function Header() {
               {user ? (
                 <>
                   <Link
+                    href="/matches"
+                    className={`btn-ghost text-sm ${
+                      pathname === '/matches' ? 'text-well-900 bg-well-50 font-semibold' : ''
+                    }`}
+                  >
+                    ההתאמות שלי
+                  </Link>
+                  <Link
                     href="/wishes/my"
                     className={`btn-ghost text-sm ${
                       pathname === '/wishes/my' ? 'text-well-900 bg-well-50 font-semibold' : ''
