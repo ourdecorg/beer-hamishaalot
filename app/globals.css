@@ -12,6 +12,7 @@
     @apply bg-sand-50 text-well-900 antialiased;
     font-family: var(--font-heebo), system-ui, sans-serif;
     min-height: 100dvh;
+    overflow-x: hidden;
     background-image: radial-gradient(ellipse 100% 40% at 50% 0%, rgba(21,73,99,0.07) 0%, transparent 70%);
   }
 
