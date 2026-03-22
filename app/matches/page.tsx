@@ -10,21 +10,27 @@ export const metadata = { title: 'ההתאמות שלי — באר המשאלו�
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-interface MatchRow {
+interface MyWishMatch {
   connectionId: string
+  myWishId: string
+  myWishText: string
   matchScore: number
   matchType: MatchType
   matchedAt: string
-  // User side
-  myWishId: string
-  myWishText: string
-  // Other side
+  sharedThemes: string[]
+}
+
+/** One card per external wish — may have multiple of the user's wishes inside */
+interface GroupedMatch {
   theirWishId: string
   theirWishText: string
   theirName: string | null
   theirEmail: string | null
   theirPhone: string | null
-  sharedThemes: string[]
+  maxScore: number
+  maxMatchType: MatchType
+  myMatches: MyWishMatch[]   // sorted by matchScore desc
+  allSharedThemes: string[]  // union across all myMatches
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -47,9 +53,7 @@ function truncate(s: string, n = 220) {
 
 function fmt(iso: string) {
   return new Date(iso).toLocaleDateString('he-IL', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
+    day: 'numeric', month: 'long', year: 'numeric',
   })
 }
 
@@ -74,7 +78,7 @@ export default async function MyMatchesPage() {
     return <EmptyLayout message="עדיין אין משאלות — צור משאלה ראשונה" cta />
   }
 
-  // 2. All connections for those wishes, sorted by score desc
+  // 2. All connections for those wishes
   const { data: connections } = await supabase
     .from('wish_connections')
     .select('id, wish_a, wish_b, match_score, match_type, created_at')
@@ -82,16 +86,14 @@ export default async function MyMatchesPage() {
     .order('match_score', { ascending: false })
 
   const connList = connections ?? []
-
   if (connList.length === 0) {
     return <EmptyLayout message="המנוע טרם מצא התאמות — חזור מאוחר יותר" />
   }
 
   // 3. Collect matched wish IDs (the other side)
-  const matchedIds = connList.map(c =>
-    myWishIds.includes(c.wish_a) ? c.wish_b : c.wish_a
-  )
-  const uniqueMatchedIds = [...new Set(matchedIds)]
+  const uniqueMatchedIds = [...new Set(
+    connList.map(c => myWishIds.includes(c.wish_a) ? c.wish_b : c.wish_a)
+  )]
 
   // 4. Fetch matched wishes (text + contact)
   const { data: theirWishes } = await supabase
@@ -99,46 +101,67 @@ export default async function MyMatchesPage() {
     .select('id, original_text, contact_name, contact_email, contact_phone')
     .in('id', uniqueMatchedIds)
 
-  const theirWishMap = new Map(
-    (theirWishes ?? []).map(w => [w.id, w])
-  )
+  const theirWishMap = new Map((theirWishes ?? []).map(w => [w.id, w]))
 
   // 5. Fetch enrichments for shared theme computation
-  const allIds = [...myWishIds, ...uniqueMatchedIds]
   const { data: enrichments } = await supabase
     .from('wish_enrichment')
     .select('wish_id, themes')
-    .in('wish_id', allIds)
+    .in('wish_id', [...myWishIds, ...uniqueMatchedIds])
 
   const themeMap = new Map<string, string[]>(
     (enrichments ?? []).map(e => [e.wish_id, e.themes ?? []])
   )
 
-  // 6. Build display rows
-  const rows: MatchRow[] = connList.map(conn => {
+  // 6. Build flat rows
+  const flatList: Array<MyWishMatch & { theirWishId: string }> = connList.map(conn => {
     const myWishId    = myWishIds.includes(conn.wish_a) ? conn.wish_a : conn.wish_b
     const theirWishId = myWishId === conn.wish_a ? conn.wish_b : conn.wish_a
-    const them        = theirWishMap.get(theirWishId)
-
     const myThemes    = new Set((themeMap.get(myWishId)    ?? []).map(t => t.toLowerCase().trim()))
-    const theirThemes =         (themeMap.get(theirWishId) ?? [])
-    const sharedThemes = theirThemes.filter(t => myThemes.has(t.toLowerCase().trim()))
-
+    const theirThemes = themeMap.get(theirWishId) ?? []
     return {
-      connectionId:  conn.id,
-      matchScore:    conn.match_score,
-      matchType:     conn.match_type as MatchType,
-      matchedAt:     conn.created_at,
+      connectionId: conn.id,
       myWishId,
-      myWishText:    myWishTextMap.get(myWishId) ?? '',
+      myWishText:   myWishTextMap.get(myWishId) ?? '',
+      matchScore:   conn.match_score,
+      matchType:    conn.match_type as MatchType,
+      matchedAt:    conn.created_at,
+      sharedThemes: theirThemes.filter(t => myThemes.has(t.toLowerCase().trim())),
       theirWishId,
-      theirWishText: them?.original_text ?? '',
-      theirName:     them?.contact_name ?? null,
-      theirEmail:    them?.contact_email ?? null,
-      theirPhone:    them?.contact_phone ?? null,
-      sharedThemes,
     }
   })
+
+  // 7. Group by theirWishId
+  const groupMap = new Map<string, GroupedMatch>()
+  for (const row of flatList) {
+    const existing = groupMap.get(row.theirWishId)
+    const them = theirWishMap.get(row.theirWishId)
+    if (!existing) {
+      groupMap.set(row.theirWishId, {
+        theirWishId:    row.theirWishId,
+        theirWishText:  them?.original_text ?? '',
+        theirName:      them?.contact_name  ?? null,
+        theirEmail:     them?.contact_email ?? null,
+        theirPhone:     them?.contact_phone ?? null,
+        maxScore:       row.matchScore,
+        maxMatchType:   row.matchType,
+        myMatches:      [row],
+        allSharedThemes: row.sharedThemes,
+      })
+    } else {
+      existing.myMatches.push(row)
+      const allThemes = new Set([...existing.allSharedThemes, ...row.sharedThemes])
+      existing.allSharedThemes = [...allThemes]
+      // maxScore is already the highest because connList is sorted desc
+    }
+  }
+
+  // Sort groups by maxScore desc (group insertion order follows sorted connList,
+  // but the first row per group sets maxScore correctly)
+  const groups: GroupedMatch[] = [...groupMap.values()]
+    .sort((a, b) => b.maxScore - a.maxScore)
+
+  const totalConnections = flatList.length
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -162,91 +185,123 @@ export default async function MyMatchesPage() {
           </div>
           <div className="h-px mt-4 bg-gradient-to-l from-transparent via-sand-300 to-transparent" />
           <p className="text-sand-400 text-sm mt-2">
-            {rows.length} {rows.length === 1 ? 'התאמה' : 'התאמות'} · ממוינות לפי ציון
+            {groups.length} {groups.length === 1 ? 'משאלה תואמת' : 'משאלות תואמות'}
+            {totalConnections !== groups.length && ` · ${totalConnections} חיבורים`}
+            {' · ממוינות לפי ציון'}
           </p>
         </div>
 
         {/* Match cards */}
         <div className="space-y-5">
-          {rows.map((row) => (
-            <div
-              key={row.connectionId}
-              className="card p-6 space-y-5"
-            >
-              {/* Header: type + score + date */}
+          {groups.map((group) => (
+            <div key={group.theirWishId} className="card p-6 space-y-5">
+
+              {/* Header: best score + type */}
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${matchTypeBg[row.matchType] ?? 'bg-sand-100 border-sand-200 text-sand-700'}`}>
-                    {matchTypeLabel[row.matchType] ?? row.matchType}
+                  <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${matchTypeBg[group.maxMatchType] ?? 'bg-sand-100 border-sand-200 text-sand-700'}`}>
+                    {matchTypeLabel[group.maxMatchType] ?? group.maxMatchType}
                   </span>
                   <span
                     className="text-sm font-bold px-2.5 py-0.5 rounded-full"
-                    style={{
-                      background: 'linear-gradient(135deg, #edf5f8, #d3e8f0)',
-                      color: '#154963',
-                    }}
+                    style={{ background: 'linear-gradient(135deg, #edf5f8, #d3e8f0)', color: '#154963' }}
                   >
-                    {Math.round(row.matchScore * 100)}%
+                    {Math.round(group.maxScore * 100)}%
                   </span>
+                  {group.myMatches.length > 1 && (
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
+                      {group.myMatches.length} משאלות שלך תואמות
+                    </span>
+                  )}
                 </div>
-                <span className="text-xs text-sand-400">{fmt(row.matchedAt)}</span>
+                <span className="text-xs text-sand-400">
+                  {fmt(group.myMatches[0].matchedAt)}
+                </span>
               </div>
 
               {/* Their wish */}
               <div className="bg-sand-50 border border-sand-200 rounded-xl px-5 py-4 space-y-2">
                 <p className="section-label text-xs">המשאלה התואמת</p>
                 <p className="text-sm text-well-700 leading-relaxed">
-                  {truncate(row.theirWishText)}
+                  {truncate(group.theirWishText)}
                 </p>
               </div>
 
-              {/* My wish context */}
-              <div className="flex items-start gap-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-sand-400 mt-0.5 whitespace-nowrap">
-                  ← מתאים למשאלתך
-                </span>
-                <Link
-                  href={`/wishes/${row.myWishId}`}
-                  className="text-xs text-well-600 hover:text-well-800 leading-relaxed line-clamp-2 transition-colors"
-                >
-                  {truncate(row.myWishText, 140)}
-                </Link>
+              {/* My matching wishes */}
+              <div className="space-y-2">
+                <p className="section-label text-xs">
+                  {group.myMatches.length === 1 ? 'מתאים למשאלתך' : 'המשאלות שלך שתואמות'}
+                </p>
+                {group.myMatches.map((m, idx) => (
+                  <div
+                    key={m.connectionId}
+                    className={`flex items-start gap-3 rounded-xl px-4 py-3 ${
+                      group.myMatches.length > 1
+                        ? 'bg-sand-50 border border-sand-200'
+                        : ''
+                    }`}
+                  >
+                    {/* Per-wish score badge — only when multiple */}
+                    {group.myMatches.length > 1 && (
+                      <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
+                        <span className="text-xs font-bold text-well-700">
+                          {Math.round(m.matchScore * 100)}%
+                        </span>
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${matchTypeBg[m.matchType] ?? 'bg-sand-100 border-sand-200 text-sand-600'}`}>
+                          {matchTypeLabel[m.matchType]?.split(' ')[1] ?? m.matchType}
+                        </span>
+                      </div>
+                    )}
+                    <Link
+                      href={`/wishes/${m.myWishId}`}
+                      className="text-xs text-well-600 hover:text-well-800 leading-relaxed line-clamp-3 transition-colors flex-1"
+                    >
+                      {truncate(m.myWishText, group.myMatches.length > 1 ? 160 : 140)}
+                    </Link>
+                    {group.myMatches.length > 1 && (
+                      <span className="text-[10px] text-sand-400 shrink-0 pt-0.5">
+                        {String(idx + 1)}
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
 
-              {/* Shared themes */}
-              {row.sharedThemes.length > 0 && (
+              {/* Shared themes — union across all matches */}
+              {group.allSharedThemes.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
-                  {row.sharedThemes.map(t => (
+                  {group.allSharedThemes.map(t => (
                     <span key={t} className="tag-badge text-xs">{t}</span>
                   ))}
                 </div>
               )}
 
               {/* Contact */}
-              {(row.theirName || row.theirEmail) && (
+              {(group.theirName || group.theirEmail) && (
                 <div
                   className="rounded-xl px-5 py-4 space-y-1.5"
                   style={{ background: 'linear-gradient(145deg, #edf5f8, #d3e8f0)' }}
                 >
                   <p className="section-label mb-2">פרטי קשר</p>
-                  {row.theirName && (
-                    <p className="text-well-800 font-semibold text-sm">{row.theirName}</p>
+                  {group.theirName && (
+                    <p className="text-well-800 font-semibold text-sm">{group.theirName}</p>
                   )}
-                  {row.theirEmail && (
+                  {group.theirEmail && (
                     <p className="text-sm" dir="ltr">
                       <a
-                        href={`mailto:${row.theirEmail}?subject=שיתוף פעולה — באר המשאלות`}
+                        href={`mailto:${group.theirEmail}?subject=שיתוף פעולה — באר המשאלות`}
                         className="text-well-700 underline underline-offset-2 hover:text-well-500 font-medium"
                       >
-                        {row.theirEmail}
+                        {group.theirEmail}
                       </a>
                     </p>
                   )}
-                  {row.theirPhone && (
-                    <p className="text-well-700 text-sm font-medium" dir="ltr">{row.theirPhone}</p>
+                  {group.theirPhone && (
+                    <p className="text-well-700 text-sm font-medium" dir="ltr">{group.theirPhone}</p>
                   )}
                 </div>
               )}
+
             </div>
           ))}
         </div>
