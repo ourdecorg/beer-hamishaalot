@@ -24,7 +24,8 @@ type LogEntry = {
   complementarity_score: number
   intent_compatibility: number | null
   domain_match: number | null
-  anchor_overlap: number | null
+  structural_similarity: number | null
+  recall_source: string | null
   geo_penalty: number | null
   match_score: number
   match_type: string | null
@@ -415,6 +416,17 @@ export default function ConnectionsDebugPage() {
                               {log.match_type}
                             </span>
                           )}
+                          {log.recall_source && (
+                            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
+                              log.recall_source === 'both'       ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              : log.recall_source === 'structured' ? 'bg-violet-50 text-violet-700 border-violet-200'
+                              : 'bg-sky-50 text-sky-700 border-sky-200'
+                            }`}>
+                              {log.recall_source === 'both' ? '◈ שני מסלולים'
+                                : log.recall_source === 'structured' ? '◇ מובנה'
+                                : '◆ סמנטי'}
+                            </span>
+                          )}
                         </div>
                         <span className="text-xs text-sand-400">{fmt(log.created_at)}</span>
                       </div>
@@ -428,14 +440,13 @@ export default function ConnectionsDebugPage() {
                         </div>
                       )}
 
-                      {/* Score breakdown — v7: 5 signals + geo penalty */}
+                      {/* Score breakdown — v8: 4 signals + geo penalty */}
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         <Pill label="ציון כולל" value={<span className="text-base font-black text-well-700">{pct(log.match_score)}</span>} />
                         <Pill label="סמנטי (×0.35)" value={pct(log.semantic_similarity)} />
-                        <Pill label="משלימות (×0.25)" value={pct(log.complementarity_score)} />
+                        <Pill label="משלימות (×0.30)" value={pct(log.complementarity_score)} />
                         <Pill label="כוונה (×0.15)" value={log.intent_compatibility != null ? pct(log.intent_compatibility) : '—'} />
-                        <Pill label="תחום (×0.15)" value={log.domain_match != null ? (log.domain_match === 1 ? '✓ זהה' : '✗ שונה') : '—'} />
-                        <Pill label="עוגנים (×0.15)" value={log.anchor_overlap != null ? pct(log.anchor_overlap) : '—'} />
+                        <Pill label="מבנה (×0.20)" value={log.structural_similarity != null ? pct(log.structural_similarity) : '—'} />
                         <Pill
                           label="עונש מרחק"
                           value={

@@ -98,6 +98,9 @@ export interface WishEnrichment {
   keywords?: string[] | null
   // Anchor entities (migration 025) — max 3 concrete nouns from the wish text.
   anchor_entities?: string[] | null
+  // Anchor keywords (migration 026) — canonical IDs derived from needs + skills +
+  // subject_entities + domain_entities. Used for structured recall.
+  anchor_keywords?: string[] | null
   // Extraction quality (migration 019) — null on rows analyzed before 019.
   confidence?: number | null         // 0.0–1.0
   ambiguity_flag?: boolean | null

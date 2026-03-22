@@ -56,3 +56,71 @@ export async function findSimilarWishes(
     return (data ?? []) as SimilarWish[]
   })
 }
+
+export interface StructuredCandidate {
+  wish_id: string
+}
+
+/**
+ * Finds wishes whose anchor_keywords overlap with sourceKeywords via the
+ * find_structured_candidates SQL function (array && operator, GIN-indexed).
+ * Non-fatal: on failure returns [] and the engine falls back to ANN-only.
+ */
+export async function findStructuredCandidates(
+  wishId: string,
+  anchorKeywords: string[],
+  { onlyLowerId = false }: { onlyLowerId?: boolean } = {}
+): Promise<StructuredCandidate[]> {
+  if (anchorKeywords.length === 0) return []
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.rpc('find_structured_candidates', {
+    source_wish_id:  wishId,
+    source_keywords: anchorKeywords,
+    only_lower_id:   onlyLowerId,
+  })
+  if (error) {
+    console.warn('[similarity] find_structured_candidates failed:', error.message)
+    return []
+  }
+  return (data ?? []) as StructuredCandidate[]
+}
+
+/**
+ * Computes cosine similarity between a query embedding and a set of wish embeddings
+ * already stored in wish_embeddings. Used to back-fill similarity for structured-only
+ * candidates that did not come from the ANN recall path.
+ *
+ * Returns a Map<wish_id, similarity>. Missing IDs (no embedding) are absent from the map.
+ */
+export async function computeSimilaritiesForIds(
+  queryEmbedding: number[],
+  wishIds: string[],
+): Promise<Map<string, number>> {
+  if (wishIds.length === 0) return new Map()
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('wish_embeddings')
+    .select('wish_id, embedding')
+    .in('wish_id', wishIds)
+  if (error) {
+    console.warn('[similarity] computeSimilaritiesForIds failed:', error.message)
+    return new Map()
+  }
+  const result = new Map<string, number>()
+  for (const row of data ?? []) {
+    // Supabase may return pgvector as a JSON string in some configurations
+    const emb: number[] = typeof row.embedding === 'string'
+      ? JSON.parse(row.embedding)
+      : (row.embedding as number[])
+    let dot = 0, normA = 0, normB = 0
+    for (let i = 0; i < queryEmbedding.length; i++) {
+      dot   += queryEmbedding[i] * emb[i]
+      normA += queryEmbedding[i] ** 2
+      normB += emb[i] ** 2
+    }
+    const sim = normA === 0 || normB === 0 ? 0
+      : dot / (Math.sqrt(normA) * Math.sqrt(normB))
+    result.set(row.wish_id, Math.max(0, Math.min(1, sim)))
+  }
+  return result
+}

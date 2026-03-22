@@ -7,6 +7,7 @@
 import OpenAI from 'openai'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { logOpenAICall } from './openaiLog'
+import { buildAnchorKeywords } from './keywords'
 import type { WishEnrichment } from '@/lib/types'
 
 // Lazy singleton — mirrors the pattern in lib/claude.ts
@@ -293,6 +294,12 @@ export async function analyzeAndStoreWish(
     date_range_end: result.date_range_end,
     keywords: result.keywords,
     anchor_entities: result.anchor_entities,
+    anchor_keywords: buildAnchorKeywords({
+      needs:            result.needs,
+      skills_offered:   result.skills_offered,
+      subject_entities: result.subject_entities,
+      domain_entities:  result.domain_entities,
+    }),
     confidence: result.confidence,
     ambiguity_flag: result.ambiguity_flag,
   }
