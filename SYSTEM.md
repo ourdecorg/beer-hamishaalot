@@ -46,6 +46,7 @@ Next.js 14 App Router (Railway)
 | `/wishes/new` | app/wishes/new/page.tsx | Server Component — יצירת משאלה |
 | `/wishes/my` | app/wishes/my/page.tsx | Server Component — המשאלות שלי |
 | `/wishes/[id]` | app/wishes/[id]/page.tsx | Server Component — פרטי משאלה |
+| `/matches` | app/matches/page.tsx | Server Component — ההתאמות שלי (מקובצות לפי משאלה חיצונית) |
 | `/(auth)/login` | app/(auth)/login/page.tsx | דף התחברות (magic link) |
 | `/admin/connections` | app/admin/connections/page.tsx | Client Component — תחקור חיבורים |
 | `/admin/test-data` | app/admin/test-data/page.tsx | Client Component — טעינת נתוני מבחן |
@@ -69,6 +70,24 @@ Next.js 14 App Router (Railway)
 | `/api/admin/connections` | GET | נתוני debug לזוג משאלות |
 | `/api/feed` | GET | Feed מותאם אישית |
 
+### דף `/matches` — היגיון עיבוד
+
+**שלב 1:** שליפת כל משאלות המשתמש + ה-wish_connections שלהן
+
+**שלב 2:** איסוף ה-IDs של המשאלות התואמות + שליפת wish_enrichment (themes) + פרטי קשר
+
+**שלב 3:** קיבוץ לפי `theirWishId` — כרטיס אחד לכל משאלה חיצונית, עם כל המשאלות של המשתמש שתואמות אותה
+
+**StructuredMatch:**
+```
+GroupedMatch {
+  theirWishId, theirWishText, theirName, theirEmail, theirPhone
+  maxScore, maxMatchType       // מהחיבור בציון הגבוה ביותר
+  myMatches[]                  // ממוינות לפי match_score desc
+  allSharedThemes              // איחוד ה-themes מכל myMatches
+}
+```
+
 ### ספריות (lib/)
 
 | מודול | קבצים | מטרה |
@@ -84,10 +103,16 @@ Next.js 14 App Router (Railway)
 |------|------|
 | components/wishes/WishForm.tsx | טופס יצירת משאלה |
 | components/wishes/WishCard.tsx | כרטיס משאלה |
-| components/wishes/MatchesSection.tsx | רשימת חיבורים |
+| components/wishes/MatchesSection.tsx | רשימת חיבורים לצד משאלה בודדת; תומך ב-`isAdmin` prop להצגת קישור debug |
 | components/wishes/ResonanceButton.tsx | כפתור לב |
-| components/layout/Header.tsx | ניווט עליון |
+| components/layout/Header.tsx | Client Component — ניווט עליון; desktop nav + mobile hamburger menu עם dropdown |
 | components/layout/Footer.tsx | כותרת תחתית |
+
+**Header — mobile hamburger menu:**
+- `menuOpen` state + `menuRef` לסגירה על-ידי לחיצה מחוץ
+- מוצג בלבד ב-`< sm`; desktop nav מוצג ב-`sm+`
+- Dropdown מכיל: "משאלה חדשה" (CTA), המשאלות שלי, ההתאמות שלי, סקציית admin (אם `isAdmin`), יציאה
+- Guard: `user.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL`
 
 ---
 
@@ -449,7 +474,8 @@ ORDER BY embedding <=> query_embedding
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ציבורי | Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | סודי | Admin client (bypass RLS) |
 | `OPENAI_API_KEY` | סודי | GPT + embeddings |
-| `ADMIN_EMAIL` | סודי | Admin guard |
+| `ADMIN_EMAIL` | סודי | Admin guard (API routes) |
+| `NEXT_PUBLIC_ADMIN_EMAIL` | ציבורי | Admin guard (Header client component) |
 | `APP_URL` | Runtime | Auth redirects |
 
 ---
