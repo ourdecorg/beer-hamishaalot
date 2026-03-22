@@ -128,6 +128,7 @@ object_of_need     text[]
 constraints        text[]
 domain_entities    text[]
 primary_domain     text (15 ערכים מוגדרים)
+anchor_keywords    text[] NOT NULL DEFAULT '{}' — canonical IDs מ-needs+skills+entities (migration 026)
 location_lat       float (WGS-84, null אם לא הוזכר מקום)
 location_lng       float
 location_name      text
@@ -137,6 +138,7 @@ confidence         float (0.0–1.0)
 ambiguity_flag     boolean
 analyzed_at        timestamptz
 ```
+**Index:** GIN על `anchor_keywords` — מאפשר `&&` overlap search ב-O(log n)
 
 #### `wish_embeddings`
 ```
@@ -165,16 +167,20 @@ wish_id               uuid
 candidate_wish_id     uuid
 semantic_similarity   float NOT NULL
 complementarity_score float NOT NULL
-theme_overlap         float NOT NULL  ← תמיד 0 (הוסר מהניקוד, NOT NULL legacy)
+theme_overlap         float NOT NULL  ← תמיד 0 (legacy NOT NULL)
 intent_compatibility  float
+domain_match          float           ← 0/1 לפי primary_domain (אובסרווביליות בלבד)
+structural_similarity float           ← signal ה-v8 (migration 026)
+recall_source         text            ← 'semantic'|'structured'|'both' (migration 026)
+geo_penalty           float           ← exp(-km/50), 1 אם אין מיקום
 match_score           float NOT NULL
 match_type            text (null אם לא עבר)
 passed_threshold      boolean NOT NULL
 created_at            timestamptz
 ```
-*עמודות נוספות בטבלה (לא נכתבות יותר):* freshness_factor, object_alignment, domain_match, distance_km, failed_distance, failed_date_range
+*עמודות ישנות בטבלה (לא נכתבות יותר):* freshness_factor, object_alignment, anchor_overlap, failed_distance
 
-**מה נרשם:** כל ניסיון שעבר את סינון טווח התאריכים
+**מה נרשם:** כל ניסיון שעבר את סינון טווח התאריכים ואת שער הכניסה לניקוד
 
 #### `openai_api_log`
 ```
@@ -199,50 +205,58 @@ UNIQUE(wish_id, user_id)
 
 ---
 
-## 4. מנגנון ההפגשה (Resonance Engine)
+## 4. מנגנון ההפגשה (Resonance Engine v8)
 
 ### pipeline ראשי — `processWishForMatching(wishId, wishText, {onlyLowerId?})`
 
 ```
 שלב 1: analyzeAndStoreWish()
   └── GPT-5.2 → JSON → wish_enrichment (upsert, מדלג אם קיים)
+  └── buildAnchorKeywords() → שמירת anchor_keywords בשורת ה-enrichment
 
 שלב 2: generateAndStoreEmbedding()
   └── buildEmbeddingText() — טקסט + domain + themes + entities + intent
   └── text-embedding-3-small → vector(1536) → wish_embeddings (upsert, מדלג אם קיים)
 
-שלב 3: findSimilarWishes()
+שלב 3a: findSimilarWishes() — ANN recall
   └── match_wishes() RPC → HNSW ANN search → candidates (similarity ≥ 0.30)
-  └── onlyLowerId=true בbatch: רק מועמדים עם id < wishId
+
+שלב 3b: findStructuredCandidates() — Structural recall
+  └── find_structured_candidates() RPC → GIN index &&-overlap על anchor_keywords
+  └── לא-קריטי: כשל מחזיר [] ומשך ANN-only (non-fatal)
+
+שלב 3c: Merge שני ערוצי ה-recall
+  └── מועמדים ב-ANN בלבד / Structural בלבד / שניהם (recallSource)
+  └── back-fill: computeSimilaritiesForIds() — cosine ב-JS למועמדים structural-only
 
 שלב 4: ניקוד וסינון
   ├── [filter קשה] dateRangesOverlap() — אם אין חפיפה → דלג
   ├── אם יש enrichment למועמד:
-  │     ├── computeComplementarity() → complementarity
-  │     └── computeIntentCompatibility() → intent
-  ├── אם אין enrichment → fallback: match_score = semantic_similarity
-  ├── computeMatchScore(semantic, complementarity, intent)
+  │     ├── computeComplementarity()       → complementarityScore
+  │     ├── computeIntentCompatibility()   → intentCompatibility
+  │     └── computeStructuralSimilarity()  → structuralSimilarity
+  ├── [שער כניסה] similarity ≥ 0.30 OR structuralSimilarity > 0 — אחרת → דלג
+  ├── computeMatchScore(semantic, complementarity, intent, structural) → match_score
   └── geo soft penalty: finalScore × exp(-distance_km / 50)
 
-שלב 5: persistance
-  ├── match_attempts_log INSERT (כל הניסיונות שעברו date filter)
-  └── wish_connections UPSERT (finalScore ≥ 0.55, ignoreDuplicates)
+שלב 5: Persistance
+  ├── match_attempts_log INSERT (כל מועמד שעבר date filter + שער כניסה)
+  └── wish_connections UPSERT (finalScore ≥ 0.48, ignoreDuplicates)
 ```
 
-### נוסחת הציון (v6)
+### נוסחת הציון (v8)
 
 ```
 match_score = 0.35 × semantic_similarity
-            + 0.25 × complementarity
+            + 0.30 × complementarity
             + 0.15 × intent_compatibility
-            + 0.15 × domain_match    (1 אם primary_domain זהה, 0 אחרת)
-            + 0.15 × anchor_overlap  (0 / 0.5 / 1 — ראה anchor.ts)
+            + 0.20 × structural_similarity
 
 final_score = match_score × exp(-distance_km / 50)
             (= match_score כשאין מיקום לאחת המשאלות)
 ```
 
-**ציון סף:** ≥ 0.48 · **כניסה לניקוד:** similarity ≥ 0.30
+**ציון סף:** ≥ 0.48 · **שער כניסה:** similarity ≥ 0.30 **או** structural_similarity > 0
 
 ### סיווג סוג ההתאמה
 
@@ -291,13 +305,57 @@ Lookup בטבלת ציונים סימטרית לפי `collaboration_type` של �
 - `connect ↔ connect` = 0.75 — שניהם מחפשים קשרים
 - Fallback לערך לא מוכר: 0.40
 
+### חישוב Structural Similarity (`lib/matching/keywords.ts`)
+
+בדיקה של 5 שדות עצמאיים. ציון = מספר ההתאמות / 4, מקסימום 1.
+
+| שדה | כיוון | שיטה |
+|-----|-------|------|
+| A.needs ↔ B.skills_offered | cross-field | `canonicalize()` — synonym-aware |
+| A.skills_offered ↔ B.needs | cross-field | `canonicalize()` — synonym-aware |
+| subject_entities | same-field | lowercase exact match |
+| domain_entities | same-field | lowercase exact match |
+| primary_domain | same-field | enum equality |
+
+**למה cross-field ולא same-field על needs?** שני אנשים שצריכים את אותו הדבר אינם משלימים אחד את השני. המטרה לגלות: A צריך מה ש-B מציע, ולהפך.
+
+**למה canonicalize() לneeds/skills?** עברית: יחיד/רבים, ה הידיעה, זכר/נקבה — `canonicalize()` ממפה מילים נרדפות ל-canonical ID אחיד ("מימון"/"השקעה" → `'funding'`), ומונע החמצות בגלל הבדלי צורה.
+
+דוגמאות ציון:
+- 0 התאמות → 0.00
+- 1 התאמה (למשל רק primary_domain זהה) → 0.25
+- 2 התאמות → 0.50
+- 4+ התאמות → 1.00 (capped)
+
+### חישוב Anchor Keywords (`lib/matching/keywords.ts`)
+
+`buildAnchorKeywords(enrichment)` — מייצר את `anchor_keywords` שנשמר ב-DB ומשמש ל-GIN recall:
+
+```
+canonicalize([
+  ...needs, ...skills_offered, ...subject_entities, ...domain_entities
+])
+```
+
+### `find_structured_candidates` RPC (migration 026)
+
+```sql
+SELECT e.wish_id FROM wish_enrichment e JOIN wishes w ON w.id = e.wish_id
+WHERE e.wish_id != source_wish_id
+  AND w.visibility IN ('anonymous', 'open')
+  AND e.anchor_keywords && source_keywords
+  AND (NOT only_lower_id OR e.wish_id < source_wish_id)
+```
+
+`&&` = PostgreSQL array overlap — מוצא כל משאלה שיש לה לפחות מילת עוגן אחת משותפת. דורש GIN index לביצועים.
+
 ### סינונים
 
 | סינון | סוג | תנאי |
 |-------|-----|------|
 | טווח תאריכים | קשה (hard) | אין חפיפה → דחייה |
+| שער כניסה | קשה | similarity < 0.30 **וגם** structural = 0 → דחייה |
 | מרחק גיאוגרפי | רך (soft) | `final_score × exp(-km/50)` |
-| enrichment חסר | fallback | match_score = semantic_similarity |
 
 ---
 
@@ -358,6 +416,8 @@ Intent: {intent}
 
 ## 7. חיפוש דמיון (lib/matching/similarity.ts)
 
+### `findSimilarWishes` — ANN recall
+
 **match_wishes SQL:**
 ```sql
 SELECT wish_id, 1 - (embedding <=> query_embedding) AS similarity
@@ -370,6 +430,14 @@ ORDER BY embedding <=> query_embedding
 ```
 
 **Retry:** 3 ניסיונות, backoff 2s/4s על timeout
+
+### `findStructuredCandidates` — Structural recall
+
+קורא ל-`find_structured_candidates` RPC (GIN `&&` על `anchor_keywords`). לא-קריטי — כשל מחזיר `[]` ומאפשר המשך ANN-only.
+
+### `computeSimilaritiesForIds` — Back-fill similarity
+
+למועמדים מה-structural path שאינם ב-ANN: מביא embeddings מ-`wish_embeddings` ומחשב cosine similarity ב-JavaScript. מחזיר `Map<wish_id, similarity>`.
 
 ---
 
@@ -458,6 +526,12 @@ ORDER BY embedding <=> query_embedding
 | 018 | failed_date_range בלוג |
 | 019 | confidence, ambiguity_flag ב-enrichment |
 | 020 | only_lower_id ב-match_wishes (אופטימיזציית batch) |
+| 021 | match_type enum → text, ביטול enum |
+| 022 | geo_penalty בלוג |
+| 023 | MATCH_THRESHOLD 0.55 → 0.48 |
+| 024 | domain_match בלוג (observability) |
+| 025 | anchor_entities ב-enrichment, anchor_overlap בלוג (deprecated) |
+| 026 | anchor_keywords + GIN index ב-enrichment, find_structured_candidates RPC, structural_similarity + recall_source בלוג |
 
 ---
 
@@ -481,17 +555,19 @@ ORDER BY embedding <=> query_embedding
 
 | קובץ | פונקציות |
 |------|---------|
-| index.ts | `processWishForMatching()` |
-| analyze.ts | `analyzeWishText()`, `analyzeAndStoreWish()` |
+| index.ts | `processWishForMatching()` — orchestrator v8 |
+| analyze.ts | `analyzeWishText()`, `analyzeAndStoreWish()` — שומר anchor_keywords |
 | embed.ts | `buildEmbeddingText()`, `generateEmbedding()`, `generateAndStoreEmbedding()` |
-| similarity.ts | `findSimilarWishes()` |
-| score.ts | `computeMatchScore()` — 3 signals only |
+| similarity.ts | `findSimilarWishes()`, `findStructuredCandidates()`, `computeSimilaritiesForIds()` |
+| keywords.ts | `buildAnchorKeywords()`, `computeStructuralSimilarity()` |
+| score.ts | `computeMatchScore()` — v8: 4 signals (0.35+0.30+0.15+0.20) |
 | complement.ts | `computeComplementarity()` |
 | intent.ts | `computeIntentCompatibility()` |
-| objectAlignment.ts | `computeObjectAlignment()` — unused in pipeline (kept) |
-| domain.ts | `computeDomainMatch()` — unused in pipeline (kept) |
 | geo.ts | `haversineKm()` — soft penalty exp(-km/50) |
 | timeRange.ts | `dateRangesOverlap()` |
 | canonicalize.ts | `canonicalize()`, `canonicalizeSubjectType()`, `canonicalizeAction()` |
 | openaiLog.ts | `logOpenAICall()` |
-| __tests__/ | Unit tests |
+| anchor.ts | `computeAnchorOverlap()` — לא בשימוש ב-pipeline (נשמר) |
+| objectAlignment.ts | `computeObjectAlignment()` — לא בשימוש ב-pipeline (נשמר) |
+| domain.ts | `computeDomainMatch()` — לא בשימוש ב-pipeline (נשמר) |
+| __tests__/ | keywords.test.ts, score.test.ts |
