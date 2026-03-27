@@ -2,20 +2,13 @@
 
 import { useRef, useState } from 'react'
 
-type LoadResult = {
-  created: number
-  errors: number
-  wishIds: string[]
-  details?: { email: string; error: string }[]
-}
-
-export default function TestDataPage() {
+export default function SettlementsPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<LoadResult | null>(null)
+  const [result, setResult] = useState<{ inserted: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  async function handleUpload() {
+  async function handleSeed() {
     const file = fileRef.current?.files?.[0]
     if (!file) { setError('נא לבחור קובץ CSV'); return }
 
@@ -26,7 +19,7 @@ export default function TestDataPage() {
     try {
       const fd = new FormData()
       fd.append('file', file)
-      const res = await fetch('/api/admin/load-test-data', { method: 'POST', body: fd })
+      const res = await fetch('/api/admin/seed-settlements', { method: 'POST', body: fd })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'שגיאה בטעינה')
       setResult(data)
@@ -41,16 +34,19 @@ export default function TestDataPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-well-900" style={{ fontFamily: 'var(--font-frank-ruhl)' }}>
-          טעינת TEST DATA
+          טעינת טבלת ישובים
         </h1>
         <p className="text-sm text-well-500 mt-1">
-          טען קובץ CSV של משאלות לסביבת הפיתוח.
+          קובץ CSV של ישובים מאתר הלמ&quot;ס — נטען לטבלת{' '}
+          <code className="bg-sand-100 px-1 rounded">settlements</code>{' '}
+          ומשמש לבחירת ישוב בטופס המשאלות.
         </p>
       </div>
 
       <div className="bg-white rounded-2xl border border-sand-200 p-6 shadow-sm space-y-4">
         <p className="text-xs text-well-500">
-          פורמט עמודות: שם, עיר, אזור, מספר בית, טלפון, אימייל, משאלה
+          הקובץ מקודד בـ Windows-1255 (ברירת מחדל של הלמ&quot;ס). ניתן להוריד מ:{' '}
+          <span className="font-mono text-sand-500">cbs.gov.il → גאוגרפיה → ישובים</span>
         </p>
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -61,35 +57,19 @@ export default function TestDataPage() {
             className="text-sm text-well-700 file:ml-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-sand-300 file:text-sm file:bg-sand-50 file:text-well-700 hover:file:bg-sand-100"
           />
           <button
-            onClick={handleUpload}
+            onClick={handleSeed}
             disabled={loading}
             className="btn-primary text-sm px-4 py-2 disabled:opacity-50"
           >
-            {loading ? 'טוען...' : 'העלה וצור משאלות'}
+            {loading ? 'טוען...' : 'טען ישובים'}
           </button>
         </div>
 
         {result && (
-          <div className="space-y-2">
-            <div className="flex gap-4 text-sm">
-              <span className="text-emerald-700 font-medium">✓ נוצרו: {result.created} משאלות</span>
-              {result.errors > 0 && (
-                <span className="text-red-600 font-medium">✗ שגיאות: {result.errors}</span>
-              )}
-            </div>
-            {result.details && result.details.length > 0 && (
-              <details className="text-xs text-red-600">
-                <summary className="cursor-pointer">פרטי שגיאות</summary>
-                <ul className="mt-1 space-y-0.5 pr-3">
-                  {result.details.map((d, i) => (
-                    <li key={i}>{d.email}: {d.error}</li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </div>
+          <p className="text-sm text-emerald-700 font-medium">
+            ✓ נטענו {result.inserted.toLocaleString()} ישובים בהצלחה
+          </p>
         )}
-
         {error && <p className="text-sm text-red-600">{error}</p>}
       </div>
     </div>

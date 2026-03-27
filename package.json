@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest"
+    "test": "jest",
+    "seed-settlements": "node scripts/seed-settlements.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.9.0",

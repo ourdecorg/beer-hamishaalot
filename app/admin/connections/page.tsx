@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -254,16 +253,11 @@ export default function ConnectionsDebugPage() {
       <div className="max-w-5xl mx-auto space-y-6">
 
         {/* Header */}
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <p className="section-label mb-1">כלי אדמין</p>
-            <h1 className="text-2xl sm:text-3xl text-well-900" style={{ fontFamily: 'var(--font-frank-ruhl)' }}>
-              תחקור חיבורים בין משאלות
-            </h1>
-          </div>
-          <Link href="/admin/test-data" className="btn-ghost text-sm">
-            ← כלי ניהול אחרים
-          </Link>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-well-900" style={{ fontFamily: 'var(--font-frank-ruhl)' }}>
+            MATCHES DEBUG
+          </h1>
+          <p className="text-sm text-well-500 mt-1">תחקור חיבורים בין משאלות</p>
         </div>
 
         {/* Wish selector */}
