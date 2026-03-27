@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { WishContactInfo } from '@/lib/types'
+import SettlementPicker from './SettlementPicker'
 
 const emptyContact: WishContactInfo = {
   contact_name: '',
@@ -139,14 +140,11 @@ export default function WishForm() {
               <label className="block text-xs text-well-600 mb-1">
                 ישוב <span className="text-red-400">*</span>
               </label>
-              <input
-                type="text"
+              <SettlementPicker
                 value={contact.contact_city}
-                onChange={(e) => setContactField('contact_city', e.target.value)}
-                placeholder="תל אביב"
+                onChange={(v) => setContactField('contact_city', v)}
                 required
                 disabled={status === 'loading'}
-                className="input-base"
               />
             </div>
 
