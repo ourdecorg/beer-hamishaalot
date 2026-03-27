@@ -14,6 +14,7 @@ interface LogEntry {
   response?: object | null
   error?: string | null
   elapsedMs: number
+  wishId?: string | null
 }
 
 export function logOpenAICall(entry: LogEntry): void {
@@ -27,6 +28,7 @@ export function logOpenAICall(entry: LogEntry): void {
       response:   entry.response ?? null,
       error:      entry.error ?? null,
       elapsed_ms: entry.elapsedMs,
+      wish_id:    entry.wishId ?? null,
     })
     .then(({ error }) => {
       if (error) console.error('[openaiLog] insert failed:', error.message)
