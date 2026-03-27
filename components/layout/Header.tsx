@@ -74,6 +74,11 @@ export default function Header() {
           >
             באר המשאלות
           </span>
+          {process.env.NEXT_PUBLIC_ENV === 'dev' && (
+            <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-300 select-none">
+              dev
+            </span>
+          )}
         </Link>
 
         {/* ── Desktop nav (sm+) ─────────────────────────────── */}
