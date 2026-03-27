@@ -61,7 +61,7 @@ export function buildEmbeddingText(
 /**
  * Generates a 1536-dimensional embedding for the given text.
  */
-export async function generateEmbedding(text: string): Promise<number[]> {
+export async function generateEmbedding(text: string, wishId?: string): Promise<number[]> {
   const model = 'text-embedding-3-small'
   const t0 = Date.now()
   let response: OpenAI.Embeddings.CreateEmbeddingResponse
@@ -73,6 +73,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
       request: { input: text },
       response: { usage: response.usage },  // vector omitted — stored in wish_embeddings
       elapsedMs: Date.now() - t0,
+      wishId,
     })
   } catch (err) {
     logOpenAICall({
@@ -81,6 +82,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
       request: { input: text },
       error: (err as { message?: string }).message ?? String(err),
       elapsedMs: Date.now() - t0,
+      wishId,
     })
     throw err
   }
@@ -129,7 +131,7 @@ export async function generateAndStoreEmbedding(
   }
 
   const text = buildEmbeddingText(wishText, enrichment)
-  const embedding = await generateEmbedding(text)
+  const embedding = await generateEmbedding(text, wishId)
 
   // Supabase expects the vector as a plain JS array — pgvector handles the cast
   await withDbRetry(

@@ -82,7 +82,7 @@ export interface WishAnalysisResult {
 /**
  * Calls GPT-4o to extract structured enrichment from a wish.
  */
-export async function analyzeWishText(wishText: string): Promise<WishAnalysisResult> {
+export async function analyzeWishText(wishText: string, wishId?: string): Promise<WishAnalysisResult> {
   const model = 'gpt-5.2'
   const today = new Date().toISOString().slice(0, 10)
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -197,6 +197,7 @@ ambiguity_flag:
         usage: completion.usage,
       },
       elapsedMs: Date.now() - t0,
+      wishId,
     })
   } catch (err) {
     logOpenAICall({
@@ -205,6 +206,7 @@ ambiguity_flag:
       request: { messages, max_completion_tokens: 1024 },
       error: (err as { message?: string }).message ?? String(err),
       elapsedMs: Date.now() - t0,
+      wishId,
     })
     throw err
   }
@@ -269,7 +271,7 @@ export async function analyzeAndStoreWish(
     if (existing) return existing as WishEnrichment
   }
 
-  const result = await analyzeWishText(wishText)
+  const result = await analyzeWishText(wishText, wishId)
 
   const row = {
     wish_id: wishId,
