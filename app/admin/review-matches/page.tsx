@@ -21,10 +21,11 @@ export default async function ReviewMatchesPage({
   if (!user || user.email !== process.env.ADMIN_EMAIL) redirect('/')
 
   const sp = searchParams
-  const typeFilter     = typeof sp.type     === 'string' ? sp.type     : 'all'
-  const reviewedFilter = typeof sp.reviewed === 'string' ? sp.reviewed : 'all'
-  const gateFilter     = typeof sp.gate     === 'string' ? sp.gate     : 'all'
-  const nearFilter     = typeof sp.near     === 'string' ? sp.near     : '0'
+  const typeFilter       = typeof sp.type      === 'string' ? sp.type      : 'all'
+  const reviewedFilter   = typeof sp.reviewed  === 'string' ? sp.reviewed  : 'all'
+  const gateFilter       = typeof sp.gate      === 'string' ? sp.gate      : 'all'
+  const nearFilter       = typeof sp.near      === 'string' ? sp.near      : '0'
+  const cancelledFilter  = typeof sp.cancelled === 'string' ? sp.cancelled : 'hide'
 
   const admin = createAdminClient()
 
@@ -50,7 +51,7 @@ export default async function ReviewMatchesPage({
   ])]
 
   const { data: wishRows } = wishIds.length > 0
-    ? await admin.from('wishes').select('id, original_text, contact_city').in('id', wishIds)
+    ? await admin.from('wishes').select('id, original_text, contact_city, status').in('id', wishIds)
     : { data: [] }
 
   const wishMap: Record<string, WishStub> = {}
@@ -85,7 +86,15 @@ export default async function ReviewMatchesPage({
     reviewMap[`${r.wish_id}:${r.candidate_wish_id}`] = r as ExistingReview
   }
 
-  // ── 5. Apply reviewed filter (client-side after review fetch) ─────────────
+  // ── 5. Apply cancelled filter ─────────────────────────────────────────────
+  if (cancelledFilter !== 'show') {
+    attempts = attempts.filter(a =>
+      wishMap[a.wish_id]?.status !== 'cancelled' &&
+      wishMap[a.candidate_wish_id]?.status !== 'cancelled'
+    )
+  }
+
+  // ── 6. Apply reviewed filter (client-side after review fetch) ─────────────
   if (reviewedFilter === 'yes') {
     attempts = attempts.filter(a => reviewMap[`${a.wish_id}:${a.candidate_wish_id}`])
   } else if (reviewedFilter === 'no') {
@@ -99,7 +108,7 @@ export default async function ReviewMatchesPage({
       connectionMap={connectionMap}
       reviewMap={reviewMap}
       userEmail={user.email!}
-      filters={{ type: typeFilter, reviewed: reviewedFilter, gate: gateFilter, near: nearFilter }}
+      filters={{ type: typeFilter, reviewed: reviewedFilter, gate: gateFilter, near: nearFilter, cancelled: cancelledFilter }}
     />
   )
 }

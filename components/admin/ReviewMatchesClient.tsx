@@ -28,6 +28,7 @@ export interface WishStub {
   id: string
   original_text: string
   contact_city: string | null
+  status?: string | null
 }
 
 export interface ExistingReview {
@@ -44,7 +45,7 @@ export interface ReviewMatchesProps {
   connectionMap: Record<string, string | null>  // canonical "a:b" → connection_id or null
   reviewMap: Record<string, ExistingReview>     // "wish_id:candidate_wish_id" → review
   userEmail: string
-  filters: { type: string; reviewed: string; gate: string; near: string }
+  filters: { type: string; reviewed: string; gate: string; near: string; cancelled: string }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -77,7 +78,7 @@ function FilterBar({ filters }: { filters: ReviewMatchesProps['filters'] }) {
 
   function filterLink(key: string, value: string, label: string, active: boolean) {
     const params = new URLSearchParams({
-      type: filters.type, reviewed: filters.reviewed, gate: filters.gate, near: filters.near,
+      type: filters.type, reviewed: filters.reviewed, gate: filters.gate, near: filters.near, cancelled: filters.cancelled,
       [key]: value,
     })
     return (
@@ -111,6 +112,9 @@ function FilterBar({ filters }: { filters: ReviewMatchesProps['filters'] }) {
 
       {filterLink('near', filters.near === '1' ? '0' : '1',
         filters.near === '1' ? '× קרוב לסף' : 'קרוב לסף', filters.near === '1')}
+
+      {filterLink('cancelled', filters.cancelled === 'show' ? 'hide' : 'show',
+        filters.cancelled === 'show' ? '× כולל מבוטלות' : 'כולל מבוטלות', filters.cancelled === 'show')}
     </div>
   )
 }
