@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { processWishForMatching } from '@/lib/matching'
+import { prepareWishForMatching, processWishForMatching } from '@/lib/matching'
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 export async function POST(request: NextRequest) {
   // Auth guard
@@ -43,13 +43,28 @@ export async function POST(request: NextRequest) {
 
   const wishMap = new Map((wishes ?? []).map((w: { id: string; original_text: string }) => [w.id, w.original_text]))
 
-  // Stagger wish processing to avoid OpenAI TPM rate limits.
-  // Each wish starts 3 seconds after the previous one — the response is
-  // returned immediately; Railway keeps the process alive so all complete.
   const STAGGER_MS = 1000
+
+  // ── Phase 1: prepare all wishes (enrichment + embedding) before matching ──
+  // Stagger to stay within OpenAI TPM limits; await all so matching only
+  // begins once every wish has its enrichment and embedding in the DB.
+  const preparePromises: Promise<void>[] = []
+  for (let i = 0; i < wishIds.length; i++) {
+    const id   = wishIds[i]
+    const text = wishMap.get(id)
+    if (!text) continue
+    preparePromises.push(
+      new Promise<void>(resolve => setTimeout(resolve, i * STAGGER_MS))
+        .then(() => prepareWishForMatching(id, text))
+    )
+  }
+  await Promise.all(preparePromises)
+
+  // ── Phase 2: run matching for all wishes (enrichment already exists) ──
+  // Fire-and-forget; Railway keeps the process alive until all complete.
   let started = 0
   for (let i = 0; i < wishIds.length; i++) {
-    const id = wishIds[i]
+    const id   = wishIds[i]
     const text = wishMap.get(id)
     if (!text) continue
     setTimeout(() => processWishForMatching(id, text, { onlyLowerId: true }), i * STAGGER_MS)
@@ -57,7 +72,7 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({
-    message: `Matching pipeline started for ${started} wishes. Results will appear in wish_connections as each completes.`,
+    message: `Preparation complete. Matching pipeline started for ${started} wishes.`,
     started,
   })
 }

@@ -50,6 +50,23 @@ function distanceScore(a: WishEnrichment, b: WishEnrichment): number {
   return Math.exp(-km / 50)
 }
 
+/**
+ * Phase 1 only — enrichment + embedding (no matching).
+ * Used by the batch runner to ensure all wishes are prepared
+ * before any matching begins.
+ */
+export async function prepareWishForMatching(
+  wishId: string,
+  wishText: string,
+): Promise<void> {
+  try {
+    const enrichment = await analyzeAndStoreWish(wishId, wishText)
+    await generateAndStoreEmbedding(wishId, wishText, enrichment)
+  } catch (err) {
+    console.error('[ResonanceEngine] prepareWishForMatching failed:', err)
+  }
+}
+
 export async function processWishForMatching(
   wishId: string,
   wishText: string,
