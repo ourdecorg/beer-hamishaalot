@@ -7,7 +7,8 @@ const navItems = [
   { href: '/admin/test-data',    icon: '📦', label: 'טעינת TEST DATA' },
   { href: '/admin/run-matching', icon: '⚡', label: 'הרצת MATCHES' },
   { href: '/admin/connections',  icon: '🔍', label: 'MATCHES DEBUG' },
-  { href: '/admin/settlements',  icon: '🏘', label: 'טעינת ישובים' },
+  { href: '/admin/settlements',    icon: '🏘', label: 'טעינת ישובים' },
+  { href: '/admin/review-matches', icon: '⭐', label: 'פידבק התאמות' },
 ]
 
 export default function AdminNav() {
