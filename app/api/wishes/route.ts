@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
       original_text: original_text.trim(),
       visibility,
       contact_name: contact?.contact_name?.trim() || null,
+      contact_email: user.email ?? null,
       contact_country: 'Israel',
       contact_city: contact?.contact_city?.trim() || null,
       contact_address: contact?.contact_address?.trim() || null,
