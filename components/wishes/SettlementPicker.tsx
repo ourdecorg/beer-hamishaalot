@@ -18,20 +18,11 @@ interface Props {
 }
 
 export default function SettlementPicker({ value, onChange, disabled, required }: Props) {
-  const [settlements, setSettlements] = useState<Settlement[]>([])
+  const [results, setResults] = useState<Settlement[]>([])
   const [query, setQuery] = useState(value)
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-
-  // Load all settlements once on mount
-  useEffect(() => {
-    createClient()
-      .from('settlements')
-      .select('id, name, name_en, district')
-      .order('name')
-      .limit(2000)
-      .then(({ data }) => { if (data) setSettlements(data as Settlement[]) })
-  }, [])
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Sync query when external value resets (e.g. form clear)
   useEffect(() => { setQuery(value) }, [value])
@@ -45,14 +36,23 @@ export default function SettlementPicker({ value, onChange, disabled, required }
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const filtered = query.length >= 2
-    ? settlements
-        .filter(s =>
-          s.name.includes(query) ||
-          s.name_en?.toLowerCase().includes(query.toLowerCase())
-        )
-        .slice(0, 25)
-    : []
+  // Search settlements server-side with debounce
+  useEffect(() => {
+    if (query.length < 2) { setResults([]); return }
+
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(async () => {
+      const { data } = await createClient()
+        .from('settlements')
+        .select('id, name, name_en, district')
+        .or(`name.ilike.%${query}%,name_en.ilike.%${query}%`)
+        .order('name')
+        .limit(25)
+      if (data) setResults(data as Settlement[])
+    }, 150)
+
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [query])
 
   const handleInput = (val: string) => {
     setQuery(val)
@@ -64,6 +64,7 @@ export default function SettlementPicker({ value, onChange, disabled, required }
     setQuery(s.name)
     onChange(s.name)
     setOpen(false)
+    setResults([])
   }
 
   return (
@@ -80,9 +81,9 @@ export default function SettlementPicker({ value, onChange, disabled, required }
         autoComplete="off"
         dir="rtl"
       />
-      {open && filtered.length > 0 && (
+      {open && results.length > 0 && (
         <ul className="absolute right-0 top-full z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-sand-200 bg-white shadow-lg">
-          {filtered.map(s => (
+          {results.map(s => (
             <li
               key={s.id}
               onMouseDown={() => handleSelect(s)}
