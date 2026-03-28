@@ -265,11 +265,22 @@ export default function ReviewMatchesClient({
   attempts, wishMap, connectionMap, reviewMap, userEmail, filters,
 }: ReviewMatchesProps) {
 
+  const [searchQuery, setSearchQuery] = useState('')
+
   const reviewed   = attempts.filter(a => reviewMap[`${a.wish_id}:${a.candidate_wish_id}`])
   const unreviewed = attempts.filter(a => !reviewMap[`${a.wish_id}:${a.candidate_wish_id}`])
   const good  = reviewed.filter(a => reviewMap[`${a.wish_id}:${a.candidate_wish_id}`]?.label === 'good').length
   const maybe = reviewed.filter(a => reviewMap[`${a.wish_id}:${a.candidate_wish_id}`]?.label === 'maybe').length
   const bad   = reviewed.filter(a => reviewMap[`${a.wish_id}:${a.candidate_wish_id}`]?.label === 'bad').length
+
+  const q = searchQuery.trim().toLowerCase()
+  const visibleAttempts = q
+    ? attempts.filter(a => {
+        const textA = wishMap[a.wish_id]?.original_text?.toLowerCase() ?? ''
+        const textB = wishMap[a.candidate_wish_id]?.original_text?.toLowerCase() ?? ''
+        return textA.includes(q) || textB.includes(q)
+      })
+    : attempts
 
   return (
     <div className="space-y-6">
@@ -302,14 +313,39 @@ export default function ReviewMatchesClient({
       {/* Filters */}
       <FilterBar filters={filters} />
 
+      {/* Search */}
+      <div className="relative">
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="חיפוש לפי טקסט משאלה…"
+          dir="rtl"
+          className="w-full text-sm rounded-xl border border-sand-200 px-4 py-2.5 text-well-800 placeholder-sand-300 focus:outline-none focus:ring-1 focus:ring-well-400"
+        />
+        {q && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-sand-400 hover:text-well-600 text-xs"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
       {/* Cards */}
-      {attempts.length === 0 ? (
+      {visibleAttempts.length === 0 ? (
         <div className="card-featured p-10 text-center text-well-500 text-sm">
-          אין רשומות התואמות את הסינון הנוכחי
+          {q ? `אין תוצאות לחיפוש "${searchQuery}"` : 'אין רשומות התואמות את הסינון הנוכחי'}
         </div>
       ) : (
         <div className="space-y-4">
-          {attempts.map(attempt => {
+          {q && (
+            <p className="text-xs text-sand-400">
+              {visibleAttempts.length} תוצאות מתוך {attempts.length}
+            </p>
+          )}
+          {visibleAttempts.map(attempt => {
             const connKey = canonicalKey(attempt.wish_id, attempt.candidate_wish_id)
             const connectionId = connectionMap[connKey] ?? null
             const existingReview = reviewMap[`${attempt.wish_id}:${attempt.candidate_wish_id}`]
