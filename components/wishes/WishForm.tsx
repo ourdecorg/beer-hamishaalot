@@ -122,12 +122,11 @@ export default function WishForm() {
             {/* City */}
             <div>
               <label className="block text-xs text-well-600 mb-1">
-                ישוב <span className="text-red-400">*</span>
+                ישוב <span className="text-sand-400">(לא חובה)</span>
               </label>
               <SettlementPicker
                 value={contact.contact_city}
                 onChange={(v) => setContactField('contact_city', v)}
-                required
                 disabled={status === 'loading'}
               />
             </div>
