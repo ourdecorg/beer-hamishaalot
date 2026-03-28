@@ -83,5 +83,11 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Delete failed', detail: error.message }, { status: 500 })
   }
 
+  // Mark all connections involving this wish as deleted
+  await admin
+    .from('wish_connections')
+    .update({ status: 'deleted' })
+    .or(`wish_a.eq.${params.id},wish_b.eq.${params.id}`)
+
   return NextResponse.json({ success: true })
 }
