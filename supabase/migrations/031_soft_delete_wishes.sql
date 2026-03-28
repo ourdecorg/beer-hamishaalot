@@ -2,6 +2,10 @@
 -- Migration 031: Soft-delete wishes (status = 'cancelled')
 -- ============================================================
 
+-- Ensure status column exists (may be missing on prod DBs created before migration tracking)
+alter table public.wishes
+  add column if not exists status text not null default 'pending';
+
 -- Update public select policy to hide cancelled wishes from non-owners
 drop policy if exists "wishes: public can select open/anon" on public.wishes;
 
