@@ -29,6 +29,7 @@ export default function SettlementPicker({ value, onChange, disabled, required }
       .from('settlements')
       .select('id, name, name_en, district')
       .order('name')
+      .limit(2000)
       .then(({ data }) => { if (data) setSettlements(data as Settlement[]) })
   }, [])
 
