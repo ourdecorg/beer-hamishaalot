@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
     .from('wishes')
     .select('id, original_text')
     .eq('user_email', email)
+    .neq('status', 'cancelled')
 
   const myWishList = myWishes ?? []
   const myWishIds = myWishList.map(w => w.id)

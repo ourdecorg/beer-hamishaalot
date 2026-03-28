@@ -61,7 +61,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
   const { error } = await supabase
     .from('wishes')
-    .delete()
+    .update({ status: 'cancelled' })
     .eq('id', params.id)
     .eq('user_id', user.id)
 
