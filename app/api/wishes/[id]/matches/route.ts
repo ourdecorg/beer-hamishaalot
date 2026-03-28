@@ -37,6 +37,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     .from('wish_connections')
     .select('*')
     .or(`wish_a.eq.${params.id},wish_b.eq.${params.id}`)
+    .neq('status', 'deleted')
     .order('match_score', { ascending: false })
 
   if (error) {

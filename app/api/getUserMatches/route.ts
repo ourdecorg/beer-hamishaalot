@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
     .from('wish_connections')
     .select('id, wish_a, wish_b, match_score, match_type, created_at')
     .or(`wish_a.in.(${myWishIds.join(',')}),wish_b.in.(${myWishIds.join(',')})`)
+    .neq('status', 'deleted')
     .order('match_score', { ascending: false })
 
   const connList = connections ?? []

@@ -37,6 +37,7 @@ export default async function MyWishesPage() {
       .from('wish_connections')
       .select('wish_a, wish_b')
       .or(`wish_a.in.(${ids.join(',')}),wish_b.in.(${ids.join(',')})`)
+      .neq('status', 'deleted')
 
     for (const c of connections ?? []) {
       if (ids.includes(c.wish_a)) matchCountMap.set(c.wish_a, (matchCountMap.get(c.wish_a) ?? 0) + 1)
