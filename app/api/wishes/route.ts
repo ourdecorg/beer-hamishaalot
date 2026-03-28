@@ -7,7 +7,7 @@ import type { CreateWishInput } from '@/lib/types'
 // Allow enough time for the matching pipeline (GPT-4o analysis + embedding + scoring)
 export const maxDuration = 60
 
-const REQUIRED_CONTACT_FIELDS = ['contact_name', 'contact_country', 'contact_city'] as const
+const REQUIRED_CONTACT_FIELDS = ['contact_name', 'contact_city'] as const
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       original_text: original_text.trim(),
       visibility,
       contact_name: contact?.contact_name?.trim() || null,
-      contact_country: contact?.contact_country?.trim() || null,
+      contact_country: 'Israel',
       contact_city: contact?.contact_city?.trim() || null,
       contact_address: contact?.contact_address?.trim() || null,
       contact_phone: contact?.contact_phone?.trim() || null,

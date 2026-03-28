@@ -7,7 +7,7 @@ import SettlementPicker from './SettlementPicker'
 
 const emptyContact: WishContactInfo = {
   contact_name: '',
-  contact_country: '',
+  contact_country: 'Israel',
   contact_city: '',
   contact_address: '',
   contact_phone: '',
@@ -113,22 +113,6 @@ export default function WishForm() {
                 value={contact.contact_name}
                 onChange={(e) => setContactField('contact_name', e.target.value)}
                 placeholder="השם שלך"
-                required
-                disabled={status === 'loading'}
-                className="input-base"
-              />
-            </div>
-
-            {/* Country */}
-            <div>
-              <label className="block text-xs text-well-600 mb-1">
-                ארץ <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={contact.contact_country}
-                onChange={(e) => setContactField('contact_country', e.target.value)}
-                placeholder="ישראל"
                 required
                 disabled={status === 'loading'}
                 className="input-base"
