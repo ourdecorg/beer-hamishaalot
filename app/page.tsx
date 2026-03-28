@@ -317,7 +317,7 @@ export default async function HomePage() {
             href="/admin/test-data"
             className="text-xs text-sand-400 hover:text-well-600 underline underline-offset-2 transition-colors"
           >
-            ניהול — טעינת נתוני בדיקה
+            מסכי ניהול
           </Link>
         </div>
       )}
