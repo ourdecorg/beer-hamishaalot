@@ -3,6 +3,7 @@ import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import { createClient } from '@/lib/supabase/server'
+import DeleteWishButton from '@/components/wishes/DeleteWishButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +37,7 @@ export default async function MyWishesPage() {
       .from('wish_connections')
       .select('wish_a, wish_b')
       .or(`wish_a.in.(${ids.join(',')}),wish_b.in.(${ids.join(',')})`)
+      .neq('status', 'deleted')
 
     for (const c of connections ?? []) {
       if (ids.includes(c.wish_a)) matchCountMap.set(c.wish_a, (matchCountMap.get(c.wish_a) ?? 0) + 1)
@@ -132,6 +134,7 @@ export default async function MyWishesPage() {
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${vis.cls}`}>
                       {vis.icon} {vis.label}
                     </span>
+                    <DeleteWishButton wishId={wish.id} />
                   </div>
                 </div>
 

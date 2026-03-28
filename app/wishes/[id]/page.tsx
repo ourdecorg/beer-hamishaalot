@@ -100,10 +100,6 @@ export default async function WishPage({ params }: Props) {
                 <dd className="text-well-800 font-medium" dir="ltr">{wish.contact_email}</dd>
               </div>
               <div>
-                <dt className="text-xs text-sand-400 mb-0.5">ארץ</dt>
-                <dd className="text-well-800">{wish.contact_country}</dd>
-              </div>
-              <div>
                 <dt className="text-xs text-sand-400 mb-0.5">ישוב</dt>
                 <dd className="text-well-800">{wish.contact_city}</dd>
               </div>

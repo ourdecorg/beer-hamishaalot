@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
       .from('wishes')
       .select('id')
       .eq('visibility', 'open')
+      .neq('status', 'cancelled')
     wishIds = (wishes ?? []).map((w: { id: string }) => w.id)
   }
 
