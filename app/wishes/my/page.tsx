@@ -3,6 +3,7 @@ import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import { createClient } from '@/lib/supabase/server'
+import DeleteWishButton from '@/components/wishes/DeleteWishButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -132,6 +133,7 @@ export default async function MyWishesPage() {
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${vis.cls}`}>
                       {vis.icon} {vis.label}
                     </span>
+                    <DeleteWishButton wishId={wish.id} />
                   </div>
                 </div>
 
