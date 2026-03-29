@@ -1,20 +1,12 @@
 /**
- * i18n — Beer Hamishaalot
+ * i18n — Beer Hamishaalot (client-safe)
  *
- * Lang is persisted in a `lang` cookie (server-readable).
- * Default for new users: 'en'.
- * Client components read via useLang() (LangProvider context).
- * Server components call getLang() directly.
+ * This file contains only pure translation data — no server imports.
+ * Server components that need to read the lang cookie should import
+ * getLang() from '@/lib/i18n/server' instead.
  */
-import { cookies } from 'next/headers'
 
 export type Lang = 'en' | 'he'
-
-export async function getLang(): Promise<Lang> {
-  const c = await cookies()
-  const val = c.get('lang')?.value
-  return val === 'he' ? 'he' : 'en'
-}
 
 export function dateLocale(lang: Lang): string {
   return lang === 'he' ? 'he-IL' : 'en-US'

@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Heebo, Frank_Ruhl_Libre } from 'next/font/google'
 import './globals.css'
 import LangProvider from '@/components/LangProvider'
-import { getLang } from '@/lib/i18n'
+import { getLang } from '@/lib/i18n/server'
 
 const heebo = Heebo({
   subsets: ['hebrew', 'latin'],

@@ -2,7 +2,8 @@ import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import { createClient } from '@/lib/supabase/server'
-import { getLang, t } from '@/lib/i18n'
+import { t } from '@/lib/i18n'
+import { getLang } from '@/lib/i18n/server'
 
 type PreviewWish = {
   original_text: string

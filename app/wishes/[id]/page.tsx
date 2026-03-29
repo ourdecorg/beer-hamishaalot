@@ -4,7 +4,8 @@ import Footer from '@/components/layout/Footer'
 import ResonanceButton from '@/components/wishes/ResonanceButton'
 import MatchesSection from '@/components/wishes/MatchesSection'
 import { createClient } from '@/lib/supabase/server'
-import { getLang, t, dateLocale } from '@/lib/i18n'
+import { t, dateLocale } from '@/lib/i18n'
+import { getLang } from '@/lib/i18n/server'
 import type { WishWithResonance } from '@/lib/types'
 
 interface Props {

@@ -4,7 +4,8 @@ import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import { createClient } from '@/lib/supabase/server'
 import DeleteWishButton from '@/components/wishes/DeleteWishButton'
-import { getLang, t, dateLocale } from '@/lib/i18n'
+import { t, dateLocale } from '@/lib/i18n'
+import { getLang } from '@/lib/i18n/server'
 
 export const dynamic = 'force-dynamic'
 

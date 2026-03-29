@@ -2,7 +2,8 @@ import Header from '@/components/layout/Header'
 import WishForm from '@/components/wishes/WishForm'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { getLang, t } from '@/lib/i18n'
+import { t } from '@/lib/i18n'
+import { getLang } from '@/lib/i18n/server'
 
 export async function generateMetadata() {
   const lang = await getLang()
