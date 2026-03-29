@@ -1,5 +1,5 @@
 /**
- * Wish Resonance Engine — Orchestrator (v8 — dual recall)
+ * Wish Resonance Engine — Orchestrator (v8.5 — relevance gate)
  *
  * processWishForMatching(wishId, wishText) is the single entry point.
  * Pipeline:
@@ -9,9 +9,10 @@
  *   3b. Structural recall → candidates with anchor_keywords overlap
  *   3c. Merge both channels, back-fill similarity for structural-only candidates
  *   4. Score          → 0.35×semantic + 0.30×complementarity + 0.15×intent + 0.20×structural
- *   5. Geo            → soft distance penalty (exp(-d/50))
- *   6. Date range     → hard filter
- *   7. Persist        → wish_connections (finalScore ≥ MATCH_THRESHOLD)
+ *   5. Relevance gate → reject if semantic<0.30 AND complementarity<0.20 AND structural<0.25
+ *   6. Geo            → soft distance penalty (exp(-d/50))
+ *   7. Date range     → hard filter
+ *   8. Persist        → wish_connections (finalScore ≥ MATCH_THRESHOLD)
  *
  * Designed to be called fire-and-forget (never throws).
  */
@@ -47,6 +48,23 @@ function distanceScore(a: WishEnrichment, b: WishEnrichment): number {
   if (aLat == null || aLng == null || bLat == null || bLng == null) return 1
   const km = haversineKm(aLat, aLng, bLat, bLng)
   return Math.exp(-km / 50)
+}
+
+/**
+ * Phase 1 only — enrichment + embedding (no matching).
+ * Used by the batch runner to ensure all wishes are prepared
+ * before any matching begins.
+ */
+export async function prepareWishForMatching(
+  wishId: string,
+  wishText: string,
+): Promise<void> {
+  try {
+    const enrichment = await analyzeAndStoreWish(wishId, wishText)
+    await generateAndStoreEmbedding(wishId, wishText, enrichment)
+  } catch (err) {
+    console.error('[ResonanceEngine] prepareWishForMatching failed:', err)
+  }
 }
 
 export async function processWishForMatching(
@@ -121,6 +139,8 @@ export async function processWishForMatching(
       match_score: number
       match_type: string | null
       passed_threshold: boolean
+      gate_passed: boolean
+      gate_reason: string
     }> = []
 
     for (const candidate of merged) {
@@ -147,9 +167,32 @@ export async function processWishForMatching(
         domainMatch           = (enrichment.primary_domain && enrichment.primary_domain === candidateEnrichment.primary_domain) ? 1 : 0
       }
 
-      // Candidate gating: admit if ANN threshold passed OR structural evidence found
-      const passesGate = candidate.similarity >= MIN_SIMILARITY || structuralSimilarity > 0
-      if (!passesGate) continue
+      // Relevance gate (v8.5): reject only if all three weak signals are below thresholds
+      const passesRelevanceGate =
+        candidate.similarity  >= 0.30 ||
+        complementarityScore  >= 0.20 ||
+        structuralSimilarity  >= 0.25
+
+      if (!passesRelevanceGate) {
+        logEntries.push({
+          wish_id:               wishId,
+          candidate_wish_id:     candidate.wish_id,
+          semantic_similarity:   Math.round(candidate.similarity      * 1000) / 1000,
+          complementarity_score: Math.round(complementarityScore      * 1000) / 1000,
+          theme_overlap:         0,
+          intent_compatibility:  Math.round(intentCompatibility       * 1000) / 1000,
+          domain_match:          domainMatch,
+          structural_similarity: Math.round(structuralSimilarity      * 1000) / 1000,
+          recall_source:         candidate.recallSource,
+          geo_penalty:           1,
+          match_score:           0,
+          match_type:            null,
+          passed_threshold:      false,
+          gate_passed:           false,
+          gate_reason:           'low_semantic_low_complementarity_low_structural',
+        })
+        continue
+      }
 
       const score = computeMatchScore(
         candidate.similarity,
@@ -177,6 +220,8 @@ export async function processWishForMatching(
         match_score:           finalScore,
         match_type:            passed ? score.match_type : null,
         passed_threshold:      passed,
+        gate_passed:           true,
+        gate_reason:           'passed',
       })
 
       if (!passed) continue

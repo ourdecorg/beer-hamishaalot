@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { WishContactInfo } from '@/lib/types'
 import SettlementPicker from './SettlementPicker'
+import { useLang } from '@/components/LangProvider'
+import { t } from '@/lib/i18n'
 
 const emptyContact: WishContactInfo = {
   contact_name: '',
@@ -13,8 +15,15 @@ const emptyContact: WishContactInfo = {
   contact_phone: '',
 }
 
-export default function WishForm() {
-  const [text, setText] = useState('')
+interface WishFormProps {
+  initialText?: string
+}
+
+export default function WishForm({ initialText = '' }: WishFormProps) {
+  const lang = useLang()
+  const tr = t(lang).wishForm
+
+  const [text, setText] = useState(initialText)
   const [contact, setContact] = useState<WishContactInfo>(emptyContact)
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
@@ -43,7 +52,7 @@ export default function WishForm() {
       const data = await res.json().catch(() => ({}))
       setStatus('error')
       const detail = data.detail ? ` (${data.detail})` : ''
-      setErrorMsg((data.error ?? 'אירעה שגיאה. נסה שוב.') + detail)
+      setErrorMsg((data.error ?? tr.errorGeneric) + detail)
       return
     }
 
@@ -57,19 +66,15 @@ export default function WishForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Text area */}
       <div>
-        <label
-          htmlFor="wish-text"
-          className="block text-sm font-medium text-well-700 mb-2"
-        >
-          מה משאלתך?
+        <label htmlFor="wish-text" className="block text-sm font-medium text-slate-700 mb-2">
+          {tr.label}
         </label>
         <textarea
           id="wish-text"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="שתף את מה שנמצא בלבך. זה יכול להיות חלום, כוונה, תקווה, או כל דבר שרצונך שיתגשם..."
+          placeholder={tr.placeholder}
           rows={6}
           maxLength={1000}
           required
@@ -79,16 +84,10 @@ export default function WishForm() {
           }`}
         />
         <div className="flex justify-between items-center mt-1">
-          <span className="text-xs text-sand-400">
-            שתף בחופשיות — הבאר מקשיבה
-          </span>
+          <span className="text-xs text-slate-400">{tr.hint}</span>
           <span
             className={`text-xs ${
-              isOverLimit
-                ? 'text-red-500'
-                : isNearLimit
-                ? 'text-amber-600'
-                : 'text-sand-400'
+              isOverLimit ? 'text-red-500' : isNearLimit ? 'text-amber-600' : 'text-slate-400'
             }`}
           >
             {charCount}/1000
@@ -96,82 +95,73 @@ export default function WishForm() {
         </div>
       </div>
 
-      {/* Contact info */}
-      <div className="card p-6 space-y-4 border-well-200 bg-well-50/40">
-          <p className="text-sm font-medium text-well-700">
-            ✦ פרטי קשר — יוצגו עם המשאלה
-          </p>
+      <div className="card p-6 space-y-4 bg-slate-50">
+        <p className="text-sm font-medium text-slate-700">{tr.contactTitle}</p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Name */}
-            <div>
-              <label className="block text-xs text-well-600 mb-1">
-                שם <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={contact.contact_name}
-                onChange={(e) => setContactField('contact_name', e.target.value)}
-                placeholder="השם שלך"
-                required
-                disabled={status === 'loading'}
-                className="input-base"
-              />
-            </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">
+              {tr.nameLabel} <span className="text-red-400">{tr.nameRequired}</span>
+            </label>
+            <input
+              type="text"
+              value={contact.contact_name}
+              onChange={(e) => setContactField('contact_name', e.target.value)}
+              placeholder={tr.namePlaceholder}
+              required
+              disabled={status === 'loading'}
+              className="input-base"
+            />
+          </div>
 
-            {/* City */}
-            <div>
-              <label className="block text-xs text-well-600 mb-1">
-                ישוב <span className="text-sand-400">(לא חובה)</span>
-              </label>
-              <SettlementPicker
-                value={contact.contact_city}
-                onChange={(v) => setContactField('contact_city', v)}
-                disabled={status === 'loading'}
-              />
-            </div>
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">
+              {tr.cityLabel} <span className="text-slate-400">{tr.optional}</span>
+            </label>
+            <SettlementPicker
+              value={contact.contact_city}
+              onChange={(v) => setContactField('contact_city', v)}
+              disabled={status === 'loading'}
+            />
+          </div>
 
-            {/* Address — optional */}
-            <div>
-              <label className="block text-xs text-well-600 mb-1">
-                כתובת <span className="text-sand-400">(לא חובה)</span>
-              </label>
-              <input
-                type="text"
-                value={contact.contact_address}
-                onChange={(e) => setContactField('contact_address', e.target.value)}
-                placeholder="רחוב ומספר בית"
-                disabled={status === 'loading'}
-                className="input-base"
-              />
-            </div>
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">
+              {tr.addressLabel} <span className="text-slate-400">{tr.optional}</span>
+            </label>
+            <input
+              type="text"
+              value={contact.contact_address}
+              onChange={(e) => setContactField('contact_address', e.target.value)}
+              placeholder={tr.addressPlaceholder}
+              disabled={status === 'loading'}
+              className="input-base"
+            />
+          </div>
 
-            {/* Phone — optional */}
-            <div>
-              <label className="block text-xs text-well-600 mb-1">
-                טלפון <span className="text-sand-400">(לא חובה)</span>
-              </label>
-              <input
-                type="tel"
-                value={contact.contact_phone}
-                onChange={(e) => setContactField('contact_phone', e.target.value)}
-                placeholder="050-0000000"
-                disabled={status === 'loading'}
-                className="input-base"
-                dir="ltr"
-              />
-            </div>
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">
+              {tr.phoneLabel} <span className="text-slate-400">{tr.optional}</span>
+            </label>
+            <input
+              type="tel"
+              value={contact.contact_phone}
+              onChange={(e) => setContactField('contact_phone', e.target.value)}
+              placeholder={tr.phonePlaceholder}
+              disabled={status === 'loading'}
+              className="input-base"
+              dir="ltr"
+            />
           </div>
         </div>
+      </div>
 
-      {/* Error */}
       {status === 'error' && (
         <div className="text-sm text-red-600 bg-red-50 rounded-lg px-4 py-3 border border-red-200">
           {errorMsg}
         </div>
       )}
 
-      {/* Submit */}
       <button
         type="submit"
         disabled={!text.trim() || isOverLimit || status === 'loading'}
@@ -180,19 +170,16 @@ export default function WishForm() {
         {status === 'loading' ? (
           <>
             <span className="animate-spin">⟳</span>
-            <span>שולח...</span>
+            <span>{tr.submitting}</span>
           </>
         ) : (
           <>
-            <span>✦</span>
-            <span>שלח את המשאלה</span>
+            <span>{tr.submitBtn}</span>
           </>
         )}
       </button>
 
-      <p className="text-xs text-center text-sand-400">
-        לאחר השליחה, המנוע יחפש התאמות ויעדכן אותך בדף המשאלה
-      </p>
+      <p className="text-xs text-center text-slate-400">{tr.afterSubmit}</p>
     </form>
   )
 }

@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
-import { Heebo, Frank_Ruhl_Libre } from 'next/font/google'
+import { Heebo, Rubik } from 'next/font/google'
 import './globals.css'
+import LangProvider from '@/components/LangProvider'
+import { getLang } from '@/lib/i18n/server'
 
 const heebo = Heebo({
   subsets: ['hebrew', 'latin'],
@@ -8,10 +10,10 @@ const heebo = Heebo({
   display: 'swap',
 })
 
-const frankRuhl = Frank_Ruhl_Libre({
+const rubik = Rubik({
   subsets: ['hebrew', 'latin'],
-  weight: ['300', '400', '700', '900'],
-  variable: '--font-frank-ruhl',
+  weight: ['400', '500', '700', '900'],
+  variable: '--font-rubik',
   display: 'swap',
 })
 
@@ -28,14 +30,18 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const lang = await getLang()
+  const dir = lang === 'he' ? 'rtl' : 'ltr'
   return (
-    <html lang="he" dir="rtl" className={`${heebo.variable} ${frankRuhl.variable}`}>
-      <body className="antialiased">{children}</body>
+    <html lang={lang} dir={dir} className={`${heebo.variable} ${rubik.variable}`}>
+      <body className="antialiased">
+        <LangProvider lang={lang}>{children}</LangProvider>
+      </body>
     </html>
   )
 }

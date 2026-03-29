@@ -22,7 +22,8 @@ Next.js 14 App Router (Railway)
         ├── Supabase (PostgreSQL + pgvector)
         │     ├── wishes, wish_enrichment, wish_embeddings
         │     ├── wish_connections, match_attempts_log
-        │     └── openai_api_log
+        │     ├── openai_api_log
+        │     └── settlements
         │
         └── OpenAI API
               ├── GPT-5.2 (ניתוח משאלה → JSON structured)
@@ -48,8 +49,12 @@ Next.js 14 App Router (Railway)
 | `/wishes/[id]` | app/wishes/[id]/page.tsx | Server Component — פרטי משאלה |
 | `/matches` | app/matches/page.tsx | Server Component — ההתאמות שלי (מקובצות לפי משאלה חיצונית) |
 | `/(auth)/login` | app/(auth)/login/page.tsx | דף התחברות (magic link) |
+| `/admin` | app/admin/layout.tsx | Layout עם sidebar + auth guard |
 | `/admin/connections` | app/admin/connections/page.tsx | Client Component — תחקור חיבורים |
 | `/admin/test-data` | app/admin/test-data/page.tsx | Client Component — טעינת נתוני מבחן |
+| `/admin/run-matching` | app/admin/run-matching/page.tsx | הרצת MATCHES |
+| `/admin/settlements` | app/admin/settlements/page.tsx | העלאת קובץ ישובים |
+| `/admin/review-matches` | app/admin/review-matches/page.tsx | Server Component — פידבק על איכות ההתאמות |
 
 ### API Routes (app/api/)
 
@@ -59,8 +64,8 @@ Next.js 14 App Router (Railway)
 | `/api/wishes` | GET | משאלות המשתמש המחובר |
 | `/api/wishes/[id]` | GET | פרטי משאלה בודדת |
 | `/api/wishes/[id]` | PATCH | עדכון משאלה (בעלים בלבד) |
-| `/api/wishes/[id]` | DELETE | מחיקת משאלה |
-| `/api/wishes/[id]/matches` | GET | חיבורים של המשאלה (בעלים בלבד) |
+| `/api/wishes/[id]` | DELETE | soft delete — מסמן `status='cancelled'` + connections→`deleted` |
+| `/api/wishes/[id]/matches` | GET | חיבורים של המשאלה (בעלים בלבד, מסנן deleted) |
 | `/api/wishes/[id]/resonate` | GET/POST/DELETE | ניהול resonances |
 | `/api/connections/[id]/approve` | POST | State machine לאישור חיבורים |
 | `/api/auth/magic-link` | POST | שליחת magic link |
@@ -68,11 +73,14 @@ Next.js 14 App Router (Railway)
 | `/api/admin/run-matching` | POST | הפעלת batch matching (admin בלבד) |
 | `/api/admin/load-test-data` | POST | ייבוא CSV (admin בלבד) |
 | `/api/admin/connections` | GET | נתוני debug לזוג משאלות |
+| `/api/admin/seed-settlements` | POST | העלאת קובץ ישובים CBS (admin בלבד, Windows-1255) |
+| `/api/admin/review-matches` | POST | upsert לטבלת match_reviews (admin בלבד) |
+| `/api/getUserMatches` | POST | webhook — קבלת התאמות לפי email |
 | `/api/feed` | GET | Feed מותאם אישית |
 
 ### דף `/matches` — היגיון עיבוד
 
-**שלב 1:** שליפת כל משאלות המשתמש + ה-wish_connections שלהן
+**שלב 1:** שליפת כל משאלות המשתמש + ה-wish_connections שלהן (ללא `status='deleted'`)
 
 **שלב 2:** איסוף ה-IDs של המשאלות התואמות + שליפת wish_enrichment (themes) + פרטי קשר
 
@@ -88,6 +96,19 @@ GroupedMatch {
 }
 ```
 
+### מסך `/admin/review-matches`
+
+Server component שטוען עד 60 רשומות מ-`match_attempts_log`, מציג אותן כ-cards עם:
+- טקסטי שתי המשאלות + סיגנלים
+- Badge: נוצר חיבור / נפסל בשער / לא נוצר חיבור
+- כפתורי label: טוב / אולי / לא טוב + שדה הערה → POST `/api/admin/review-matches`
+
+**סינונים (URL searchParams → server re-fetch):** סוג (עבר/לא עבר סף) · סקירה (סוקרו/לא) · שער · קרוב לסף · כולל מבוטלות (ברירת מחדל: מסתיר)
+
+**חיפוש טקסט:** client-side, מסנן כרטיסים לפי תוכן משאלות ללא round-trip לשרת
+
+---
+
 ### ספריות (lib/)
 
 | מודול | קבצים | מטרה |
@@ -101,11 +122,15 @@ GroupedMatch {
 
 | קובץ | מטרה |
 |------|------|
-| components/wishes/WishForm.tsx | טופס יצירת משאלה |
+| components/wishes/WishForm.tsx | טופס יצירת משאלה (ללא שדה ארץ, contact_country מוכנס ל-'Israel') |
 | components/wishes/WishCard.tsx | כרטיס משאלה |
-| components/wishes/MatchesSection.tsx | רשימת חיבורים לצד משאלה בודדת; תומך ב-`isAdmin` prop להצגת קישור debug |
+| components/wishes/SettlementPicker.tsx | חיפוש ישוב server-side עם ilike, debounce 150ms |
+| components/wishes/DeleteWishButton.tsx | כפתור מחיקה עם אישור דו-שלבי (soft delete) |
+| components/wishes/MatchesSection.tsx | רשימת חיבורים לצד משאלה בודדת |
 | components/wishes/ResonanceButton.tsx | כפתור לב |
-| components/layout/Header.tsx | Client Component — ניווט עליון; desktop nav + mobile hamburger menu עם dropdown |
+| components/admin/AdminNav.tsx | Sidebar ניווט לאדמין (5 מסכים) |
+| components/admin/ReviewMatchesClient.tsx | Client Component — כרטיסי review עם חיפוש טקסט וסינונים |
+| components/layout/Header.tsx | Client Component — ניווט עליון; badge סביבה ב-dev |
 | components/layout/Footer.tsx | כותרת תחתית |
 
 **Header — mobile hamburger menu:**
@@ -113,6 +138,7 @@ GroupedMatch {
 - מוצג בלבד ב-`< sm`; desktop nav מוצג ב-`sm+`
 - Dropdown מכיל: "משאלה חדשה" (CTA), המשאלות שלי, ההתאמות שלי, סקציית admin (אם `isAdmin`), יציאה
 - Guard: `user.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL`
+- Badge סביבה: מוצג רק כש-`NEXT_PUBLIC_ENV === 'dev'`
 
 ---
 
@@ -125,17 +151,31 @@ GroupedMatch {
 id              uuid PK
 user_id         uuid FK→auth.users
 original_text   text (עד 1000 תווים)
-visibility      'open' (כל המשאלות פתוחות)
-contact_name    text NOT NULL
-contact_email   text NOT NULL
-contact_country text NOT NULL
-contact_city    text NOT NULL
+visibility      'open'
+status          text NOT NULL DEFAULT 'pending' — 'pending'|'cancelled'
+contact_name    text
+contact_email   text (מאוכלס אוטומטית מ-user.email)
+contact_country text DEFAULT 'Israel' (מוכנס תמיד כ-'Israel')
+contact_city    text (לא חובה, נבחר מ-SettlementPicker)
 contact_address text
 contact_phone   text
 user_email      text (denormalized)
 created_at      timestamptz
 updated_at      timestamptz
 ```
+
+**Soft delete:** DELETE endpoint מסמן `status='cancelled'` (לא מוחק פיזית).
+RLS מסנן `status != 'cancelled'` לכלל השאילתות (בעלים + ציבורי).
+
+#### `settlements`
+```
+id        integer PK (סמל ישוב CBS)
+name      text NOT NULL (שם בעברית)
+name_en   text
+district  text
+council   text
+```
+RLS: public read. נטען מקובץ CBS (Windows-1255) דרך `/api/admin/seed-settlements`.
 
 #### `wish_enrichment`
 ```
@@ -180,10 +220,12 @@ wish_a      uuid FK→wishes (תמיד wish_a < wish_b — UUID lex order)
 wish_b      uuid FK→wishes
 match_score float (0–1)
 match_type  'strong'|'complementary'|'similar'
-status      'suggested'|'accepted_by_a'|'connected'|'rejected'
+status      'suggested'|'accepted_by_a'|'connected'|'rejected'|'deleted'
 created_at  timestamptz
 UNIQUE(wish_a, wish_b), CHECK(wish_a < wish_b)
 ```
+`status='deleted'` נקבע אוטומטית כשמשאלה מסומנת כ-cancelled.
+כל שאילתות wish_connections מסננות `status != 'deleted'`.
 
 #### `match_attempts_log`
 ```
@@ -201,11 +243,28 @@ geo_penalty           float           ← exp(-km/50), 1 אם אין מיקום
 match_score           float NOT NULL
 match_type            text (null אם לא עבר)
 passed_threshold      boolean NOT NULL
+gate_passed           boolean  ← null=לא הגיע לשער, true=עבר, false=נפסל
+gate_reason           text     ← 'passed' | סיבת כשל
 created_at            timestamptz
 ```
 *עמודות ישנות בטבלה (לא נכתבות יותר):* freshness_factor, object_alignment, anchor_overlap, failed_distance
 
 **מה נרשם:** כל ניסיון שעבר את סינון טווח התאריכים ואת שער הכניסה לניקוד
+
+#### `match_reviews`
+```
+id                 uuid PK
+wish_id            uuid FK→wishes
+candidate_wish_id  uuid FK→wishes
+connection_id      uuid FK→wish_connections (nullable)
+reviewer_email     text
+label              'good'|'maybe'|'bad'
+note               text (nullable)
+created_at         timestamptz
+UNIQUE(wish_id, candidate_wish_id, reviewer_email)
+```
+Human-in-the-loop feedback על זוגות התאמה, לצורך כיוונון עתידי של הסף והמשקולות.
+נכתב מ-`/api/admin/review-matches` (POST, upsert on conflict).
 
 #### `openai_api_log`
 ```
@@ -216,6 +275,7 @@ request    jsonb
 response   jsonb
 error      text
 elapsed_ms integer
+wish_id    uuid FK→wishes (nullable — מאוכלס מה-pipeline)
 created_at timestamptz
 ```
 
@@ -230,7 +290,7 @@ UNIQUE(wish_id, user_id)
 
 ---
 
-## 4. מנגנון ההפגשה (Resonance Engine v8)
+## 4. מנגנון ההפגשה (Resonance Engine v8.5)
 
 ### pipeline ראשי — `processWishForMatching(wishId, wishText, {onlyLowerId?})`
 
@@ -245,9 +305,11 @@ UNIQUE(wish_id, user_id)
 
 שלב 3a: findSimilarWishes() — ANN recall
   └── match_wishes() RPC → HNSW ANN search → candidates (similarity ≥ 0.30)
+  └── מסנן status != 'cancelled'
 
 שלב 3b: findStructuredCandidates() — Structural recall
   └── find_structured_candidates() RPC → GIN index &&-overlap על anchor_keywords
+  └── מסנן status != 'cancelled'
   └── לא-קריטי: כשל מחזיר [] ומשך ANN-only (non-fatal)
 
 שלב 3c: Merge שני ערוצי ה-recall
@@ -260,7 +322,9 @@ UNIQUE(wish_id, user_id)
   │     ├── computeComplementarity()       → complementarityScore
   │     ├── computeIntentCompatibility()   → intentCompatibility
   │     └── computeStructuralSimilarity()  → structuralSimilarity
-  ├── [שער כניסה] similarity ≥ 0.30 OR structuralSimilarity > 0 — אחרת → דלג
+  ├── [שער רלוונטיות v8.5] semantic ≥ 0.30 OR complementarity ≥ 0.20 OR structural ≥ 0.25
+  │     ├── נכשל → נרשם עם gate_passed=false + gate_reason → דלג (לא נוצר חיבור)
+  │     └── עבר → gate_passed=true, gate_reason='passed'
   ├── computeMatchScore(semantic, complementarity, intent, structural) → match_score
   └── geo soft penalty: finalScore × exp(-distance_km / 50)
 
@@ -281,7 +345,7 @@ final_score = match_score × exp(-distance_km / 50)
             (= match_score כשאין מיקום לאחת המשאלות)
 ```
 
-**ציון סף:** ≥ 0.48 · **שער כניסה:** similarity ≥ 0.30 **או** structural_similarity > 0
+**ציון סף:** ≥ 0.48 · **שער רלוונטיות (v8.5):** semantic ≥ 0.30 **או** complementarity ≥ 0.20 **או** structural ≥ 0.25
 
 ### סיווג סוג ההתאמה
 
@@ -362,12 +426,13 @@ canonicalize([
 ])
 ```
 
-### `find_structured_candidates` RPC (migration 026)
+### `find_structured_candidates` RPC (migration 026, עודכן 032)
 
 ```sql
 SELECT e.wish_id FROM wish_enrichment e JOIN wishes w ON w.id = e.wish_id
 WHERE e.wish_id != source_wish_id
   AND w.visibility IN ('anonymous', 'open')
+  AND w.status != 'cancelled'
   AND e.anchor_keywords && source_keywords
   AND (NOT only_lower_id OR e.wish_id < source_wish_id)
 ```
@@ -379,8 +444,9 @@ WHERE e.wish_id != source_wish_id
 | סינון | סוג | תנאי |
 |-------|-----|------|
 | טווח תאריכים | קשה (hard) | אין חפיפה → דחייה |
-| שער כניסה | קשה | similarity < 0.30 **וגם** structural = 0 → דחייה |
+| שער רלוונטיות | קשה | semantic < 0.30 **וגם** complementarity < 0.20 **וגם** structural < 0.25 → דחייה |
 | מרחק גיאוגרפי | רך (soft) | `final_score × exp(-km/50)` |
+| status cancelled | קשה | מסונן ב-RLS + ב-RPCs |
 
 ---
 
@@ -443,12 +509,13 @@ Intent: {intent}
 
 ### `findSimilarWishes` — ANN recall
 
-**match_wishes SQL:**
+**match_wishes SQL (migration 020, עודכן 032):**
 ```sql
 SELECT wish_id, 1 - (embedding <=> query_embedding) AS similarity
 FROM wish_embeddings e JOIN wishes w ON w.id = e.wish_id
 WHERE wish_id != match_wish_id
   AND visibility IN ('anonymous','open')
+  AND status != 'cancelled'
   AND (NOT only_lower_id OR wish_id < match_wish_id)
   AND similarity >= min_similarity
 ORDER BY embedding <=> query_embedding
@@ -476,6 +543,7 @@ ORDER BY embedding <=> query_embedding
 | `OPENAI_API_KEY` | סודי | GPT + embeddings |
 | `ADMIN_EMAIL` | סודי | Admin guard (API routes) |
 | `NEXT_PUBLIC_ADMIN_EMAIL` | ציבורי | Admin guard (Header client component) |
+| `NEXT_PUBLIC_ENV` | ציבורי | `'dev'` בסביבת פיתוח — מציג badge בכותרת |
 | `APP_URL` | Runtime | Auth redirects |
 
 ---
@@ -497,7 +565,8 @@ ORDER BY embedding <=> query_embedding
 
 | טבלה | מדיניות |
 |------|---------|
-| wishes | בעלים ← CRUD · כולם ← open wishes |
+| wishes | בעלים ← CRUD (status != 'cancelled') · כולם ← open wishes (status != 'cancelled') |
+| settlements | כולם ← read only |
 | wish_resonances | auth users ← resonance על open wishes |
 | wish_enrichment | בעלים OR public wish |
 | wish_embeddings | בעלים בלבד |
@@ -558,6 +627,13 @@ ORDER BY embedding <=> query_embedding
 | 024 | domain_match בלוג (observability) |
 | 025 | anchor_entities ב-enrichment, anchor_overlap בלוג (deprecated) |
 | 026 | anchor_keywords + GIN index ב-enrichment, find_structured_candidates RPC, structural_similarity + recall_source בלוג |
+| 027 | settlements table + RLS (public read) |
+| 028 | wish_id ב-openai_api_log |
+| 029 | migration_test table (בדיקת pipeline — נמחקת ב-030) |
+| 030 | DROP migration_test |
+| 031 | status column ב-wishes + RLS מסנן cancelled |
+| 032 | 'deleted' ב-connection_status enum; match_wishes + find_structured_candidates מסננים cancelled |
+| 033 | gate_passed + gate_reason ב-match_attempts_log; טבלת match_reviews |
 
 ---
 
@@ -592,7 +668,7 @@ ORDER BY embedding <=> query_embedding
 | geo.ts | `haversineKm()` — soft penalty exp(-km/50) |
 | timeRange.ts | `dateRangesOverlap()` |
 | canonicalize.ts | `canonicalize()`, `canonicalizeSubjectType()`, `canonicalizeAction()` |
-| openaiLog.ts | `logOpenAICall()` |
+| openaiLog.ts | `logOpenAICall(entry)` — כולל `wishId` |
 | anchor.ts | `computeAnchorOverlap()` — לא בשימוש ב-pipeline (נשמר) |
 | objectAlignment.ts | `computeObjectAlignment()` — לא בשימוש ב-pipeline (נשמר) |
 | domain.ts | `computeDomainMatch()` — לא בשימוש ב-pipeline (נשמר) |
