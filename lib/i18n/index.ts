@@ -12,6 +12,11 @@ export function dateLocale(lang: Lang): string {
   return lang === 'he' ? 'he-IL' : 'en-US'
 }
 
+/** Forward-navigation arrow — points right in LTR, left in RTL */
+export function forwardArrow(lang: Lang): string {
+  return lang === 'he' ? '←' : '→'
+}
+
 // ── English ───────────────────────────────────────────────────────────────────
 
 const en = {

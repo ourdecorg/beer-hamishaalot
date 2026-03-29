@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import type { WishWithResonance } from '@/lib/types'
 import ResonanceButton from './ResonanceButton'
-import { dateLocale, type Lang } from '@/lib/i18n'
+import { dateLocale, forwardArrow, type Lang } from '@/lib/i18n'
 
 interface Props {
   wish: WishWithResonance
@@ -54,7 +54,7 @@ export default function WishCard({ wish, isAuthenticated, showFullText = false, 
           className="text-sm font-medium text-well-500 hover:text-well-700 transition-colors inline-flex items-center gap-1"
         >
           <span>{readMoreLabel}</span>
-          <span>←</span>
+          <span>{forwardArrow(lang)}</span>
         </Link>
       </div>
     </article>

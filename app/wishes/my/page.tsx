@@ -151,7 +151,7 @@ export default async function MyWishesPage() {
                       💫 {tr.resonances(resonanceCount)}
                     </span>
                   )}
-                  <span className="text-xs text-well-600 font-medium mr-auto">{tr.details}</span>
+                  <span className="text-xs text-well-600 font-medium ms-auto">{tr.details}</span>
                 </div>
               </Link>
             )
