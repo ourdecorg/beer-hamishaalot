@@ -120,7 +120,7 @@ export async function computeSimilaritiesForIds(
     }
     const sim = normA === 0 || normB === 0 ? 0
       : dot / (Math.sqrt(normA) * Math.sqrt(normB))
-    result.set(row.wish_id, Math.max(0, Math.min(1, sim)))
+    result.set(row.wish_id, Number.isFinite(sim) ? Math.max(0, Math.min(1, sim)) : 0)
   }
   return result
 }
