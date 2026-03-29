@@ -4,6 +4,7 @@ import Footer from '@/components/layout/Footer'
 import ResonanceButton from '@/components/wishes/ResonanceButton'
 import MatchesSection from '@/components/wishes/MatchesSection'
 import { createClient } from '@/lib/supabase/server'
+import { getLang, t, dateLocale } from '@/lib/i18n'
 import type { WishWithResonance } from '@/lib/types'
 
 interface Props {
@@ -11,16 +12,16 @@ interface Props {
 }
 
 export async function generateMetadata(_: Props) {
-  return {
-    title: 'משאלה — באר המשאלות',
-  }
+  const lang = await getLang()
+  return { title: t(lang).wishDetail.pageTitle }
 }
 
 export default async function WishPage({ params }: Props) {
-  const supabase = await createClient()
+  const [supabase, lang] = await Promise.all([createClient(), getLang()])
+  const tr = t(lang).wishDetail
+
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Fetch the wish
   const { data: wish, error } = await supabase
     .from('wishes')
     .select('*')
@@ -29,13 +30,11 @@ export default async function WishPage({ params }: Props) {
 
   if (error || !wish) notFound()
 
-  // Get resonance count
   const { count: resonanceCount } = await supabase
     .from('wish_resonances')
     .select('*', { count: 'exact', head: true })
     .eq('wish_id', wish.id)
 
-  // Check if current user has resonated
   let userHasResonated = false
   if (user) {
     const { data: ownResonance } = await supabase
@@ -57,7 +56,7 @@ export default async function WishPage({ params }: Props) {
   const isAdmin = !!(user?.email && user.email === process.env.ADMIN_EMAIL)
   const canResonate = !isOwner
 
-  const formattedDate = new Date(wish.created_at).toLocaleDateString('he-IL', {
+  const formattedDate = new Date(wish.created_at).toLocaleDateString(dateLocale(lang), {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -68,14 +67,13 @@ export default async function WishPage({ params }: Props) {
       <Header />
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-12 fade-in">
-        {/* Wish Header */}
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
           <p className="section-label">{formattedDate}</p>
         </div>
 
         {/* Original Text */}
         <div className="card-featured p-10 mb-8">
-          <p className="section-label mb-4">המשאלה המקורית</p>
+          <p className="section-label mb-4">{tr.originalWish}</p>
           <p
             className="text-well-800 text-xl leading-relaxed whitespace-pre-wrap"
             style={{ fontFamily: 'var(--font-frank-ruhl)' }}
@@ -88,30 +86,30 @@ export default async function WishPage({ params }: Props) {
         {wish.contact_name && (
           <div className="card p-6 mt-6" style={{ background: 'linear-gradient(145deg, #edf5f8, #f5f9fb)' }}>
             <p className="section-label mb-4">
-              <span className="text-well-500">◎</span> פרטי קשר
+              <span className="text-well-500">◎</span> {tr.contactDetails}
             </p>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
               <div>
-                <dt className="text-xs text-sand-400 mb-0.5">שם</dt>
+                <dt className="text-xs text-sand-400 mb-0.5">{tr.nameLabel}</dt>
                 <dd className="text-well-800 font-medium">{wish.contact_name}</dd>
               </div>
               <div>
-                <dt className="text-xs text-sand-400 mb-0.5">אימייל</dt>
+                <dt className="text-xs text-sand-400 mb-0.5">{tr.emailLabel}</dt>
                 <dd className="text-well-800 font-medium" dir="ltr">{wish.contact_email}</dd>
               </div>
               <div>
-                <dt className="text-xs text-sand-400 mb-0.5">ישוב</dt>
+                <dt className="text-xs text-sand-400 mb-0.5">{tr.cityLabel}</dt>
                 <dd className="text-well-800">{wish.contact_city}</dd>
               </div>
               {wish.contact_address && (
                 <div>
-                  <dt className="text-xs text-sand-400 mb-0.5">כתובת</dt>
+                  <dt className="text-xs text-sand-400 mb-0.5">{tr.addressLabel}</dt>
                   <dd className="text-well-800">{wish.contact_address}</dd>
                 </div>
               )}
               {wish.contact_phone && (
                 <div>
-                  <dt className="text-xs text-sand-400 mb-0.5">טלפון</dt>
+                  <dt className="text-xs text-sand-400 mb-0.5">{tr.phoneLabel}</dt>
                   <dd className="text-well-800" dir="ltr">{wish.contact_phone}</dd>
                 </div>
               )}
@@ -126,7 +124,7 @@ export default async function WishPage({ params }: Props) {
             style={{ background: 'linear-gradient(145deg, #fdfaf5, #f9f3e7)' }}
           >
             <p className="text-well-600 mb-4 text-sm font-medium">
-              משאלה זו נוגעת בך?
+              {tr.resonateQuestion}
             </p>
             <ResonanceButton
               wishId={wish.id}
@@ -136,7 +134,7 @@ export default async function WishPage({ params }: Props) {
             />
             {wishWithResonance.resonance_count > 0 && (
               <p className="text-xs text-sand-400 mt-3">
-                {wishWithResonance.resonance_count} {wishWithResonance.resonance_count === 1 ? 'אדם' : 'אנשים'} מהדהדים
+                {tr.resonateCount(wishWithResonance.resonance_count)}
               </p>
             )}
           </div>
@@ -146,18 +144,16 @@ export default async function WishPage({ params }: Props) {
         {isOwner && (
           <div className="mt-6 flex gap-3 flex-wrap">
             <div className="tag-badge">
-              <span>זו המשאלה שלך</span>
+              <span>{tr.yourWish}</span>
             </div>
             {wishWithResonance.resonance_count > 0 && (
               <div className="tag-badge text-amber-700 bg-amber-50 border-amber-200">
-                <span>💛</span>
-                <span>{wishWithResonance.resonance_count} אנשים מהדהדים</span>
+                <span>{tr.yourResonances(wishWithResonance.resonance_count)}</span>
               </div>
             )}
           </div>
         )}
 
-        {/* Resonance Engine matches — owner only */}
         {isOwner && (
           <MatchesSection wishId={wish.id} isAdmin={isAdmin} />
         )}

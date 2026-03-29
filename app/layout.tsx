@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { Heebo, Frank_Ruhl_Libre } from 'next/font/google'
 import './globals.css'
+import LangProvider from '@/components/LangProvider'
+import { getLang } from '@/lib/i18n'
 
 const heebo = Heebo({
   subsets: ['hebrew', 'latin'],
@@ -28,14 +30,18 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const lang = await getLang()
+  const dir = lang === 'he' ? 'rtl' : 'ltr'
   return (
-    <html lang="he" dir="rtl" className={`${heebo.variable} ${frankRuhl.variable}`}>
-      <body className="antialiased">{children}</body>
+    <html lang={lang} dir={dir} className={`${heebo.variable} ${frankRuhl.variable}`}>
+      <body className="antialiased">
+        <LangProvider lang={lang}>{children}</LangProvider>
+      </body>
     </html>
   )
 }

@@ -1,14 +1,17 @@
 import Link from 'next/link'
 import type { WishWithResonance } from '@/lib/types'
 import ResonanceButton from './ResonanceButton'
+import { dateLocale, type Lang } from '@/lib/i18n'
 
 interface Props {
   wish: WishWithResonance
   isAuthenticated: boolean
   showFullText?: boolean
+  lang: Lang
+  readMoreLabel: string
 }
 
-export default function WishCard({ wish, isAuthenticated, showFullText = false }: Props) {
+export default function WishCard({ wish, isAuthenticated, showFullText = false, lang, readMoreLabel }: Props) {
   const displayText = wish.original_text
 
   const truncated =
@@ -16,7 +19,7 @@ export default function WishCard({ wish, isAuthenticated, showFullText = false }
       ? displayText.slice(0, 220) + '…'
       : displayText
 
-  const formattedDate = new Date(wish.created_at).toLocaleDateString('he-IL', {
+  const formattedDate = new Date(wish.created_at).toLocaleDateString(dateLocale(lang), {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -24,15 +27,12 @@ export default function WishCard({ wish, isAuthenticated, showFullText = false }
 
   return (
     <article className="card-hover p-6 flex flex-col gap-4">
-      {/* Accent bar */}
       <div className="w-6 h-0.5 bg-amber-400 rounded-full" />
 
-      {/* Date */}
       <div className="flex items-center justify-between gap-2">
         <span className="section-label text-xs">{formattedDate}</span>
       </div>
 
-      {/* Author email */}
       {wish.user_email && (
         <div className="flex items-center gap-1.5 text-xs text-well-500">
           <span>✉</span>
@@ -40,10 +40,8 @@ export default function WishCard({ wish, isAuthenticated, showFullText = false }
         </div>
       )}
 
-      {/* Text */}
       <p className="text-well-800 leading-relaxed text-base flex-1">{truncated}</p>
 
-      {/* Footer */}
       <div className="flex items-center justify-between gap-3 pt-3 border-t border-sand-100">
         <ResonanceButton
           wishId={wish.id}
@@ -55,7 +53,7 @@ export default function WishCard({ wish, isAuthenticated, showFullText = false }
           href={`/wishes/${wish.id}`}
           className="text-sm font-medium text-well-500 hover:text-well-700 transition-colors inline-flex items-center gap-1"
         >
-          <span>קרא עוד</span>
+          <span>{readMoreLabel}</span>
           <span>←</span>
         </Link>
       </div>

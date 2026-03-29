@@ -2,8 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useLang } from '@/components/LangProvider'
+import { t } from '@/lib/i18n'
 
 export default function LoginPage() {
+  const lang = useLang()
+  const tr = t(lang).login
+
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
@@ -15,8 +20,6 @@ export default function LoginPage() {
     setStatus('loading')
     setErrorMsg('')
 
-    // Use server-side API route so emailRedirectTo uses APP_URL runtime env var
-    // (avoids window.location.origin returning Railway's internal localhost:8080)
     const res = await fetch('/api/auth/magic-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -27,7 +30,7 @@ export default function LoginPage() {
 
     if (!res.ok) {
       setStatus('error')
-      setErrorMsg(data.error ?? 'אירעה שגיאה. נסה שוב.')
+      setErrorMsg(data.error ?? tr.error)
     } else {
       setStatus('sent')
     }
@@ -42,14 +45,12 @@ export default function LoginPage() {
           className="inline-flex items-center gap-2 text-well-700 hover:text-well-900 transition-colors"
         >
           <span>✦</span>
-          <span style={{ fontFamily: 'var(--font-frank-ruhl)' }}>באר המשאלות</span>
+          <span style={{ fontFamily: 'var(--font-frank-ruhl)' }}>{t(lang).siteName}</span>
         </Link>
       </div>
 
-      {/* Main */}
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-sm">
-          {/* Well icon */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-well-800 shadow-lg mb-4">
               <span className="text-2xl text-amber-300">✦</span>
@@ -58,12 +59,11 @@ export default function LoginPage() {
               className="text-3xl font-bold text-well-900"
               style={{ fontFamily: 'var(--font-frank-ruhl)' }}
             >
-              ברוך הבא לבאר
+              {tr.heading}
             </h1>
-            <p className="text-well-500 mt-2">הכנס את כתובת האימייל שלך כדי להיכנס</p>
+            <p className="text-well-500 mt-2">{tr.subtitle}</p>
           </div>
 
-          {/* Card */}
           <div className="card p-8">
             {status === 'sent' ? (
               <div className="text-center space-y-4">
@@ -72,19 +72,19 @@ export default function LoginPage() {
                   className="text-xl font-bold text-well-900"
                   style={{ fontFamily: 'var(--font-frank-ruhl)' }}
                 >
-                  בדוק את האימייל שלך
+                  {tr.sentTitle}
                 </h2>
                 <p className="text-well-600 text-sm leading-relaxed">
-                  שלחנו קישור כניסה לכתובת{' '}
+                  {tr.sentDesc}{' '}
                   <strong className="text-well-800">{email}</strong>.
                   <br />
-                  לחץ על הקישור כדי להיכנס לבאר.
+                  {tr.sentInstructions}
                 </p>
                 <button
                   onClick={() => setStatus('idle')}
                   className="btn-ghost text-sm w-full justify-center"
                 >
-                  שלח שוב עם אימייל אחר
+                  {tr.resend}
                 </button>
               </div>
             ) : (
@@ -94,7 +94,7 @@ export default function LoginPage() {
                     htmlFor="email"
                     className="block text-sm font-medium text-well-700 mb-2"
                   >
-                    כתובת אימייל
+                    {tr.emailLabel}
                   </label>
                   <input
                     id="email"
@@ -111,7 +111,7 @@ export default function LoginPage() {
 
                 {status === 'error' && (
                   <div className="text-sm text-red-600 bg-red-50 rounded-lg px-4 py-3 border border-red-200">
-                    {errorMsg || 'אירעה שגיאה. נסה שוב.'}
+                    {errorMsg || tr.error}
                   </div>
                 )}
 
@@ -123,18 +123,18 @@ export default function LoginPage() {
                   {status === 'loading' ? (
                     <>
                       <span className="animate-spin text-sm">⟳</span>
-                      <span>שולח...</span>
+                      <span>{tr.submitting}</span>
                     </>
                   ) : (
                     <>
                       <span>✦</span>
-                      <span>שלח קישור כניסה</span>
+                      <span>{tr.submitBtn}</span>
                     </>
                   )}
                 </button>
 
                 <p className="text-xs text-sand-400 text-center leading-relaxed">
-                  אין סיסמאות. רק קישור קסם לאימייל שלך.
+                  {tr.noPassword}
                 </p>
               </form>
             )}
@@ -142,7 +142,7 @@ export default function LoginPage() {
 
           <p className="text-center mt-6 text-sm text-sand-500">
             <Link href="/" className="hover:text-well-600 transition-colors">
-              חזרה לדף הבית
+              {tr.backHome}
             </Link>
           </p>
         </div>

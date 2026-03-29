@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { useLang } from '@/components/LangProvider'
+import { t } from '@/lib/i18n'
 
 interface Props {
   wishId: string
@@ -17,6 +19,9 @@ export default function ResonanceButton({
   initialResonated,
   isAuthenticated,
 }: Props) {
+  const lang = useLang()
+  const tr = t(lang).resonance
+
   const [count, setCount] = useState(initialCount)
   const [resonated, setResonated] = useState(initialResonated)
   const [loading, setLoading] = useState(false)
@@ -33,7 +38,6 @@ export default function ResonanceButton({
     const supabase = createClient()
 
     if (resonated) {
-      // Remove resonance
       const { error } = await supabase
         .from('wish_resonances')
         .delete()
@@ -44,7 +48,6 @@ export default function ResonanceButton({
         setResonated(false)
       }
     } else {
-      // Add resonance
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         router.push('/login')
@@ -69,7 +72,7 @@ export default function ResonanceButton({
     <button
       onClick={handleToggle}
       disabled={loading}
-      title={resonated ? 'הסר הדהוד' : 'הדהד משאלה זו'}
+      title={resonated ? tr.remove : tr.add}
       className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium
         transition-all duration-200 border
         ${resonated
@@ -79,15 +82,11 @@ export default function ResonanceButton({
         ${loading ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer active:scale-95'}
       `}
     >
-      <span
-        className={`text-base transition-transform duration-200 ${
-          resonated ? 'scale-110' : ''
-        }`}
-      >
+      <span className={`text-base transition-transform duration-200 ${resonated ? 'scale-110' : ''}`}>
         {resonated ? '💛' : '🤍'}
       </span>
       <span>{count > 0 ? count : ''}</span>
-      <span>{resonated ? 'מהדהד' : 'הדהד'}</span>
+      <span>{resonated ? tr.active : tr.inactive}</span>
     </button>
   )
 }
