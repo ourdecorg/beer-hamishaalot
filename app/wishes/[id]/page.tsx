@@ -64,7 +64,7 @@ export default async function WishPage({ params }: Props) {
   })
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-white">
       <Header />
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-12 fade-in">
@@ -73,45 +73,42 @@ export default async function WishPage({ params }: Props) {
         </div>
 
         {/* Original Text */}
-        <div className="card-featured p-10 mb-8">
+        <div className="card p-8 mb-8">
           <p className="section-label mb-4">{tr.originalWish}</p>
-          <p
-            className="text-well-800 text-xl leading-relaxed whitespace-pre-wrap"
-            style={{ fontFamily: 'var(--font-frank-ruhl)' }}
-          >
+          <p className="text-slate-800 text-xl leading-relaxed whitespace-pre-wrap">
             {wish.original_text}
           </p>
         </div>
 
         {/* Contact info */}
         {wish.contact_name && (
-          <div className="card p-6 mt-6" style={{ background: 'linear-gradient(145deg, #edf5f8, #f5f9fb)' }}>
+          <div className="card p-6 mt-6 bg-slate-50">
             <p className="section-label mb-4">
-              <span className="text-well-500">◎</span> {tr.contactDetails}
+              {tr.contactDetails}
             </p>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
               <div>
-                <dt className="text-xs text-sand-400 mb-0.5">{tr.nameLabel}</dt>
-                <dd className="text-well-800 font-medium">{wish.contact_name}</dd>
+                <dt className="text-xs text-slate-400 mb-0.5">{tr.nameLabel}</dt>
+                <dd className="text-slate-800 font-medium">{wish.contact_name}</dd>
               </div>
               <div>
-                <dt className="text-xs text-sand-400 mb-0.5">{tr.emailLabel}</dt>
-                <dd className="text-well-800 font-medium" dir="ltr">{wish.contact_email}</dd>
+                <dt className="text-xs text-slate-400 mb-0.5">{tr.emailLabel}</dt>
+                <dd className="text-slate-800 font-medium" dir="ltr">{wish.contact_email}</dd>
               </div>
               <div>
-                <dt className="text-xs text-sand-400 mb-0.5">{tr.cityLabel}</dt>
-                <dd className="text-well-800">{wish.contact_city}</dd>
+                <dt className="text-xs text-slate-400 mb-0.5">{tr.cityLabel}</dt>
+                <dd className="text-slate-800">{wish.contact_city}</dd>
               </div>
               {wish.contact_address && (
                 <div>
-                  <dt className="text-xs text-sand-400 mb-0.5">{tr.addressLabel}</dt>
-                  <dd className="text-well-800">{wish.contact_address}</dd>
+                  <dt className="text-xs text-slate-400 mb-0.5">{tr.addressLabel}</dt>
+                  <dd className="text-slate-800">{wish.contact_address}</dd>
                 </div>
               )}
               {wish.contact_phone && (
                 <div>
-                  <dt className="text-xs text-sand-400 mb-0.5">{tr.phoneLabel}</dt>
-                  <dd className="text-well-800" dir="ltr">{wish.contact_phone}</dd>
+                  <dt className="text-xs text-slate-400 mb-0.5">{tr.phoneLabel}</dt>
+                  <dd className="text-slate-800" dir="ltr">{wish.contact_phone}</dd>
                 </div>
               )}
             </dl>
@@ -120,11 +117,8 @@ export default async function WishPage({ params }: Props) {
 
         {/* Resonance */}
         {canResonate && (
-          <div
-            className="mt-8 card p-8 text-center"
-            style={{ background: 'linear-gradient(145deg, #fdfaf5, #f9f3e7)' }}
-          >
-            <p className="text-well-600 mb-4 text-sm font-medium">
+          <div className="mt-8 card p-8 text-center bg-slate-50">
+            <p className="text-slate-600 mb-4 text-sm font-medium">
               {tr.resonateQuestion}
             </p>
             <ResonanceButton
@@ -134,7 +128,7 @@ export default async function WishPage({ params }: Props) {
               isAuthenticated={!!user}
             />
             {wishWithResonance.resonance_count > 0 && (
-              <p className="text-xs text-sand-400 mt-3">
+              <p className="text-xs text-slate-400 mt-3">
                 {tr.resonateCount(wishWithResonance.resonance_count)}
               </p>
             )}
@@ -148,7 +142,7 @@ export default async function WishPage({ params }: Props) {
               <span>{tr.yourWish}</span>
             </div>
             {wishWithResonance.resonance_count > 0 && (
-              <div className="tag-badge text-amber-700 bg-amber-50 border-amber-200">
+              <div className="tag-badge tag-badge-well">
                 <span>{tr.yourResonances(wishWithResonance.resonance_count)}</span>
               </div>
             )}

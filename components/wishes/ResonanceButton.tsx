@@ -77,7 +77,7 @@ export default function ResonanceButton({
         transition-all duration-200 border
         ${resonated
           ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 shadow-sm shadow-amber-200'
-          : 'bg-white border-sand-200 text-sand-500 hover:border-amber-300 hover:text-amber-600 hover:bg-amber-50 hover:shadow-sm'
+          : 'bg-white border-slate-200 text-slate-500 hover:border-amber-300 hover:text-amber-600 hover:bg-amber-50 hover:shadow-sm'
         }
         ${loading ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer active:scale-95'}
       `}

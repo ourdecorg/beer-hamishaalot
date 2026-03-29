@@ -22,9 +22,9 @@ export default async function MyWishesPage() {
   if (!user) redirect('/login')
 
   const visibilityLabel = {
-    open:      { label: tr.visOpen,   icon: '✦',  cls: 'bg-well-50 border-well-200 text-well-700' },
-    anonymous: { label: tr.visAnon,   icon: '🎭', cls: 'bg-sand-100 border-sand-200 text-sand-600' },
-    private:   { label: tr.visPrivate, icon: '🔒', cls: 'bg-sand-50 border-sand-200 text-sand-500' },
+    open:      { label: tr.visOpen,    cls: 'bg-indigo-50 border-indigo-200 text-indigo-700' },
+    anonymous: { label: tr.visAnon,    cls: 'bg-slate-100 border-slate-200 text-slate-600' },
+    private:   { label: tr.visPrivate, cls: 'bg-slate-50 border-slate-200 text-slate-500' },
   }
 
   const { data: wishes } = await supabase
@@ -63,42 +63,34 @@ export default async function MyWishesPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-white">
       <Header />
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-12 fade-in">
         <div className="mb-10">
           <p className="section-label mb-3">{tr.personalArea}</p>
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <h1
-              className="text-3xl sm:text-4xl text-well-900"
-              style={{ fontFamily: 'var(--font-frank-ruhl)' }}
-            >
+            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900">
               {tr.title}
             </h1>
             <Link href="/wishes/new" className="btn-primary px-5 py-2.5 text-sm">
-              <span>✦</span>
               <span>{tr.newWish}</span>
             </Link>
           </div>
-          <div className="h-px mt-4 bg-gradient-to-l from-transparent via-sand-300 to-transparent" />
+          <div className="h-px mt-4 bg-slate-200" />
           {wishList.length > 0 && (
-            <p className="text-sand-400 text-sm mt-2">{tr.wishCount(wishList.length)}</p>
+            <p className="text-slate-400 text-sm mt-2">{tr.wishCount(wishList.length)}</p>
           )}
         </div>
 
         {wishList.length === 0 && (
-          <div className="card-featured p-12 text-center">
-            <div className="text-5xl mb-4">✦</div>
-            <h2
-              className="text-xl text-well-700 mb-3"
-              style={{ fontFamily: 'var(--font-frank-ruhl)' }}
-            >
+          <div className="card p-12 text-center">
+            <div className="text-4xl mb-4">🌱</div>
+            <h2 className="text-xl font-bold text-slate-700 mb-3">
               {tr.emptyTitle}
             </h2>
-            <p className="text-well-500 text-sm mb-6">{tr.emptySub}</p>
+            <p className="text-slate-500 text-sm mb-6">{tr.emptySub}</p>
             <Link href="/wishes/new" className="btn-primary">
-              <span>✦</span>
               <span>{tr.firstWish}</span>
             </Link>
           </div>
@@ -130,28 +122,28 @@ export default async function MyWishesPage() {
                   <span className="section-label text-xs">{date}</span>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${vis.cls}`}>
-                      {vis.icon} {vis.label}
+                      {vis.label}
                     </span>
                     <DeleteWishButton wishId={wish.id} />
                   </div>
                 </div>
 
-                <p className="text-well-800 leading-relaxed">{truncated}</p>
+                <p className="text-slate-800 leading-relaxed">{truncated}</p>
 
-                <div className="flex items-center gap-3 pt-1 border-t border-sand-100 flex-wrap">
+                <div className="flex items-center gap-3 pt-1 border-t border-slate-100 flex-wrap">
                   {matchCount > 0 ? (
-                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
                       🎯 {tr.matches(matchCount)}
                     </span>
                   ) : (
-                    <span className="text-xs text-sand-300">{tr.noMatches}</span>
+                    <span className="text-xs text-slate-300">{tr.noMatches}</span>
                   )}
                   {resonanceCount > 0 && (
-                    <span className="text-xs text-well-500">
-                      💫 {tr.resonances(resonanceCount)}
+                    <span className="text-xs text-slate-500">
+                      💛 {tr.resonances(resonanceCount)}
                     </span>
                   )}
-                  <span className="text-xs text-well-600 font-medium ms-auto">{tr.details}</span>
+                  <span className="text-xs text-slate-600 font-medium ms-auto">{tr.details}</span>
                 </div>
               </Link>
             )

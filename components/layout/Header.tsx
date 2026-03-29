@@ -58,19 +58,16 @@ export default function Header() {
   const isAdmin = !!(user?.email && user.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL)
 
   const activeCls = (path: string) =>
-    pathname === path ? 'font-semibold text-well-900 bg-sand-50' : 'text-well-700'
+    pathname === path ? 'font-semibold text-slate-900 bg-slate-100' : 'text-slate-700'
 
   return (
-    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-sand-200/60 shadow-sm">
+    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-lg border-b border-slate-200 shadow-sm">
       <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
 
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <span className="text-2xl select-none text-well-800">✦</span>
-          <span
-            className="text-xl font-serif text-well-800 hidden sm:block"
-            style={{ fontFamily: 'var(--font-frank-ruhl)' }}
-          >
+          <span className="text-lg font-black text-indigo-600 select-none">W</span>
+          <span className="text-base font-bold text-slate-800 hidden sm:block">
             {tr.siteName}
           </span>
           {process.env.NEXT_PUBLIC_ENV === 'dev' && (
@@ -87,24 +84,23 @@ export default function Header() {
               <>
                 <Link
                   href="/matches"
-                  className={`btn-ghost text-sm ${pathname === '/matches' ? 'text-well-900 bg-well-50 font-semibold' : ''}`}
+                  className={`btn-ghost text-sm ${pathname === '/matches' ? 'text-slate-900 bg-slate-100 font-semibold' : ''}`}
                 >
                   {tr.nav.myMatches}
                 </Link>
                 <Link
                   href="/wishes/my"
-                  className={`btn-ghost text-sm ${pathname === '/wishes/my' ? 'text-well-900 bg-well-50 font-semibold' : ''}`}
+                  className={`btn-ghost text-sm ${pathname === '/wishes/my' ? 'text-slate-900 bg-slate-100 font-semibold' : ''}`}
                 >
                   {tr.nav.myWishes}
                 </Link>
-                <Link href="/wishes/new" className="btn-primary text-sm px-4 py-2 shadow-md">
-                  <span>✦</span>
+                <Link href="/wishes/new" className="btn-primary text-sm px-4 py-2">
                   <span>{tr.nav.newWish}</span>
                 </Link>
-                <span className="text-xs text-sand-400 max-w-[120px] truncate" dir="ltr">
+                <span className="text-xs text-slate-400 max-w-[120px] truncate" dir="ltr">
                   {user.email}
                 </span>
-                <button onClick={handleSignOut} className="btn-ghost text-xs text-sand-500">
+                <button onClick={handleSignOut} className="btn-ghost text-xs text-slate-500">
                   {tr.nav.logout}
                 </button>
               </>
@@ -123,37 +119,36 @@ export default function Header() {
               <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setMenuOpen(o => !o)}
-                  className="btn-ghost px-3 py-2 text-xl text-well-700 leading-none"
+                  className="btn-ghost px-3 py-2 text-xl text-slate-700 leading-none"
                   aria-label={tr.nav.menuAriaLabel}
                 >
                   {menuOpen ? '✕' : '☰'}
                 </button>
 
                 {menuOpen && (
-                  <div className="absolute end-0 top-full mt-2 w-60 bg-white rounded-2xl border border-sand-200 shadow-xl z-50 overflow-hidden">
+                  <div className="absolute end-0 top-full mt-2 w-60 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 overflow-hidden">
 
                     <div className="p-2">
                       <Link
                         href="/wishes/new"
-                        className="flex items-center gap-2 px-4 py-3 rounded-xl bg-well-700 text-white text-sm font-medium hover:bg-well-600 transition-colors"
+                        className="flex items-center gap-2 px-4 py-3 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-500 transition-colors"
                       >
-                        <span>✦</span>
                         <span>{tr.nav.newWish}</span>
                       </Link>
                     </div>
 
-                    <div className="border-t border-sand-100" />
+                    <div className="border-t border-slate-100" />
 
                     <div className="p-2 space-y-0.5">
                       <Link
                         href="/wishes/my"
-                        className={`flex items-center px-4 py-2.5 rounded-xl text-sm hover:bg-sand-50 transition-colors ${activeCls('/wishes/my')}`}
+                        className={`flex items-center px-4 py-2.5 rounded-xl text-sm hover:bg-slate-50 transition-colors ${activeCls('/wishes/my')}`}
                       >
                         {tr.nav.myWishes}
                       </Link>
                       <Link
                         href="/matches"
-                        className={`flex items-center px-4 py-2.5 rounded-xl text-sm hover:bg-sand-50 transition-colors ${activeCls('/matches')}`}
+                        className={`flex items-center px-4 py-2.5 rounded-xl text-sm hover:bg-slate-50 transition-colors ${activeCls('/matches')}`}
                       >
                         {tr.nav.myMatches}
                       </Link>
@@ -161,20 +156,20 @@ export default function Header() {
 
                     {isAdmin && (
                       <>
-                        <div className="border-t border-sand-100" />
+                        <div className="border-t border-slate-100" />
                         <div className="p-2 space-y-0.5">
-                          <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-sand-400">
+                          <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
                             {tr.nav.admin}
                           </p>
                           <Link
                             href="/admin/test-data"
-                            className={`flex items-center px-4 py-2.5 rounded-xl text-sm hover:bg-sand-50 transition-colors ${activeCls('/admin/test-data')}`}
+                            className={`flex items-center px-4 py-2.5 rounded-xl text-sm hover:bg-slate-50 transition-colors ${activeCls('/admin/test-data')}`}
                           >
                             {tr.nav.adminTestData}
                           </Link>
                           <Link
                             href="/admin/connections"
-                            className={`flex items-center px-4 py-2.5 rounded-xl text-sm hover:bg-sand-50 transition-colors ${activeCls('/admin/connections')}`}
+                            className={`flex items-center px-4 py-2.5 rounded-xl text-sm hover:bg-slate-50 transition-colors ${activeCls('/admin/connections')}`}
                           >
                             {tr.nav.adminConnections}
                           </Link>
@@ -182,15 +177,15 @@ export default function Header() {
                       </>
                     )}
 
-                    <div className="border-t border-sand-100" />
+                    <div className="border-t border-slate-100" />
 
                     <div className="p-2">
-                      <p className="px-4 py-1 text-xs text-sand-400 truncate" dir="ltr">
+                      <p className="px-4 py-1 text-xs text-slate-400 truncate" dir="ltr">
                         {user.email}
                       </p>
                       <button
                         onClick={handleSignOut}
-                        className="w-full text-start px-4 py-2.5 rounded-xl text-sm text-sand-500 hover:bg-sand-50 transition-colors"
+                        className="w-full text-start px-4 py-2.5 rounded-xl text-sm text-slate-500 hover:bg-slate-50 transition-colors"
                       >
                         {tr.nav.logout}
                       </button>

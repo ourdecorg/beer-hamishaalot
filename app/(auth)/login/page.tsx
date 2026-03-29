@@ -37,46 +37,40 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-sand-50">
+    <div className="min-h-screen flex flex-col bg-white">
       {/* Minimal header */}
       <div className="p-4">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-well-700 hover:text-well-900 transition-colors"
+          className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
         >
-          <span>✦</span>
-          <span style={{ fontFamily: 'var(--font-frank-ruhl)' }}>{t(lang).siteName}</span>
+          <span className="text-lg font-black text-indigo-600">W</span>
+          <span className="font-semibold text-slate-800">{t(lang).siteName}</span>
         </Link>
       </div>
 
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-well-800 shadow-lg mb-4">
-              <span className="text-2xl text-amber-300">✦</span>
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 shadow-lg mb-4">
+              <span className="text-2xl">✉️</span>
             </div>
-            <h1
-              className="text-3xl font-bold text-well-900"
-              style={{ fontFamily: 'var(--font-frank-ruhl)' }}
-            >
+            <h1 className="text-2xl font-bold text-slate-900">
               {tr.heading}
             </h1>
-            <p className="text-well-500 mt-2">{tr.subtitle}</p>
+            <p className="text-slate-500 mt-2 text-sm">{tr.subtitle}</p>
           </div>
 
           <div className="card p-8">
             {status === 'sent' ? (
               <div className="text-center space-y-4">
                 <div className="text-5xl">📬</div>
-                <h2
-                  className="text-xl font-bold text-well-900"
-                  style={{ fontFamily: 'var(--font-frank-ruhl)' }}
-                >
+                <h2 className="text-xl font-bold text-slate-900">
                   {tr.sentTitle}
                 </h2>
-                <p className="text-well-600 text-sm leading-relaxed">
+                <p className="text-slate-600 text-sm leading-relaxed">
                   {tr.sentDesc}{' '}
-                  <strong className="text-well-800">{email}</strong>.
+                  <strong className="text-slate-800">{email}</strong>.
                   <br />
                   {tr.sentInstructions}
                 </p>
@@ -92,7 +86,7 @@ export default function LoginPage() {
                 <div>
                   <label
                     htmlFor="email"
-                    className="block text-sm font-medium text-well-700 mb-2"
+                    className="block text-sm font-medium text-slate-700 mb-2"
                   >
                     {tr.emailLabel}
                   </label>
@@ -126,22 +120,19 @@ export default function LoginPage() {
                       <span>{tr.submitting}</span>
                     </>
                   ) : (
-                    <>
-                      <span>✦</span>
-                      <span>{tr.submitBtn}</span>
-                    </>
+                    <span>{tr.submitBtn}</span>
                   )}
                 </button>
 
-                <p className="text-xs text-sand-400 text-center leading-relaxed">
+                <p className="text-xs text-slate-400 text-center leading-relaxed">
                   {tr.noPassword}
                 </p>
               </form>
             )}
           </div>
 
-          <p className="text-center mt-6 text-sm text-sand-500">
-            <Link href="/" className="hover:text-well-600 transition-colors">
+          <p className="text-center mt-6 text-sm text-slate-500">
+            <Link href="/" className="hover:text-slate-800 transition-colors">
               {tr.backHome}
             </Link>
           </p>

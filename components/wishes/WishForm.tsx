@@ -67,7 +67,7 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div>
-        <label htmlFor="wish-text" className="block text-sm font-medium text-well-700 mb-2">
+        <label htmlFor="wish-text" className="block text-sm font-medium text-slate-700 mb-2">
           {tr.label}
         </label>
         <textarea
@@ -84,10 +84,10 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
           }`}
         />
         <div className="flex justify-between items-center mt-1">
-          <span className="text-xs text-sand-400">{tr.hint}</span>
+          <span className="text-xs text-slate-400">{tr.hint}</span>
           <span
             className={`text-xs ${
-              isOverLimit ? 'text-red-500' : isNearLimit ? 'text-amber-600' : 'text-sand-400'
+              isOverLimit ? 'text-red-500' : isNearLimit ? 'text-amber-600' : 'text-slate-400'
             }`}
           >
             {charCount}/1000
@@ -95,12 +95,12 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
         </div>
       </div>
 
-      <div className="card p-6 space-y-4 border-well-200 bg-well-50/40">
-        <p className="text-sm font-medium text-well-700">{tr.contactTitle}</p>
+      <div className="card p-6 space-y-4 bg-slate-50">
+        <p className="text-sm font-medium text-slate-700">{tr.contactTitle}</p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs text-well-600 mb-1">
+            <label className="block text-xs text-slate-600 mb-1">
               {tr.nameLabel} <span className="text-red-400">{tr.nameRequired}</span>
             </label>
             <input
@@ -115,8 +115,8 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
           </div>
 
           <div>
-            <label className="block text-xs text-well-600 mb-1">
-              {tr.cityLabel} <span className="text-sand-400">{tr.optional}</span>
+            <label className="block text-xs text-slate-600 mb-1">
+              {tr.cityLabel} <span className="text-slate-400">{tr.optional}</span>
             </label>
             <SettlementPicker
               value={contact.contact_city}
@@ -126,8 +126,8 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
           </div>
 
           <div>
-            <label className="block text-xs text-well-600 mb-1">
-              {tr.addressLabel} <span className="text-sand-400">{tr.optional}</span>
+            <label className="block text-xs text-slate-600 mb-1">
+              {tr.addressLabel} <span className="text-slate-400">{tr.optional}</span>
             </label>
             <input
               type="text"
@@ -140,8 +140,8 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
           </div>
 
           <div>
-            <label className="block text-xs text-well-600 mb-1">
-              {tr.phoneLabel} <span className="text-sand-400">{tr.optional}</span>
+            <label className="block text-xs text-slate-600 mb-1">
+              {tr.phoneLabel} <span className="text-slate-400">{tr.optional}</span>
             </label>
             <input
               type="tel"
@@ -174,13 +174,12 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
           </>
         ) : (
           <>
-            <span>✦</span>
             <span>{tr.submitBtn}</span>
           </>
         )}
       </button>
 
-      <p className="text-xs text-center text-sand-400">{tr.afterSubmit}</p>
+      <p className="text-xs text-center text-slate-400">{tr.afterSubmit}</p>
     </form>
   )
 }

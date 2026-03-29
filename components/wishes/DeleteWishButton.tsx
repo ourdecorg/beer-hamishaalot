@@ -43,7 +43,7 @@ export default function DeleteWishButton({ wishId }: { wishId: string }) {
         <button
           onClick={e => { e.preventDefault(); e.stopPropagation(); setConfirming(false); setError(false) }}
           disabled={loading}
-          className="text-sm px-3 py-1 rounded-lg border border-sand-200 text-sand-500 hover:bg-sand-50"
+          className="text-sm px-3 py-1 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
         >
           {tr.cancel}
         </button>
