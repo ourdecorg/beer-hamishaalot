@@ -127,7 +127,10 @@ export async function generateAndStoreEmbedding(
       .select('embedding')
       .eq('wish_id', wishId)
       .maybeSingle()
-    if (existing?.embedding) return existing.embedding as number[]
+    if (existing?.embedding) {
+      const raw = existing.embedding
+      return (typeof raw === 'string' ? JSON.parse(raw) : raw) as number[]
+    }
   }
 
   const text = buildEmbeddingText(wishText, enrichment)
