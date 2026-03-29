@@ -61,13 +61,24 @@ export async function POST(request: NextRequest) {
   await Promise.all(preparePromises)
 
   // ── Phase 2: run matching for all wishes (enrichment already exists) ──
-  // Fire-and-forget; Railway keeps the process alive until all complete.
+  // For small batches (≤ 300), use full-scan: sort IDs and pass each wish
+  // the explicit list of lower-sorted IDs as candidates — guarantees 100%
+  // pair coverage without the ANN similarity floor.
+  // For large batches, fall back to ANN + structural recall (onlyLowerId=true).
+  const FULL_SCAN_MAX = 300
+  const useFullScan = wishIds.length <= FULL_SCAN_MAX
+  const sortedIds = useFullScan ? [...wishIds].sort() : wishIds
+
   let started = 0
-  for (let i = 0; i < wishIds.length; i++) {
-    const id   = wishIds[i]
+  for (let i = 0; i < sortedIds.length; i++) {
+    const id   = sortedIds[i]
     const text = wishMap.get(id)
     if (!text) continue
-    setTimeout(() => processWishForMatching(id, text, { onlyLowerId: true }), i * STAGGER_MS)
+    const explicitCandidateIds = useFullScan ? sortedIds.slice(0, i) : undefined
+    setTimeout(
+      () => processWishForMatching(id, text, { onlyLowerId: !useFullScan, explicitCandidateIds }),
+      i * STAGGER_MS
+    )
     started++
   }
 

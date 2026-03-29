@@ -70,7 +70,12 @@ export async function prepareWishForMatching(
 export async function processWishForMatching(
   wishId: string,
   wishText: string,
-  { onlyLowerId = false }: { onlyLowerId?: boolean } = {}
+  { onlyLowerId = false, explicitCandidateIds }: {
+    onlyLowerId?: boolean
+    /** When provided, skip ANN + structural recall and evaluate these IDs directly.
+     *  Used for full-scan mode on small batches (≤ 300 wishes) to guarantee 100% pair coverage. */
+    explicitCandidateIds?: string[]
+  } = {}
 ): Promise<void> {
   try {
     const supabase = createAdminClient()
@@ -81,16 +86,28 @@ export async function processWishForMatching(
     // Step 2 — Generate + store embedding
     const embedding = await generateAndStoreEmbedding(wishId, wishText, enrichment)
 
-    // Step 3a — Semantic (ANN) recall
-    const annCandidates = await findSimilarWishes(wishId, embedding, { onlyLowerId })
+    // Step 3 — Recall
+    let annMap: Map<string, number>
+    let structuredSet: Set<string>
 
-    // Step 3b — Structural recall via anchor_keywords &&-overlap
-    const sourceKeywords = buildAnchorKeywords(enrichment)
-    const structuredCandidates = await findStructuredCandidates(wishId, sourceKeywords, { onlyLowerId })
+    if (explicitCandidateIds && explicitCandidateIds.length > 0) {
+      // Full-scan: compute similarities for all explicit candidates directly —
+      // bypasses ANN threshold so every pair is evaluated regardless of similarity floor
+      annMap = await computeSimilaritiesForIds(embedding, explicitCandidateIds)
+      structuredSet = new Set()
+    } else {
+      // Normal recall: ANN + structural
+      // Step 3a — Semantic (ANN) recall
+      const annCandidates = await findSimilarWishes(wishId, embedding, { onlyLowerId })
+      annMap = new Map(annCandidates.map(c => [c.wish_id, c.similarity]))
+
+      // Step 3b — Structural recall via anchor_keywords &&-overlap
+      const sourceKeywords = buildAnchorKeywords(enrichment)
+      const structuredCandidates = await findStructuredCandidates(wishId, sourceKeywords, { onlyLowerId })
+      structuredSet = new Set(structuredCandidates.map(c => c.wish_id))
+    }
 
     // Step 3c — Merge both recall channels
-    const annMap = new Map(annCandidates.map(c => [c.wish_id, c.similarity]))
-    const structuredSet = new Set(structuredCandidates.map(c => c.wish_id))
     const allIds = new Set([...annMap.keys(), ...structuredSet])
 
     if (allIds.size === 0) return
