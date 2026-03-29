@@ -40,99 +40,34 @@ const en = {
   },
 
   home: {
-    sectionLabel: 'Well of Wishes',
-    h1a: 'Share a wish from your heart —',
-    h1b: 'and find who can help',
-    subtitle:
-      'A platform for connecting people through wishes. The AI analyzes each wish and finds matches — people who can help, collaborate, or join you.',
-    ctaWrite: 'Write Your Wish',
+    heroLabel: 'AI-powered wish matching',
+    h1: 'A good idea starts with a wish',
+    subtitle: "Write what's on your mind — AI will find people who can help",
+    ctaWrite: 'Get Started',
     myWishes: 'My Wishes',
-    freeLabel: 'Free · No commitment',
+
+    inputPlaceholder: 'What would you like to happen?',
+    inputHint: 'It can be an idea, question, or direction',
+    inputCta: 'Continue',
 
     howLabel: 'How it works',
-    howTitle: 'Three steps to connection',
 
-    whatLabel: 'What you get',
-    whatTitle: 'More than a place to save wishes',
-
-    featuresLabel: 'What makes it special',
-    featuresTitle: 'What makes the engine special',
-
-    previewLabel: 'A peek into the well',
-    previewTitle: "What's already here",
-    previewSub: 'Real wishes from the well',
-
-    ctaLabel: 'Join the well',
-    ctaTitle: 'Ready to send your wish?',
-    ctaSub:
-      'The engine is waiting. The well is open. Maybe someone out there is waiting for exactly your wish.',
-    ctaBtn: 'Send a Wish',
+    proofText: 'People are already sharing wishes and finding connections',
 
     adminLink: 'Admin screens',
 
     steps: [
       {
-        emoji: '✍️',
-        title: 'Write your wish',
-        desc: 'Share a dream, intention, or hope — in a few words, with contact details so others can reach you.',
+        title: 'Write',
+        desc: 'Write a wish, idea, or request in your own words',
       },
       {
-        emoji: '✨',
-        title: 'AI analyzes the wish',
-        desc: 'The language model identifies themes, needs, capabilities, location and timeframe — to find precise connections.',
+        title: 'AI Processing',
+        desc: 'AI analyzes and finds similar and complementary wishes',
       },
       {
-        emoji: '🔗',
-        title: 'The well discovers connections',
-        desc: 'The engine finds related and complementary wishes and shows contact details — so you can start a conversation.',
-      },
-    ],
-
-    outcomes: [
-      {
-        icon: '🎯',
-        bg: 'linear-gradient(145deg, #fff7ed, #fef3c7)',
-        title: 'Precise matches',
-        desc: 'The engine analyzes theme, needs, capabilities, location and availability — connecting wishes that can truly meet.',
-      },
-      {
-        icon: '🤝',
-        bg: 'linear-gradient(145deg, #edf5f8, #d3e8f0)',
-        title: 'Direct connection',
-        desc: "When a match is found, both parties' contact details are shown — reach out immediately.",
-      },
-      {
-        icon: '💫',
-        bg: 'linear-gradient(145deg, #fdfaf5, #f9f3e7)',
-        title: 'Community resonance',
-        desc: "When your wish touches someone, they can resonate — and show you you're not alone.",
-      },
-    ],
-
-    features: [
-      {
-        icon: '🎯',
-        bg: 'linear-gradient(145deg, #fff7ed, #fef3c7)',
-        title: 'Smart matches',
-        desc: 'The engine identifies similar and complementary wishes — whether someone is looking for exactly what you offer, or shares your aspiration.',
-      },
-      {
-        icon: '📍',
-        bg: 'linear-gradient(145deg, #edf5f8, #d3e8f0)',
-        title: 'Location and time aware',
-        desc: 'If you mentioned a location or timeframe, the engine ensures matched wishes are relevant geographically and temporally.',
-      },
-      {
-        icon: '✨',
-        bg: 'linear-gradient(145deg, #fdfaf5, #f2e5cd)',
-        title: 'Context-aware AI',
-        desc: 'The analysis identifies domain, intention and object type — to avoid wrong connections between different topics.',
-      },
-      {
-        icon: '📬',
-        bg: 'linear-gradient(145deg, #edf5f8, #a9d2e2)',
-        title: 'Direct contact',
-        desc: 'Each wish includes contact details. When a match is found — reach out directly, no intermediaries.',
+        title: 'Connect',
+        desc: 'Get contact details and start a conversation',
       },
     ],
   },
@@ -296,99 +231,34 @@ const he: typeof en = {
   },
 
   home: {
-    sectionLabel: 'באר המשאלות',
-    h1a: 'שתף משאלה שבלב —',
-    h1b: 'ומצא את מי שיכול לעזור',
-    subtitle:
-      'פלטפורמה לחיבור בין אנשים על בסיס משאלות. ה-AI מנתח כל משאלה ומוצא התאמות — אנשים שיכולים לסייע, לשתף פעולה, או להצטרף אליך.',
-    ctaWrite: 'כתוב את משאלתך',
+    heroLabel: 'חיבורים מבוססי AI',
+    h1: 'רעיון טוב מתחיל במשאלה',
+    subtitle: 'כתוב מה שבלב — ה-AI ימצא אנשים שיכולים לעזור',
+    ctaWrite: 'התחל עכשיו',
     myWishes: 'המשאלות שלי',
-    freeLabel: 'בחינם · ללא מחויבות',
+
+    inputPlaceholder: 'מה היית רוצה שיקרה?',
+    inputHint: 'זה יכול להיות רעיון, שאלה או כיוון',
+    inputCta: 'המשך',
 
     howLabel: 'איך זה עובד',
-    howTitle: 'שלושה צעדים לחיבור',
 
-    whatLabel: 'מה מקבלים',
-    whatTitle: 'יותר ממקום לשמור משאלות',
-
-    featuresLabel: 'מה מיוחד כאן',
-    featuresTitle: 'מה מיוחד במנוע',
-
-    previewLabel: 'הצצה לבאר',
-    previewTitle: 'מה כבר נמצא כאן',
-    previewSub: 'משאלות אמיתיות מהבאר',
-
-    ctaLabel: 'הצטרף לבאר',
-    ctaTitle: 'מוכן לשלח את משאלתך?',
-    ctaSub:
-      'המנוע ממתין. הבאר פתוחה. אולי מישהו שם בחוץ מחכה בדיוק למשאלה שלך.',
-    ctaBtn: 'שלח משאלה',
+    proofText: 'אנשים כבר שיתפו משאלות ומצאו חיבורים',
 
     adminLink: 'מסכי ניהול',
 
     steps: [
       {
-        emoji: '✍️',
-        title: 'כתוב את משאלתך',
-        desc: 'שתף חלום, כוונה, או תקווה — בכמה מילים, עם פרטי קשר כדי שאחרים יוכלו ליצור קשר.',
+        title: 'כתיבה',
+        desc: 'כתוב משאלה, רעיון, או בקשה בשפה שלך',
       },
       {
-        emoji: '✨',
-        title: 'ה-AI מנתח את המשאלה',
-        desc: 'מודל השפה מזהה נושאים, צרכים, יכולות, מיקום וטווח זמן — כדי למצוא חיבורים מדויקים.',
+        title: 'עיבוד AI',
+        desc: 'ה-AI מנתח ומוצא משאלות דומות ומשלימות',
       },
       {
-        emoji: '🔗',
-        title: 'הבאר מגלה חיבורים',
-        desc: 'המנוע מוצא משאלות קשורות ומשלימות ומציג פרטי קשר — כדי שתוכל להתחיל שיחה.',
-      },
-    ],
-
-    outcomes: [
-      {
-        icon: '🎯',
-        bg: 'linear-gradient(145deg, #fff7ed, #fef3c7)',
-        title: 'התאמות מדויקות',
-        desc: 'המנוע מנתח נושא, צרכים, יכולות, מיקום וזמינות — ומחבר בין משאלות שיכולות באמת להיפגש.',
-      },
-      {
-        icon: '🤝',
-        bg: 'linear-gradient(145deg, #edf5f8, #d3e8f0)',
-        title: 'חיבור ישיר',
-        desc: 'כשנמצאת התאמה, פרטי הקשר של שני הצדדים מוצגים — ניתן ליצור קשר מיידית.',
-      },
-      {
-        icon: '💫',
-        bg: 'linear-gradient(145deg, #fdfaf5, #f9f3e7)',
-        title: 'הדהוד קהילתי',
-        desc: 'כשמשאלתך נוגעת למישהו, הם יכולים להדהד — ולהראות לך שאתה לא לבד.',
-      },
-    ],
-
-    features: [
-      {
-        icon: '🎯',
-        bg: 'linear-gradient(145deg, #fff7ed, #fef3c7)',
-        title: 'התאמות חכמות',
-        desc: 'המנוע מזהה משאלות דומות ומשלימות — בין אם מישהו מחפש בדיוק מה שיש לך לתת, ובין אם חולקים אתך אותה שאיפה.',
-      },
-      {
-        icon: '📍',
-        bg: 'linear-gradient(145deg, #edf5f8, #d3e8f0)',
-        title: 'מודע למיקום ולזמן',
-        desc: 'אם ציינת מיקום או טווח זמן, המנוע מוודא שהמשאלות שמופגשות רלוונטיות גם גיאוגרפית וגם לוח-זמנית.',
-      },
-      {
-        icon: '✨',
-        bg: 'linear-gradient(145deg, #fdfaf5, #f2e5cd)',
-        title: 'AI שמבין הקשר',
-        desc: 'הניתוח מזהה את תחום העניין, הכוונה וסוג האובייקט — כדי להימנע מחיבורים מוטעים בין נושאים שונים.',
-      },
-      {
-        icon: '📬',
-        bg: 'linear-gradient(145deg, #edf5f8, #a9d2e2)',
-        title: 'יצירת קשר ישירה',
-        desc: 'כל משאלה כוללת פרטי קשר. כשנמצאת התאמה — אפשר לפנות ישירות, ללא מתווכים.',
+        title: 'חיבור לאנשים',
+        desc: 'מקבלים פרטי קשר ומתחילים שיחה',
       },
     ],
   },

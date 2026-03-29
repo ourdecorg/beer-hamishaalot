@@ -15,11 +15,15 @@ const emptyContact: WishContactInfo = {
   contact_phone: '',
 }
 
-export default function WishForm() {
+interface WishFormProps {
+  initialText?: string
+}
+
+export default function WishForm({ initialText = '' }: WishFormProps) {
   const lang = useLang()
   const tr = t(lang).wishForm
 
-  const [text, setText] = useState('')
+  const [text, setText] = useState(initialText)
   const [contact, setContact] = useState<WishContactInfo>(emptyContact)
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')

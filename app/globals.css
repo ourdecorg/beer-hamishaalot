@@ -16,7 +16,7 @@
   }
 
   h1, h2, h3, h4 {
-    font-family: var(--font-frank-ruhl), Georgia, serif;
+    font-family: var(--font-rubik), system-ui, sans-serif;
     line-height: 1.2;
   }
 
