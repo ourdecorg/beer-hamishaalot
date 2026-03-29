@@ -39,6 +39,8 @@ const en = {
     switchLabel: 'עב',   // label shown when UI is in English — click to switch to Hebrew
   },
 
+  tagline: 'Connecting people through wishes',
+
   home: {
     heroLabel: 'AI-powered wish matching',
     h1: 'A good idea starts with a wish',
@@ -229,6 +231,8 @@ const he: typeof en = {
   lang: {
     switchLabel: 'EN',
   },
+
+  tagline: 'פלטפורמה לחיבור בין אנשים על בסיס משאלות',
 
   home: {
     heroLabel: 'חיבורים מבוססי AI',

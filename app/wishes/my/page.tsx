@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
-import Footer from '@/components/layout/Footer'
 import { createClient } from '@/lib/supabase/server'
 import DeleteWishButton from '@/components/wishes/DeleteWishButton'
 import { t, dateLocale } from '@/lib/i18n'
@@ -151,7 +150,6 @@ export default async function MyWishesPage() {
         </div>
       </main>
 
-      <Footer />
     </div>
   )
 }

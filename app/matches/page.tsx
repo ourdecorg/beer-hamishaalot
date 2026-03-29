@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
-import Footer from '@/components/layout/Footer'
 import { createClient } from '@/lib/supabase/server'
 import { t, dateLocale } from '@/lib/i18n'
 import { getLang } from '@/lib/i18n/server'
@@ -285,7 +284,6 @@ export default async function MyMatchesPage() {
 
       </main>
 
-      <Footer />
     </div>
   )
 }
@@ -326,7 +324,6 @@ function EmptyLayout({
           )}
         </div>
       </main>
-      <Footer />
     </div>
   )
 }

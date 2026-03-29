@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation'
 import Header from '@/components/layout/Header'
-import Footer from '@/components/layout/Footer'
 import ResonanceButton from '@/components/wishes/ResonanceButton'
 import MatchesSection from '@/components/wishes/MatchesSection'
 import { createClient } from '@/lib/supabase/server'
@@ -154,7 +153,6 @@ export default async function WishPage({ params }: Props) {
         )}
       </main>
 
-      <Footer />
     </div>
   )
 }

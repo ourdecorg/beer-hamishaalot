@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
-import Footer from '@/components/layout/Footer'
 import WishInputBox from '@/components/home/WishInputBox'
 import { createClient } from '@/lib/supabase/server'
 import { t, forwardArrow } from '@/lib/i18n'
@@ -98,7 +97,6 @@ export default async function HomePage() {
         </div>
       )}
 
-      <Footer />
     </div>
   )
 }
