@@ -90,10 +90,13 @@ export async function processWishForMatching(
     let annMap: Map<string, number>
     let structuredSet: Set<string>
 
-    if (explicitCandidateIds && explicitCandidateIds.length > 0) {
+    if (explicitCandidateIds !== undefined) {
       // Full-scan: compute similarities for all explicit candidates directly —
-      // bypasses ANN threshold so every pair is evaluated regardless of similarity floor
-      annMap = await computeSimilaritiesForIds(embedding, explicitCandidateIds)
+      // bypasses ANN threshold so every pair is evaluated regardless of similarity floor.
+      // Empty list (first wish in sorted order) → no candidates → pipeline exits at allIds.size===0.
+      annMap = explicitCandidateIds.length > 0
+        ? await computeSimilaritiesForIds(embedding, explicitCandidateIds)
+        : new Map()
       structuredSet = new Set()
     } else {
       // Normal recall: ANN + structural
