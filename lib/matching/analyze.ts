@@ -184,7 +184,7 @@ ambiguity_flag:
   try {
     completion = await withRetry(() => getOpenAI().chat.completions.create({
       model,
-      max_completion_tokens: 1024,
+      max_completion_tokens: 2048,
       response_format: { type: 'json_object' },
       messages,
     }))
