@@ -88,6 +88,8 @@ const en = {
     sentInstructions: 'Click the link to sign in to the well.',
     resend: 'Send again with a different email',
     error: 'An error occurred. Please try again.',
+    googleBtn: 'Continue with Google',
+    orDivider: 'or',
   },
 
   newWish: {
@@ -281,6 +283,8 @@ const he: typeof en = {
     sentInstructions: 'לחץ על הקישור כדי להיכנס לבאר.',
     resend: 'שלח שוב עם אימייל אחר',
     error: 'אירעה שגיאה. נסה שוב.',
+    googleBtn: 'המשך עם Google',
+    orDivider: 'או',
   },
 
   newWish: {
