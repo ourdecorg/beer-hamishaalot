@@ -65,15 +65,16 @@ export default function Header() {
       <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
 
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity min-w-0">
+        <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
           <span className="text-lg font-black text-indigo-600 select-none shrink-0">W</span>
-          <span className="text-base font-bold text-slate-800 hidden sm:block shrink-0">
-            {tr.siteName}
-          </span>
-          <span className="hidden lg:block text-slate-300 shrink-0">·</span>
-          <span className="hidden lg:block text-sm text-slate-500 truncate">
-            {tr.tagline}
-          </span>
+          <div className="flex flex-col leading-tight">
+            <span className="text-base font-bold text-slate-800">
+              {tr.siteName}
+            </span>
+            <span className="hidden sm:block text-[11px] text-slate-400 font-normal">
+              {tr.tagline}
+            </span>
+          </div>
           {process.env.NEXT_PUBLIC_ENV === 'dev' && (
             <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-300 select-none shrink-0">
               dev
