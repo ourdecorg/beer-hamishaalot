@@ -11,7 +11,6 @@ export interface AttemptRow {
   wish_id: string
   candidate_wish_id: string
   semantic_similarity: number
-  semantic_similarity_orig: number | null
   complementarity_score: number
   structural_similarity: number | null
   geo_penalty: number | null
@@ -76,12 +75,11 @@ const labelConfig: Record<Label, { label: string; active: string; idle: string }
 }
 
 const SORT_OPTIONS: { key: string; label: string }[] = [
-  { key: 'match_score',    label: 'ציון סופי' },
-  { key: 'semantic_en',    label: 'סמנטי EN' },
-  { key: 'semantic_orig',  label: 'סמנטי מקור' },
+  { key: 'match_score',     label: 'ציון סופי' },
+  { key: 'semantic_en',     label: 'סמנטי' },
   { key: 'complementarity', label: 'משלים' },
-  { key: 'structural',     label: 'מבני' },
-  { key: 'geo',            label: 'גיאו' },
+  { key: 'structural',      label: 'מבני' },
+  { key: 'geo',             label: 'גיאו' },
 ]
 
 // ── Shared URL builder ────────────────────────────────────────────────────────
@@ -281,12 +279,11 @@ function ReviewCard({
 
   // Score components in display order with active sort highlighted
   const signals: { key: string; label: string; value: string }[] = [
-    { key: 'match_score',    label: 'ציון',       value: pct(attempt.match_score) },
-    { key: 'semantic_en',    label: 'סמנטי EN',   value: pct(attempt.semantic_similarity) },
-    { key: 'semantic_orig',  label: 'סמנטי מקור', value: pct(attempt.semantic_similarity_orig) },
-    { key: 'complementarity',label: 'משלים',      value: pct(attempt.complementarity_score) },
-    { key: 'structural',     label: 'מבני',       value: pct(attempt.structural_similarity) },
-    { key: 'geo',            label: 'גיאו',       value: pct(attempt.geo_penalty) },
+    { key: 'match_score',     label: 'ציון',  value: pct(attempt.match_score) },
+    { key: 'semantic_en',     label: 'סמנטי', value: pct(attempt.semantic_similarity) },
+    { key: 'complementarity', label: 'משלים', value: pct(attempt.complementarity_score) },
+    { key: 'structural',      label: 'מבני',  value: pct(attempt.structural_similarity) },
+    { key: 'geo',             label: 'גיאו',  value: pct(attempt.geo_penalty) },
   ]
 
   return (

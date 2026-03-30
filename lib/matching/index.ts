@@ -1,14 +1,14 @@
 /**
- * Wish Resonance Engine — Orchestrator (v9 — dual-semantic)
+ * Wish Resonance Engine — Orchestrator (v10 — 3 signals)
  *
  * processWishForMatching(wishId, wishText) is the single entry point.
  * Pipeline:
  *   1. Deep analysis  → wish_enrichment (skip-if-exists)
- *   2. Embedding      → wish_embeddings English + original (skip-if-exists)
+ *   2. Embedding      → wish_embeddings English + original stored (skip-if-exists)
  *   3a. Semantic recall  → ANN candidates via English embedding (similarity ≥ MIN_SIMILARITY)
  *   3b. Structural recall → candidates with anchor_keywords overlap
- *   3c. Merge both channels, back-fill both similarities for structural-only candidates
- *   4. Score          → 0.35×semantic_en + 0.20×semantic_orig + 0.25×complementarity + 0.20×structural
+ *   3c. Merge both channels, back-fill English similarity for structural-only candidates
+ *   4. Score          → 0.55×semantic_en + 0.25×complementarity + 0.20×structural
  *   5. Relevance gate → reject if semantic_en<0.30 AND complementarity<0.20 AND structural<0.25
  *   6. Geo            → soft distance penalty (exp(-d/50))
  *   7. Date range     → hard filter
@@ -31,8 +31,7 @@ type RecallSource = 'semantic' | 'structured' | 'both'
 
 interface MergedCandidate {
   wish_id: string
-  similarityEn:   number
-  similarityOrig: number
+  similarityEn: number
   recallSource: RecallSource
 }
 
@@ -83,25 +82,22 @@ export async function processWishForMatching(
     // Step 1 — Deep analysis
     const enrichment = await analyzeAndStoreWish(wishId, wishText)
 
-    // Step 2 — Generate + store embedding (English primary + original)
-    const { en: embeddingEn, orig: embeddingOrig } = await generateAndStoreEmbedding(wishId, wishText, enrichment)
+    // Step 2 — Generate + store both embeddings (original stored for future use, not used in scoring)
+    const { en: embeddingEn } = await generateAndStoreEmbedding(wishId, wishText, enrichment)
 
     // Step 3 — Recall
-    let annEnMap:   Map<string, number>
-    let annOrigMap: Map<string, number>
+    let annEnMap: Map<string, number>
     let structuredSet: Set<string>
 
     if (explicitCandidateIds !== undefined) {
-      // Full-scan: compute both similarities for all explicit candidates directly —
+      // Full-scan: compute English similarity for all explicit candidates directly —
       // bypasses ANN threshold so every pair is evaluated regardless of similarity floor.
       // Empty list (first wish in sorted order) → no candidates → pipeline exits at allIds.size===0.
       if (explicitCandidateIds.length > 0) {
-        const dual = await computeSimilaritiesForIds(embeddingEn, embeddingOrig, explicitCandidateIds)
-        annEnMap   = dual.en
-        annOrigMap = dual.orig
+        const dual = await computeSimilaritiesForIds(embeddingEn, null, explicitCandidateIds)
+        annEnMap = dual.en
       } else {
-        annEnMap   = new Map()
-        annOrigMap = new Map()
+        annEnMap = new Map()
       }
       structuredSet = new Set()
     } else {
@@ -109,7 +105,6 @@ export async function processWishForMatching(
       // Step 3a — Semantic (ANN) recall via English embedding
       const annCandidates = await findSimilarWishes(wishId, embeddingEn, { onlyLowerId })
       annEnMap = new Map(annCandidates.map(c => [c.wish_id, c.similarity]))
-      annOrigMap = new Map()
 
       // Step 3b — Structural recall via anchor_keywords &&-overlap
       const sourceKeywords = buildAnchorKeywords(enrichment)
@@ -122,17 +117,16 @@ export async function processWishForMatching(
 
     if (allIds.size === 0) return
 
-    // Back-fill both similarities for all candidates not already in annOrigMap
-    const backfillIds = [...allIds].filter(id => !annOrigMap.has(id))
+    // Back-fill English similarity for structural-only candidates
+    const backfillIds = [...allIds].filter(id => !annEnMap.has(id))
     const extra = backfillIds.length > 0
-      ? await computeSimilaritiesForIds(embeddingEn, embeddingOrig, backfillIds)
+      ? await computeSimilaritiesForIds(embeddingEn, null, backfillIds)
       : { en: new Map<string, number>(), orig: new Map<string, number>() }
 
     const merged: MergedCandidate[] = [...allIds].map(id => ({
-      wish_id:        id,
-      similarityEn:   annEnMap.get(id)   ?? extra.en.get(id)   ?? 0,
-      similarityOrig: annOrigMap.get(id) ?? extra.orig.get(id) ?? 0,
-      recallSource:   (annEnMap.has(id) && structuredSet.has(id)) ? 'both'
+      wish_id:      id,
+      similarityEn: annEnMap.get(id) ?? extra.en.get(id) ?? 0,
+      recallSource: (annEnMap.has(id) && structuredSet.has(id)) ? 'both'
         : annEnMap.has(id) ? 'semantic' : 'structured',
     }))
 
@@ -159,10 +153,9 @@ export async function processWishForMatching(
       wish_id: string
       candidate_wish_id: string
       semantic_similarity: number
-      semantic_similarity_orig: number
       complementarity_score: number
       theme_overlap: number          // NOT NULL in DB — always 0 (legacy)
-      intent_compatibility: number   // always 0 (removed from formula v9)
+      intent_compatibility: number   // always 0 (legacy)
       domain_match: number
       structural_similarity: number
       recall_source: string
@@ -201,29 +194,27 @@ export async function processWishForMatching(
 
       if (!passesRelevanceGate) {
         logEntries.push({
-          wish_id:                  wishId,
-          candidate_wish_id:        candidate.wish_id,
-          semantic_similarity:      Math.round(candidate.similarityEn   * 1000) / 1000,
-          semantic_similarity_orig: Math.round(candidate.similarityOrig * 1000) / 1000,
-          complementarity_score:    Math.round(complementarityScore     * 1000) / 1000,
-          theme_overlap:            0,
-          intent_compatibility:     0,
-          domain_match:             domainMatch,
-          structural_similarity:    Math.round(structuralSimilarity     * 1000) / 1000,
-          recall_source:            candidate.recallSource,
-          geo_penalty:              1,
-          match_score:              0,
-          match_type:               null,
-          passed_threshold:         false,
-          gate_passed:              false,
-          gate_reason:              'low_semantic_low_complementarity_low_structural',
+          wish_id:               wishId,
+          candidate_wish_id:     candidate.wish_id,
+          semantic_similarity:   Math.round(candidate.similarityEn  * 1000) / 1000,
+          complementarity_score: Math.round(complementarityScore    * 1000) / 1000,
+          theme_overlap:         0,
+          intent_compatibility:  0,
+          domain_match:          domainMatch,
+          structural_similarity: Math.round(structuralSimilarity    * 1000) / 1000,
+          recall_source:         candidate.recallSource,
+          geo_penalty:           1,
+          match_score:           0,
+          match_type:            null,
+          passed_threshold:      false,
+          gate_passed:           false,
+          gate_reason:           'low_semantic_low_complementarity_low_structural',
         })
         continue
       }
 
       const score = computeMatchScore(
         candidate.similarityEn,
-        candidate.similarityOrig,
         complementarityScore,
         structuralSimilarity,
       )
@@ -234,22 +225,21 @@ export async function processWishForMatching(
       const passed = finalScore >= MATCH_THRESHOLD
 
       logEntries.push({
-        wish_id:                  wishId,
-        candidate_wish_id:        candidate.wish_id,
-        semantic_similarity:      Math.round(candidate.similarityEn   * 1000) / 1000,
-        semantic_similarity_orig: Math.round(candidate.similarityOrig * 1000) / 1000,
-        complementarity_score:    Math.round(complementarityScore     * 1000) / 1000,
-        theme_overlap:            0,
-        intent_compatibility:     0,
-        domain_match:             domainMatch,
-        structural_similarity:    Math.round(structuralSimilarity     * 1000) / 1000,
-        recall_source:            candidate.recallSource,
-        geo_penalty:              Math.round(geoPenalty               * 1000) / 1000,
-        match_score:              finalScore,
-        match_type:               passed ? score.match_type : null,
-        passed_threshold:         passed,
-        gate_passed:              true,
-        gate_reason:              'passed',
+        wish_id:               wishId,
+        candidate_wish_id:     candidate.wish_id,
+        semantic_similarity:   Math.round(candidate.similarityEn  * 1000) / 1000,
+        complementarity_score: Math.round(complementarityScore    * 1000) / 1000,
+        theme_overlap:         0,
+        intent_compatibility:  0,
+        domain_match:          domainMatch,
+        structural_similarity: Math.round(structuralSimilarity    * 1000) / 1000,
+        recall_source:         candidate.recallSource,
+        geo_penalty:           Math.round(geoPenalty              * 1000) / 1000,
+        match_score:           finalScore,
+        match_type:            passed ? score.match_type : null,
+        passed_threshold:      passed,
+        gate_passed:           true,
+        gate_reason:           'passed',
       })
 
       if (!passed) continue
