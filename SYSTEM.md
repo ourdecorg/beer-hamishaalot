@@ -99,11 +99,15 @@ GroupedMatch {
 ### מסך `/admin/review-matches`
 
 Server component שטוען עד 60 רשומות מ-`match_attempts_log`, מציג אותן כ-cards עם:
-- טקסטי שתי המשאלות + סיגנלים
+- טקסטי שתי המשאלות + סיגנלים: ציון · סמנטי (×0.55) · משלים (×0.25) · מבני (×0.20) · גיאו
 - Badge: נוצר חיבור / נפסל בשער / לא נוצר חיבור
 - כפתורי label: טוב / אולי / לא טוב + שדה הערה → POST `/api/admin/review-matches`
 
 **סינונים (URL searchParams → server re-fetch):** סוג (עבר/לא עבר סף) · סקירה (סוקרו/לא) · שער · קרוב לסף · כולל מבוטלות (ברירת מחדל: מסתיר)
+
+**מיון (URL param `sort`):** match_score · semantic_en · complementarity · structural · geo — server-side ORDER BY
+
+**דפדוף:** server-side pagination, 60 רשומות לעמוד · prev/next Links · "עמוד X מתוך Y · N רשומות"
 
 **חיפוש טקסט:** client-side, מסנן כרטיסים לפי תוכן משאלות ללא round-trip לשרת
 
@@ -229,11 +233,11 @@ UNIQUE(wish_a, wish_b), CHECK(wish_a < wish_b)
 id                       uuid PK
 wish_id                  uuid
 candidate_wish_id        uuid
-semantic_similarity      float NOT NULL  ← English embedding similarity
-semantic_similarity_orig float           ← original-language embedding similarity (migration 035)
+semantic_similarity      float NOT NULL  ← English embedding similarity (v10: ×0.55)
+semantic_similarity_orig float           ← original-language similarity (migration 035); נכתב NULL ב-v10
 complementarity_score    float NOT NULL
 theme_overlap            float NOT NULL  ← תמיד 0 (legacy NOT NULL)
-intent_compatibility     float           ← תמיד 0 (הוסר מהנוסחה ב-v9)
+intent_compatibility     float           ← תמיד 0 (הוסר מהנוסחה ב-v9, לא נכתב ב-v10)
 domain_match             float           ← 0/1 לפי primary_domain (אובסרווביליות בלבד)
 structural_similarity    float
 recall_source            text            ← 'semantic'|'structured'|'both'
@@ -288,7 +292,7 @@ UNIQUE(wish_id, user_id)
 
 ---
 
-## 4. מנגנון ההפגשה (Resonance Engine v9 — dual-semantic)
+## 4. מנגנון ההפגשה (Resonance Engine v10 — 3 signals)
 
 ### pipeline ראשי — `processWishForMatching(wishId, wishText, {onlyLowerId?, explicitCandidateIds?})`
 
@@ -304,7 +308,7 @@ UNIQUE(wish_id, user_id)
   ├── English embedding (ראשי):
   │     buildEnglishEmbeddingText(translation_en, { themes })
   │     → text-embedding-3-small → wish_embeddings.embedding
-  └── Original embedding (משני):
+  └── Original embedding (נשמר, לא בשימוש בניקוד v10):
         buildEmbeddingText(wishText, { themes })
         → text-embedding-3-small → wish_embeddings.embedding_original
   מדלג אם שני ה-embeddings קיימים
@@ -318,9 +322,9 @@ UNIQUE(wish_id, user_id)
 
 שלב 3c: Merge + back-fill
   └── מועמדים: ANN בלבד / Structural בלבד / שניהם (recallSource)
-  └── computeSimilaritiesForIds(embeddingEn, embeddingOrig, ids) →
-      DualSimilarityMaps { en: Map, orig: Map }
-      (שאילתה אחת מביאה embedding + embedding_original יחד)
+  └── computeSimilaritiesForIds(embeddingEn, null, ids) →
+      DualSimilarityMaps { en: Map, orig: Map (ריק) }
+      (queryEmbeddingOrig=null — נטענת embedding_original מה-DB אך לא בשימוש)
 
 **מצב Full-scan** (≤ 300 משאלות):
   └── IDs ממוינים; wish[i] מקבל explicitCandidateIds = sortedIds.slice(0, i)
@@ -334,7 +338,7 @@ UNIQUE(wish_id, user_id)
   │     └── computeStructuralSimilarity() → structuralSimilarity
   ├── [שער רלוונטיות] semantic_en ≥ 0.30 OR complementarity ≥ 0.20 OR structural ≥ 0.25
   │     נכשל → gate_passed=false → דלג
-  ├── computeMatchScore(en, orig, complementarity, structural) → match_score
+  ├── computeMatchScore(semanticEn, complementarity, structural) → match_score
   └── geo soft penalty: finalScore × exp(-distance_km / 50)
 
 שלב 5: Persistence
@@ -342,11 +346,10 @@ UNIQUE(wish_id, user_id)
   └── wish_connections UPSERT (finalScore ≥ 0.48, ignoreDuplicates)
 ```
 
-### נוסחת הציון (v9)
+### נוסחת הציון (v10)
 
 ```
-match_score = 0.35 × semantic_similarity_en    (English embedding — cross-lingual)
-            + 0.20 × semantic_similarity_orig  (original-language embedding)
+match_score = 0.55 × semantic_similarity      (English embedding — cross-lingual)
             + 0.25 × complementarity           (needs ↔ skills bidirectional)
             + 0.20 × structural_similarity     (field overlap: entities, domain)
 
@@ -485,8 +488,8 @@ fallback → 1000 × 2^attempt (עד 4 ניסיונות)
 
 | עמודה | בנוי מ | מטרה |
 |-------|--------|------|
-| `embedding` | `translation_en` + `themes` | ANN cross-lingual (ראשי) |
-| `embedding_original` | `wishText` + `themes` | signal ניקוד משני |
+| `embedding` | `translation_en` + `themes` | ANN cross-lingual (ראשי) + ניקוד v10 |
+| `embedding_original` | `wishText` + `themes` | נשמר בלבד — לא בשימוש בניקוד v10 |
 
 **skip-if-exists:** שני ה-embeddings קיימים → מחזיר `{ en, orig }` ללא קריאת OpenAI
 
@@ -518,7 +521,7 @@ ORDER BY embedding <=> query_embedding
 
 ### `computeSimilaritiesForIds` — Back-fill similarity
 
-מביא `embedding` + `embedding_original` ב**שאילתה אחת** ומחשב cosine similarity ב-JavaScript לשני הוקטורים. מחזיר `DualSimilarityMaps { en: Map<wish_id, similarity>, orig: Map<wish_id, similarity> }`.
+מביא `embedding` + `embedding_original` ב**שאילתה אחת** ומחשב cosine similarity ב-JavaScript. כשמועבר `queryEmbeddingOrig=null` (כפי שנקרא ב-v10) — מחזיר `orig: Map` ריק. מחזיר `DualSimilarityMaps { en: Map<wish_id, similarity>, orig: Map<wish_id, similarity> }`.
 
 ---
 
@@ -578,11 +581,13 @@ ORDER BY embedding <=> query_embedding
 | `.card` | לבן, blur, פינות מעוגלות |
 | `.card-hover` | card + hover scale |
 | `.card-featured` | card בולט |
-| `.btn-primary` | well-700 |
+| `.btn-primary` | indigo-600 background |
 | `.btn-amber` | amber-400, shadow |
-| `.section-label` | uppercase, sand-500, small |
+| `.section-label` | uppercase, slate-400, small |
 | `.tag-badge` | תגית עגולה |
 | `.fade-in` | אנימציית כניסה 0.5s |
+
+**מסכי Admin:** רקע slate-50 · כרטיסים bg-white border-slate-200 · CTAs indigo-600 · active nav indigo-600 · idle nav slate-600 hover:slate-100
 
 ---
 
@@ -648,14 +653,14 @@ ORDER BY embedding <=> query_embedding
 
 | קובץ | פונקציות |
 |------|---------|
-| index.ts | `processWishForMatching()`, `prepareWishForMatching()` — orchestrator v9 |
+| index.ts | `processWishForMatching()`, `prepareWishForMatching()` — orchestrator v10 |
 | analyze.ts | `analyzeWishText()`, `analyzeAndStoreWish()` — enrichment + translation_en |
 | embed.ts | `buildEmbeddingText()`, `buildEnglishEmbeddingText()`, `generateEmbedding()`, `generateAndStoreEmbedding()` → `DualEmbedding` |
 | similarity.ts | `findSimilarWishes()`, `findStructuredCandidates()`, `computeSimilaritiesForIds()` → `DualSimilarityMaps` |
 | keywords.ts | `buildAnchorKeywords()`, `computeStructuralSimilarity()` |
-| score.ts | `computeMatchScore()` — v9: 0.35en + 0.20orig + 0.25comp + 0.20struct |
+| score.ts | `computeMatchScore(semantic, complementarity, structural)` — v10: 0.55×semantic + 0.25×comp + 0.20×struct |
 | complement.ts | `computeComplementarity()` |
-| intent.ts | `computeIntentCompatibility()` — לא בשימוש בנוסחה v9 (נשמר) |
+| intent.ts | `computeIntentCompatibility()` — לא בשימוש בנוסחה v10 (נשמר) |
 | geo.ts | `haversineKm()` — soft penalty exp(-km/50) |
 | timeRange.ts | `dateRangesOverlap()` |
 | canonicalize.ts | `canonicalize()`, `canonicalizeSubjectType()`, `canonicalizeAction()` |
