@@ -36,12 +36,13 @@ export function buildEmbeddingText(
 
   const lines: string[] = [wishText]
 
-  if (enrichment.primary_domain) {
+  /*if (enrichment.primary_domain) {
     lines.push(`Domain: ${enrichment.primary_domain}`)
-  }
+  }*/
   if (enrichment.themes?.length) {
     lines.push(`Themes: ${enrichment.themes.join(', ')}`)
   }
+  /*
   const entities = [
     ...(enrichment.subject_entities ?? []),
     ...(enrichment.domain_entities ?? []),
@@ -51,7 +52,7 @@ export function buildEmbeddingText(
   }
   if (enrichment.intent) {
     lines.push(`Intent: ${enrichment.intent}`)
-  }
+  }*/
 
   return lines.join('\n')
 }
@@ -66,12 +67,16 @@ function buildEnglishEmbeddingText(
     primary_domain?: string | null
     intent?: string | null
     collaboration_type?: string | null
+    themes?: string[]
   }
 ): string {
   const lines: string[] = [translationEn]
-  if (enrichment?.primary_domain) lines.push(`Domain: ${enrichment.primary_domain}`)
+  if (enrichment?.themes?.length) {
+    lines.push(`Themes: ${enrichment.themes.join(', ')}`)
+  }
+  /*if (enrichment?.primary_domain) lines.push(`Domain: ${enrichment.primary_domain}`)
   if (enrichment?.intent)         lines.push(`Intent: ${enrichment.intent}`)
-  if (enrichment?.collaboration_type) lines.push(`Collaboration: ${enrichment.collaboration_type}`)
+  if (enrichment?.collaboration_type) lines.push(`Collaboration: ${enrichment.collaboration_type}`)*/
   return lines.join('\n')
 }
 
