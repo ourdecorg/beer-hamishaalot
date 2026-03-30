@@ -13,12 +13,11 @@ export const metadata = { title: 'פידבק התאמות — ניהול' }
 const PAGE_SIZE = 60
 
 const SORT_COLUMNS: Record<string, string> = {
-  match_score:              'match_score',
-  semantic_en:              'semantic_similarity',
-  semantic_orig:            'semantic_similarity_orig',
-  complementarity:          'complementarity_score',
-  structural:               'structural_similarity',
-  geo:                      'geo_penalty',
+  match_score:     'match_score',
+  semantic_en:     'semantic_similarity',
+  complementarity: 'complementarity_score',
+  structural:      'structural_similarity',
+  geo:             'geo_penalty',
 }
 
 export default async function ReviewMatchesPage({
