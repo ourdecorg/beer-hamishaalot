@@ -1,14 +1,11 @@
 /**
- * Match Scoring Engine (v8 — 4 signals)
+ * Match Scoring Engine (v9 — dual-semantic, 4 signals)
  *
  * Formula:
- *   match_score = 0.35 × semantic_similarity
- *               + 0.30 × complementarity
- *               + 0.15 × intent_compatibility
- *               + 0.20 × structural_similarity
- *
- * structural_similarity = computeStructuralSimilarity(a, b) in keywords.ts
- *   Counts field-level overlaps (needs↔skills, entities, primary_domain) / 4, capped at 1.
+ *   match_score = 0.35 × semantic_similarity_en   (English embedding — cross-lingual ANN)
+ *               + 0.20 × semantic_similarity_orig  (original-language embedding)
+ *               + 0.25 × complementarity           (needs ↔ skills bidirectional)
+ *               + 0.20 × structural_similarity     (field-level overlap: entities, domain)
  *
  * Weights sum to exactly 1.00.
  */
@@ -20,22 +17,22 @@ export const MIN_SIMILARITY  = 0.30   // minimum cosine similarity for ANN recal
 export interface MatchScore {
   match_score: number
   match_type: MatchType
-  semantic_similarity: number
+  semantic_similarity_en: number
+  semantic_similarity_orig: number
   complementarity: number
-  intent_compatibility: number
   structural_similarity: number
 }
 
 export function computeMatchScore(
-  semanticSimilarity: number,
+  semanticSimilarityEn: number,
+  semanticSimilarityOrig: number,
   complementarityScore: number,
-  intentCompatibility: number,
   structuralSimilarity: number,
 ): MatchScore {
   const match_score = Math.min(1,
-    0.35 * semanticSimilarity +
-    0.30 * complementarityScore +
-    0.15 * intentCompatibility +
+    0.35 * semanticSimilarityEn   +
+    0.20 * semanticSimilarityOrig +
+    0.25 * complementarityScore   +
     0.20 * structuralSimilarity,
   )
 
@@ -47,9 +44,9 @@ export function computeMatchScore(
   return {
     match_score,
     match_type,
-    semantic_similarity:   semanticSimilarity,
-    complementarity:       complementarityScore,
-    intent_compatibility:  intentCompatibility,
-    structural_similarity: structuralSimilarity,
+    semantic_similarity_en:   semanticSimilarityEn,
+    semantic_similarity_orig: semanticSimilarityOrig,
+    complementarity:          complementarityScore,
+    structural_similarity:    structuralSimilarity,
   }
 }
