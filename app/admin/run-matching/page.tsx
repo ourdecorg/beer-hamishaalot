@@ -123,7 +123,9 @@ export default function RunMatchingPage() {
           <p className="text-xs text-slate-400 mb-2">לניטור ב-Supabase:</p>
           <pre className="text-xs bg-slate-100 rounded-lg p-3 whitespace-pre-wrap text-slate-700 font-mono" dir="ltr">{
 `select wc.match_score, wc.match_type,
-       mal.intent_compatibility
+       mal.semantic_similarity,
+       mal.complementarity_score,
+       mal.structural_similarity
 from wish_connections wc
 join match_attempts_log mal
   on mal.wish_id = wc.wish_a or mal.wish_id = wc.wish_b
