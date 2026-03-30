@@ -70,23 +70,18 @@ export interface ApiError {
 
 export interface WishEnrichment {
   wish_id: string
+  analyzed_at: string
+  // English translation (migration 034) — used for cross-lingual English embedding.
+  translation_en?: string | null
+  // Matching fields
   themes: string[]
   intent: string | null
   needs: string[]
   skills_offered: string[]
   collaboration_type: string | null
-  emotional_tone: string | null
-  analyzed_at: string
-  // Primary domain label (migration 013) — null on rows analyzed before 013.
-  primary_domain?: string | null
-  // Object-aware fields — null/empty on rows analyzed before migration 012.
-  // All matching code must handle these gracefully (treat missing as neutral).
-  subject_type?: string | null
   subject_entities?: string[]
-  target_action?: string | null
-  object_of_need?: string[]
-  constraints?: string[]
   domain_entities?: string[]
+  primary_domain?: string | null
   // Location (migration 016) — null when no place mentioned.
   location_lat?: number | null
   location_lng?: number | null
@@ -101,8 +96,13 @@ export interface WishEnrichment {
   // Anchor keywords (migration 026) — canonical IDs derived from needs + skills +
   // subject_entities + domain_entities. Used for structured recall.
   anchor_keywords?: string[] | null
-  // Extraction quality (migration 019) — null on rows analyzed before 019.
-  confidence?: number | null         // 0.0–1.0
+  // Legacy fields — kept for backwards compatibility with old enrichment rows.
+  emotional_tone?: string | null
+  subject_type?: string | null
+  target_action?: string | null
+  object_of_need?: string[]
+  constraints?: string[]
+  confidence?: number | null
   ambiguity_flag?: boolean | null
 }
 

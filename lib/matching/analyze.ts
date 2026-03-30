@@ -48,20 +48,16 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 4): Promise<T> {
 }
 
 export interface WishAnalysisResult {
+  // English translation of the wish (for cross-lingual embedding)
+  translation_en: string
+  // Matching fields
   themes: string[]
   intent: string
   needs: string[]
   skills_offered: string[]
   collaboration_type: 'build' | 'learn' | 'connect' | 'support' | 'share'
-  emotional_tone: 'hopeful' | 'urgent' | 'reflective' | 'excited' | 'uncertain'
-  // Object-aware fields (migration 012)
-  subject_type: string | null
   subject_entities: string[]
-  target_action: string | null
-  object_of_need: string[]
-  constraints: string[]
   domain_entities: string[]
-  // Primary domain (migration 013)
   primary_domain: string | null
   // Location (migration 016) — null when no place mentioned
   location_lat: number | null
@@ -74,9 +70,6 @@ export interface WishAnalysisResult {
   keywords: string[]
   // Anchor entities — max 3 concrete nouns useful for matching (original language)
   anchor_entities: string[]
-  // Extraction quality signals
-  confidence: number        // 0.0–1.0
-  ambiguity_flag: boolean   // true if wish is vague/unclear for matching
 }
 
 /**
@@ -95,87 +88,58 @@ export async function analyzeWishText(wishText: string, wishId?: string): Promis
     },
     {
       role: 'user',
-      content: `Analyze this wish for collaboration potential:
+      content: `Analyze this wish for collaboration matching:
 "${wishText}"
 
 Today's date: ${today}
 
-Return JSON:
+Return JSON with exactly these fields:
 {
+  "translation_en": "",
   "themes": [],
   "intent": "",
   "needs": [],
   "skills_offered": [],
   "collaboration_type": "build|learn|connect|support|share",
-  "emotional_tone": "hopeful|urgent|reflective|excited|uncertain",
-  "subject_type": "community|partner|project|startup|group|event|job|resource|place|knowledge|platform|person|funding|mentor",
   "subject_entities": [],
-  "target_action": "build|join|find|offer|learn|teach|fund|support|host|create|collaborate",
-  "object_of_need": [],
-  "constraints": [],
   "domain_entities": [],
   "primary_domain": "health_wellness|technology|entrepreneurship|education|arts_culture|community_social|environment|spirituality|family_parenting|sports_recreation|food_lifestyle|finance|personal_development|professional_career|other",
   "location": {"lat": null, "lng": null, "name": null},
   "date_range": {"start": null, "end": null},
   "keywords": [],
-  "anchor_entities": [],
-  "confidence": 0.0,
-  "ambiguity_flag": false
+  "anchor_entities": []
 }
 
-Language Rules (CRITICAL):
-- Detect the original language of the wish.
-- ALL free-text fields MUST be returned in the SAME language as the original wish:
-  themes, needs, skills_offered, subject_offered, object_of_need, constraints, domain_entities, keywords
-- DO NOT translate or normalize to English.
-- Keep wording natural and concise in the original language.
+translation_en:
+- Translate the wish into clear, natural English. If the wish is already in English, copy it as-is.
 
-Enum Fields (always in English):
-- intent
-- collaboration_type
-- emotional_tone
-- subject_type
-- target_action
-- primary_domain
+Language rules for free-text fields (themes, needs, skills_offered, domain_entities, keywords, subject_entities, anchor_entities):
+- Return in the SAME language as the original wish. Do NOT translate.
 
-Rules:
-- themes: 5-7 concise keywords
-- intent: short verb phrase
-- needs: 2-5 explicit needs (what the user lacks)
-- skills_offered: 2-5 explicit contributions (what the user brings)
-- subject_entities: 1-3 concrete, specific entities (no abstractions)
-- object_of_need: 1-3 concrete items the user seeks
-- constraints: only verifiable constraints (location, time, format, budget)
-- domain_entities: 2-5 nouns in original language
-- keywords: 3-8 important terms extracted verbatim or near-verbatim from the wish text (in the original language)
-- anchor_entities: max 3 concrete nouns/short noun phrases explicitly mentioned in the wish that are useful for matching (original language). Only specific, concrete items — no abstract themes, emotions, or broad motivational words. Empty array if none.
+Enum fields (always English): intent, collaboration_type, primary_domain.
 
-Strict interpretation rules:
-- Do NOT infer skills if not stated
-- Do NOT infer location unless explicitly mentioned
-- Do NOT infer time unless explicitly mentioned
+Field rules:
+- themes: 3-5 concise topic keywords
+- intent: short verb phrase describing the goal
+- needs: 2-5 explicit needs (what the person lacks or seeks)
+- skills_offered: 2-5 explicit contributions (what the person brings)
+- subject_entities: 1-3 specific named entities (no abstract concepts)
+- domain_entities: 2-5 domain-specific nouns
+- keywords: 3-8 important terms verbatim or near-verbatim from the wish text
+- anchor_entities: max 3 concrete nouns explicitly mentioned, useful for matching. Empty if none.
+
+Strict rules:
+- Do NOT infer skills, location, or time unless explicitly stated
 - Prefer empty arrays over guessing
 
-Location rules (VERY IMPORTANT):
-- If a specific place is explicitly mentioned (city, town, village, neighborhood, country, venue, street+city), you MUST fill:
-  - location.name
-  - location.lat
-  - location.lng
-- Coordinates should be approximate WGS-84 coordinates for the center of the mentioned place.
-- If multiple places are mentioned, choose the main place most relevant to the wish.
-- Use null only if NO explicit place is mentioned at all.
-- Do not leave coordinates null when a clear city/town/place is explicitly written.
+Location (IMPORTANT):
+- Fill location.name, location.lat, location.lng if a specific place is explicitly mentioned
+- Coordinates: approximate WGS-84 center of the place
+- null only when NO explicit place is mentioned
 
 date_range:
-- Resolve relative expressions using today's date
-- Format: YYYY-MM-DD
-
-confidence:
-- 0.0-1.0 score of extraction confidence
-
-ambiguity_flag:
-- true if the wish is vague or unclear for matching
-- false otherwise`,
+- Resolve relative dates using today's date (${today})
+- Format: YYYY-MM-DD`,
     },
   ]
 
@@ -225,28 +189,22 @@ ambiguity_flag:
   const dr  = parsed.date_range ?? {}
 
   return {
-    themes: Array.isArray(parsed.themes) ? parsed.themes.slice(0, 7) : [],
-    intent: parsed.intent ?? '',
-    needs: Array.isArray(parsed.needs) ? parsed.needs.slice(0, 5) : [],
-    skills_offered: Array.isArray(parsed.skills_offered) ? parsed.skills_offered.slice(0, 5) : [],
+    translation_en:   typeof parsed.translation_en === 'string' && parsed.translation_en ? parsed.translation_en : wishText,
+    themes:           Array.isArray(parsed.themes)          ? parsed.themes.slice(0, 5)          : [],
+    intent:           parsed.intent ?? '',
+    needs:            Array.isArray(parsed.needs)           ? parsed.needs.slice(0, 5)           : [],
+    skills_offered:   Array.isArray(parsed.skills_offered)  ? parsed.skills_offered.slice(0, 5)  : [],
     collaboration_type: parsed.collaboration_type ?? 'connect',
-    emotional_tone: parsed.emotional_tone ?? 'hopeful',
-    subject_type: typeof parsed.subject_type === 'string' ? parsed.subject_type : null,
     subject_entities: Array.isArray(parsed.subject_entities) ? parsed.subject_entities.slice(0, 3) : [],
-    target_action: typeof parsed.target_action === 'string' ? parsed.target_action : null,
-    object_of_need: Array.isArray(parsed.object_of_need) ? parsed.object_of_need.slice(0, 3) : [],
-    constraints: Array.isArray(parsed.constraints) ? parsed.constraints.slice(0, 3) : [],
-    domain_entities: Array.isArray(parsed.domain_entities) ? parsed.domain_entities.slice(0, 5) : [],
-    primary_domain: typeof parsed.primary_domain === 'string' ? parsed.primary_domain : null,
-    location_lat:  typeof loc.lat === 'number' ? loc.lat : null,
-    location_lng:  typeof loc.lng === 'number' ? loc.lng : null,
-    location_name: typeof loc.name === 'string' && loc.name ? loc.name : null,
+    domain_entities:  Array.isArray(parsed.domain_entities) ? parsed.domain_entities.slice(0, 5) : [],
+    primary_domain:   typeof parsed.primary_domain === 'string' ? parsed.primary_domain : null,
+    location_lat:     typeof loc.lat === 'number' ? loc.lat : null,
+    location_lng:     typeof loc.lng === 'number' ? loc.lng : null,
+    location_name:    typeof loc.name === 'string' && loc.name ? loc.name : null,
     date_range_start: typeof dr.start === 'string' && dr.start ? dr.start : null,
     date_range_end:   typeof dr.end   === 'string' && dr.end   ? dr.end   : null,
     keywords:         Array.isArray(parsed.keywords)        ? parsed.keywords.slice(0, 8)        : [],
     anchor_entities:  Array.isArray(parsed.anchor_entities) ? parsed.anchor_entities.slice(0, 3) : [],
-    confidence:     typeof parsed.confidence === 'number' ? Math.min(1, Math.max(0, parsed.confidence)) : 0.5,
-    ambiguity_flag: parsed.ambiguity_flag === true,
   }
 }
 
@@ -274,36 +232,30 @@ export async function analyzeAndStoreWish(
   const result = await analyzeWishText(wishText, wishId)
 
   const row = {
-    wish_id: wishId,
-    themes: result.themes,
-    intent: result.intent,
-    needs: result.needs,
-    skills_offered: result.skills_offered,
+    wish_id:          wishId,
+    translation_en:   result.translation_en,
+    themes:           result.themes,
+    intent:           result.intent,
+    needs:            result.needs,
+    skills_offered:   result.skills_offered,
     collaboration_type: result.collaboration_type,
-    emotional_tone: result.emotional_tone,
-    analyzed_at: new Date().toISOString(),
-    subject_type: result.subject_type,
     subject_entities: result.subject_entities,
-    target_action: result.target_action,
-    object_of_need: result.object_of_need,
-    constraints: result.constraints,
-    domain_entities: result.domain_entities,
-    primary_domain: result.primary_domain,
-    location_lat: result.location_lat,
-    location_lng: result.location_lng,
-    location_name: result.location_name,
+    domain_entities:  result.domain_entities,
+    primary_domain:   result.primary_domain,
+    location_lat:     result.location_lat,
+    location_lng:     result.location_lng,
+    location_name:    result.location_name,
     date_range_start: result.date_range_start,
-    date_range_end: result.date_range_end,
-    keywords: result.keywords,
-    anchor_entities: result.anchor_entities,
-    anchor_keywords: buildAnchorKeywords({
+    date_range_end:   result.date_range_end,
+    keywords:         result.keywords,
+    anchor_entities:  result.anchor_entities,
+    anchor_keywords:  buildAnchorKeywords({
       needs:            result.needs,
       skills_offered:   result.skills_offered,
       subject_entities: result.subject_entities,
       domain_entities:  result.domain_entities,
     }),
-    confidence: result.confidence,
-    ambiguity_flag: result.ambiguity_flag,
+    analyzed_at: new Date().toISOString(),
   }
 
   const { error } = await supabase
