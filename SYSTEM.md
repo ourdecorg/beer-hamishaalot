@@ -180,17 +180,13 @@ RLS: public read. נטען מקובץ CBS (Windows-1255) דרך `/api/admin/seed
 #### `wish_enrichment`
 ```
 wish_id            uuid PK FK→wishes
-themes             text[] (5-7 מילות מפתח)
-intent             text
-needs              text[] (מה הרוצה צריך)
-skills_offered     text[] (מה הרוצה מציע)
+translation_en     text — תרגום לאנגלית תקנית (migration 034); בסיס ל-English embedding
+themes             text[] (3-5 מילות מפתח, באנגלית)
+intent             text (אנגלית)
+needs              text[] (מה הרוצה צריך, באנגלית)
+skills_offered     text[] (מה הרוצה מציע, באנגלית)
 collaboration_type 'build'|'learn'|'connect'|'support'|'share'
-emotional_tone     'hopeful'|'urgent'|'reflective'|'excited'|'uncertain'
-subject_type       text (16 ערכים)
 subject_entities   text[]
-target_action      text
-object_of_need     text[]
-constraints        text[]
 domain_entities    text[]
 primary_domain     text (15 ערכים מוגדרים)
 anchor_keywords    text[] NOT NULL DEFAULT '{}' — canonical IDs מ-needs+skills+entities (migration 026)
@@ -199,19 +195,20 @@ location_lng       float
 location_name      text
 date_range_start   date (YYYY-MM-DD)
 date_range_end     date
-confidence         float (0.0–1.0)
-ambiguity_flag     boolean
 analyzed_at        timestamptz
+--- שדות legacy (לא נכתבים בניתוחים חדשים) ---
+emotional_tone, subject_type, target_action, object_of_need, constraints, confidence, ambiguity_flag
 ```
 **Index:** GIN על `anchor_keywords` — מאפשר `&&` overlap search ב-O(log n)
 
 #### `wish_embeddings`
 ```
-wish_id    uuid PK FK→wishes
-embedding  vector(1536) — text-embedding-3-small
-created_at timestamptz
+wish_id            uuid PK FK→wishes
+embedding          vector(1536) — English embedding (מ-translation_en); ראשי לחיפוש ANN
+embedding_original vector(1536) — embedding שפת מקור (migration 034); signal ניקוד משני
+created_at         timestamptz
 ```
-**Index:** HNSW (m=16, ef_construction=64, cosine)
+**Index:** HNSW (m=16, ef_construction=64, cosine) על `embedding`
 
 #### `wish_connections`
 ```
@@ -229,23 +226,24 @@ UNIQUE(wish_a, wish_b), CHECK(wish_a < wish_b)
 
 #### `match_attempts_log`
 ```
-id                    uuid PK
-wish_id               uuid
-candidate_wish_id     uuid
-semantic_similarity   float NOT NULL
-complementarity_score float NOT NULL
-theme_overlap         float NOT NULL  ← תמיד 0 (legacy NOT NULL)
-intent_compatibility  float
-domain_match          float           ← 0/1 לפי primary_domain (אובסרווביליות בלבד)
-structural_similarity float           ← signal ה-v8 (migration 026)
-recall_source         text            ← 'semantic'|'structured'|'both' (migration 026)
-geo_penalty           float           ← exp(-km/50), 1 אם אין מיקום
-match_score           float NOT NULL
-match_type            text (null אם לא עבר)
-passed_threshold      boolean NOT NULL
-gate_passed           boolean  ← null=לא הגיע לשער, true=עבר, false=נפסל
-gate_reason           text     ← 'passed' | סיבת כשל
-created_at            timestamptz
+id                       uuid PK
+wish_id                  uuid
+candidate_wish_id        uuid
+semantic_similarity      float NOT NULL  ← English embedding similarity
+semantic_similarity_orig float           ← original-language embedding similarity (migration 035)
+complementarity_score    float NOT NULL
+theme_overlap            float NOT NULL  ← תמיד 0 (legacy NOT NULL)
+intent_compatibility     float           ← תמיד 0 (הוסר מהנוסחה ב-v9)
+domain_match             float           ← 0/1 לפי primary_domain (אובסרווביליות בלבד)
+structural_similarity    float
+recall_source            text            ← 'semantic'|'structured'|'both'
+geo_penalty              float           ← exp(-km/50), 1 אם אין מיקום
+match_score              float NOT NULL
+match_type               text (null אם לא עבר)
+passed_threshold         boolean NOT NULL
+gate_passed              boolean  ← null=לא הגיע לשער, true=עבר, false=נפסל
+gate_reason              text     ← 'passed' | סיבת כשל
+created_at               timestamptz
 ```
 *עמודות ישנות בטבלה (לא נכתבות יותר):* freshness_factor, object_alignment, anchor_overlap, failed_distance
 
@@ -290,62 +288,73 @@ UNIQUE(wish_id, user_id)
 
 ---
 
-## 4. מנגנון ההפגשה (Resonance Engine v8.5)
+## 4. מנגנון ההפגשה (Resonance Engine v9 — dual-semantic)
 
-### pipeline ראשי — `processWishForMatching(wishId, wishText, {onlyLowerId?})`
+### pipeline ראשי — `processWishForMatching(wishId, wishText, {onlyLowerId?, explicitCandidateIds?})`
 
 ```
 שלב 1: analyzeAndStoreWish()
   └── GPT-5.2 → JSON → wish_enrichment (upsert, מדלג אם קיים)
+      שדות: translation_en, themes, intent, needs, skills_offered,
+             collaboration_type, subject_entities, domain_entities,
+             primary_domain, location, date_range, keywords, anchor_entities
   └── buildAnchorKeywords() → שמירת anchor_keywords בשורת ה-enrichment
 
-שלב 2: generateAndStoreEmbedding()
-  └── buildEmbeddingText() — טקסט + domain + themes + entities + intent
-  └── text-embedding-3-small → vector(1536) → wish_embeddings (upsert, מדלג אם קיים)
+שלב 2: generateAndStoreEmbedding() → DualEmbedding { en, orig }
+  ├── English embedding (ראשי):
+  │     buildEnglishEmbeddingText(translation_en, { themes })
+  │     → text-embedding-3-small → wish_embeddings.embedding
+  └── Original embedding (משני):
+        buildEmbeddingText(wishText, { themes })
+        → text-embedding-3-small → wish_embeddings.embedding_original
+  מדלג אם שני ה-embeddings קיימים
 
-שלב 3a: findSimilarWishes() — ANN recall
-  └── match_wishes() RPC → HNSW ANN search → candidates (similarity ≥ 0.30)
-  └── מסנן status != 'cancelled'
+שלב 3a: findSimilarWishes(embeddingEn) — ANN recall
+  └── match_wishes() RPC → HNSW ANN search על embedding (אנגלית) → candidates (similarity ≥ 0.30)
 
 שלב 3b: findStructuredCandidates() — Structural recall
-  └── find_structured_candidates() RPC → GIN index &&-overlap על anchor_keywords
-  └── מסנן status != 'cancelled'
-  └── לא-קריטי: כשל מחזיר [] ומשך ANN-only (non-fatal)
+  └── find_structured_candidates() RPC → GIN &&-overlap על anchor_keywords
+  └── לא-קריטי: כשל מחזיר []
 
-שלב 3c: Merge שני ערוצי ה-recall
-  └── מועמדים ב-ANN בלבד / Structural בלבד / שניהם (recallSource)
-  └── back-fill: computeSimilaritiesForIds() — cosine ב-JS למועמדים structural-only
+שלב 3c: Merge + back-fill
+  └── מועמדים: ANN בלבד / Structural בלבד / שניהם (recallSource)
+  └── computeSimilaritiesForIds(embeddingEn, embeddingOrig, ids) →
+      DualSimilarityMaps { en: Map, orig: Map }
+      (שאילתה אחת מביאה embedding + embedding_original יחד)
+
+**מצב Full-scan** (≤ 300 משאלות):
+  └── IDs ממוינים; wish[i] מקבל explicitCandidateIds = sortedIds.slice(0, i)
+  └── מדלג ANN + structural — computeSimilaritiesForIds ישירות על כל הזוגות
+  └── מבטיח כיסוי 100% (N×(N-1)/2 זוגות)
 
 שלב 4: ניקוד וסינון
-  ├── [filter קשה] dateRangesOverlap() — אם אין חפיפה → דלג
+  ├── [filter קשה] dateRangesOverlap()
   ├── אם יש enrichment למועמד:
-  │     ├── computeComplementarity()       → complementarityScore
-  │     ├── computeIntentCompatibility()   → intentCompatibility
-  │     └── computeStructuralSimilarity()  → structuralSimilarity
-  ├── [שער רלוונטיות v8.5] semantic ≥ 0.30 OR complementarity ≥ 0.20 OR structural ≥ 0.25
-  │     ├── נכשל → נרשם עם gate_passed=false + gate_reason → דלג (לא נוצר חיבור)
-  │     └── עבר → gate_passed=true, gate_reason='passed'
-  ├── computeMatchScore(semantic, complementarity, intent, structural) → match_score
+  │     ├── computeComplementarity()      → complementarityScore
+  │     └── computeStructuralSimilarity() → structuralSimilarity
+  ├── [שער רלוונטיות] semantic_en ≥ 0.30 OR complementarity ≥ 0.20 OR structural ≥ 0.25
+  │     נכשל → gate_passed=false → דלג
+  ├── computeMatchScore(en, orig, complementarity, structural) → match_score
   └── geo soft penalty: finalScore × exp(-distance_km / 50)
 
-שלב 5: Persistance
-  ├── match_attempts_log INSERT (כל מועמד שעבר date filter + שער כניסה)
+שלב 5: Persistence
+  ├── match_attempts_log INSERT
   └── wish_connections UPSERT (finalScore ≥ 0.48, ignoreDuplicates)
 ```
 
-### נוסחת הציון (v8)
+### נוסחת הציון (v9)
 
 ```
-match_score = 0.35 × semantic_similarity
-            + 0.30 × complementarity
-            + 0.15 × intent_compatibility
-            + 0.20 × structural_similarity
+match_score = 0.35 × semantic_similarity_en    (English embedding — cross-lingual)
+            + 0.20 × semantic_similarity_orig  (original-language embedding)
+            + 0.25 × complementarity           (needs ↔ skills bidirectional)
+            + 0.20 × structural_similarity     (field overlap: entities, domain)
 
 final_score = match_score × exp(-distance_km / 50)
             (= match_score כשאין מיקום לאחת המשאלות)
 ```
 
-**ציון סף:** ≥ 0.48 · **שער רלוונטיות (v8.5):** semantic ≥ 0.30 **או** complementarity ≥ 0.20 **או** structural ≥ 0.25
+**ציון סף:** ≥ 0.48 · **שער רלוונטיות:** semantic_en ≥ 0.30 **או** complementarity ≥ 0.20 **או** structural ≥ 0.25
 
 ### סיווג סוג ההתאמה
 
@@ -377,22 +386,6 @@ bOffersWhatANeeds = max(jaccard(skillsB, needsA), softOverlap(skillsB, needsA))
 | שניהם תורמים | `min(1, avg(max, min) × 1.2)` |
 
 הגיון: כשרק כיוון אחד חזק זו ההשלמה הטובה ביותר — לכן מתוגמלת ישירות במקום להידלל בממוצע.
-
-### חישוב Intent Compatibility (`lib/matching/intent.ts`)
-
-Lookup בטבלת ציונים סימטרית לפי `collaboration_type` של שתי המשאלות:
-
-| | build | learn | connect | support | share |
-|---|---|---|---|---|---|
-| **build** | 0.60 | 0.35 | 0.40 | 0.40 | 0.30 |
-| **learn** | | 0.40 | 0.35 | **0.85** | 0.50 |
-| **connect** | | | **0.75** | 0.40 | 0.65 |
-| **support** | | | | 0.40 | 0.40 |
-| **share** | | | | | 0.60 |
-
-- `learn ↔ support` = 0.85 — המשלים ביותר (אחד רוצה ללמוד, השני מציע הדרכה)
-- `connect ↔ connect` = 0.75 — שניהם מחפשים קשרים
-- Fallback לערך לא מוכר: 0.40
 
 ### חישוב Structural Similarity (`lib/matching/keywords.ts`)
 
@@ -452,31 +445,27 @@ WHERE e.wish_id != source_wish_id
 
 ## 5. ניתוח GPT (lib/matching/analyze.ts)
 
-**מודל:** `gpt-5.2` · `max_completion_tokens: 1024` · `response_format: json_object`
+**מודל:** `gpt-5.2` · `max_completion_tokens: 4096` · `response_format: json_object`
 
-### שדות מחולצים
+### שדות מחולצים (רק שדות המשתתפים ב-matching)
 
-| שדה | סוג | תיאור |
-|-----|-----|--------|
-| themes | string[5-7] | מילות מפתח בשפת המשאלה |
-| intent | string | פועל קצר (אנגלית) |
-| needs | string[2-5] | מה חסר (בשפת המשאלה) |
-| skills_offered | string[2-5] | מה מוצע (בשפת המשאלה) |
-| collaboration_type | enum | build/learn/connect/support/share |
-| emotional_tone | enum | hopeful/urgent/reflective/excited/uncertain |
-| subject_type | enum | community/partner/project/startup/... |
-| subject_entities | string[1-3] | ישויות קונקרטיות |
-| target_action | enum | build/join/find/offer/learn/teach/... |
-| object_of_need | string[1-3] | מה נדרש קונקרטית |
-| constraints | string[0-3] | מגבלות מאומתות בלבד |
-| domain_entities | string[2-5] | שמות עצם תחומיים |
-| primary_domain | enum | אחד מ-15 תחומים |
-| location.lat/lng/name | float/string | WGS-84, null אם לא מוזכר |
-| date_range.start/end | ISO date | null אם לא מוזכר |
-| confidence | float 0-1 | רמת בטחון בחילוץ |
-| ambiguity_flag | boolean | true אם המשאלה עמומה |
+| שדה | סוג | שפה | תיאור |
+|-----|-----|-----|--------|
+| translation_en | string | אנגלית | תרגום תקני לאנגלית (בסיס ל-English embedding) |
+| themes | string[3-5] | אנגלית | מילות מפתח נושאיות |
+| intent | string | אנגלית | פועל קצר המתאר המטרה |
+| needs | string[2-5] | אנגלית | מה חסר |
+| skills_offered | string[2-5] | אנגלית | מה מוצע |
+| collaboration_type | enum | אנגלית | build/learn/connect/support/share |
+| subject_entities | string[1-3] | אנגלית | ישויות קונקרטיות |
+| domain_entities | string[2-5] | אנגלית | שמות עצם תחומיים |
+| primary_domain | enum | אנגלית | אחד מ-15 תחומים |
+| location.lat/lng/name | float/string | — | WGS-84, null אם לא מוזכר |
+| date_range.start/end | ISO date | — | null אם לא מוזכר |
+| keywords | string[3-8] | אנגלית | מונחים חשובים מהמשאלה |
+| anchor_entities | string[0-3] | אנגלית | שמות עצם קונקרטיים לצורך matching |
 
-**כללים קריטיים:** שדות חופשיים בשפת המשאלה המקורית · לא להמציא מידע שלא נזכר · העדף מערכים ריקים על ניחושים
+**כללים קריטיים:** כל שדות הטקסט החופשי באנגלית · לא להמציא מידע שלא נזכר · העדף מערכים ריקים על ניחושים
 
 ### withRetry — backoff על 429
 
@@ -492,16 +481,16 @@ fallback → 1000 × 2^attempt (עד 4 ניסיונות)
 
 **מודל:** `text-embedding-3-small` (1536 ממדים)
 
-**buildEmbeddingText — העשרת הטקסט:**
-```
-[טקסט המשאלה]
-Domain: {primary_domain}
-Themes: {themes}
-Topics: {subject_entities + domain_entities}
-Intent: {intent}
-```
+**שני embeddings לכל משאלה:**
 
-**skip-if-exists:** embedding קיים → מחזיר וקטור קיים (ללא קריאת OpenAI)
+| עמודה | בנוי מ | מטרה |
+|-------|--------|------|
+| `embedding` | `translation_en` + `themes` | ANN cross-lingual (ראשי) |
+| `embedding_original` | `wishText` + `themes` | signal ניקוד משני |
+
+**skip-if-exists:** שני ה-embeddings קיימים → מחזיר `{ en, orig }` ללא קריאת OpenAI
+
+**return type:** `DualEmbedding { en: number[], orig: number[] }`
 
 ---
 
@@ -529,7 +518,7 @@ ORDER BY embedding <=> query_embedding
 
 ### `computeSimilaritiesForIds` — Back-fill similarity
 
-למועמדים מה-structural path שאינם ב-ANN: מביא embeddings מ-`wish_embeddings` ומחשב cosine similarity ב-JavaScript. מחזיר `Map<wish_id, similarity>`.
+מביא `embedding` + `embedding_original` ב**שאילתה אחת** ומחשב cosine similarity ב-JavaScript לשני הוקטורים. מחזיר `DualSimilarityMaps { en: Map<wish_id, similarity>, orig: Map<wish_id, similarity> }`.
 
 ---
 
@@ -578,9 +567,9 @@ ORDER BY embedding <=> query_embedding
 
 ## 11. עיצוב (Design System)
 
-**שפה:** עברית, RTL · **פונטים:** Heebo (body), Frank Ruhl Libre (headings)
+**שפה:** עברית, RTL · **פונטים:** Rubik (headings + body)
 
-**פלטת צבעים:** `sand-*` (רקעים) · `well-*` (ראשי, כחול-כהה) · `amber-*` (accent/CTA)
+**פלטת צבעים:** לבן (רקע) · `slate-*` (טקסט, גבולות, קלטים) · `indigo-*` (CTA, accent, badges)
 
 **קלאסות מרכזיות:**
 
@@ -634,6 +623,8 @@ ORDER BY embedding <=> query_embedding
 | 031 | status column ב-wishes + RLS מסנן cancelled |
 | 032 | 'deleted' ב-connection_status enum; match_wishes + find_structured_candidates מסננים cancelled |
 | 033 | gate_passed + gate_reason ב-match_attempts_log; טבלת match_reviews |
+| 034 | translation_en ב-wish_enrichment; embedding_original (vector 1536) ב-wish_embeddings |
+| 035 | semantic_similarity_orig ב-match_attempts_log |
 
 ---
 
@@ -657,18 +648,18 @@ ORDER BY embedding <=> query_embedding
 
 | קובץ | פונקציות |
 |------|---------|
-| index.ts | `processWishForMatching()` — orchestrator v8 |
-| analyze.ts | `analyzeWishText()`, `analyzeAndStoreWish()` — שומר anchor_keywords |
-| embed.ts | `buildEmbeddingText()`, `generateEmbedding()`, `generateAndStoreEmbedding()` |
-| similarity.ts | `findSimilarWishes()`, `findStructuredCandidates()`, `computeSimilaritiesForIds()` |
+| index.ts | `processWishForMatching()`, `prepareWishForMatching()` — orchestrator v9 |
+| analyze.ts | `analyzeWishText()`, `analyzeAndStoreWish()` — enrichment + translation_en |
+| embed.ts | `buildEmbeddingText()`, `buildEnglishEmbeddingText()`, `generateEmbedding()`, `generateAndStoreEmbedding()` → `DualEmbedding` |
+| similarity.ts | `findSimilarWishes()`, `findStructuredCandidates()`, `computeSimilaritiesForIds()` → `DualSimilarityMaps` |
 | keywords.ts | `buildAnchorKeywords()`, `computeStructuralSimilarity()` |
-| score.ts | `computeMatchScore()` — v8: 4 signals (0.35+0.30+0.15+0.20) |
+| score.ts | `computeMatchScore()` — v9: 0.35en + 0.20orig + 0.25comp + 0.20struct |
 | complement.ts | `computeComplementarity()` |
-| intent.ts | `computeIntentCompatibility()` |
+| intent.ts | `computeIntentCompatibility()` — לא בשימוש בנוסחה v9 (נשמר) |
 | geo.ts | `haversineKm()` — soft penalty exp(-km/50) |
 | timeRange.ts | `dateRangesOverlap()` |
 | canonicalize.ts | `canonicalize()`, `canonicalizeSubjectType()`, `canonicalizeAction()` |
-| openaiLog.ts | `logOpenAICall(entry)` — כולל `wishId` |
+| openaiLog.ts | `logOpenAICall(entry)` |
 | anchor.ts | `computeAnchorOverlap()` — לא בשימוש ב-pipeline (נשמר) |
 | objectAlignment.ts | `computeObjectAlignment()` — לא בשימוש ב-pipeline (נשמר) |
 | domain.ts | `computeDomainMatch()` — לא בשימוש ב-pipeline (נשמר) |
