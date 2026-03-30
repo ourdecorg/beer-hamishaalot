@@ -114,7 +114,7 @@ translation_en:
 - Translate the wish into clear, natural English. If the wish is already in English, copy it as-is.
 
 Language rules for free-text fields (themes, needs, skills_offered, domain_entities, keywords, subject_entities, anchor_entities):
-- Return in the SAME language as the original wish. Do NOT translate.
+- Return in English.
 
 Enum fields (always English): intent, collaboration_type, primary_domain.
 
@@ -148,7 +148,7 @@ date_range:
   try {
     completion = await withRetry(() => getOpenAI().chat.completions.create({
       model,
-      max_completion_tokens: 2048,
+      max_completion_tokens: 4096,
       response_format: { type: 'json_object' },
       messages,
     }))
