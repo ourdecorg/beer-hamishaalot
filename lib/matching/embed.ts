@@ -38,11 +38,10 @@ export function buildEmbeddingText(
 
   /*if (enrichment.primary_domain) {
     lines.push(`Domain: ${enrichment.primary_domain}`)
-  }*/
+  }
   if (enrichment.themes?.length) {
     lines.push(`Themes: ${enrichment.themes.join(', ')}`)
   }
-  /*
   const entities = [
     ...(enrichment.subject_entities ?? []),
     ...(enrichment.domain_entities ?? []),
@@ -134,6 +133,11 @@ async function withDbRetry<T>(fn: () => Promise<T>, label: string, maxRetries = 
   throw new Error(`${label}: max retries exceeded`)
 }
 
+export interface DualEmbedding {
+  en:   number[]   // English-based embedding (primary, used for ANN)
+  orig: number[]   // original-language embedding
+}
+
 export async function generateAndStoreEmbedding(
   wishId: string,
   wishText: string,
@@ -142,7 +146,7 @@ export async function generateAndStoreEmbedding(
     collaboration_type?: string | null
   },
   { force = false }: { force?: boolean } = {}
-): Promise<number[]> {
+): Promise<DualEmbedding> {
   const supabase = createAdminClient()
 
   // Skip if both embeddings already exist
@@ -153,8 +157,8 @@ export async function generateAndStoreEmbedding(
       .eq('wish_id', wishId)
       .maybeSingle()
     if (existing?.embedding && existing?.embedding_original) {
-      const raw = existing.embedding
-      return (typeof raw === 'string' ? JSON.parse(raw) : raw) as number[]
+      const parse = (raw: unknown) => typeof raw === 'string' ? JSON.parse(raw) : (raw as number[])
+      return { en: parse(existing.embedding), orig: parse(existing.embedding_original) }
     }
   }
 
@@ -162,11 +166,11 @@ export async function generateAndStoreEmbedding(
 
   // English embedding (primary) — language-agnostic, used for ANN search
   const enText = buildEnglishEmbeddingText(translationEn, enrichment)
-  const embeddingEn = await generateEmbedding(enText, wishId)
+  const en = await generateEmbedding(enText, wishId)
 
-  // Original-language embedding — stored for future use
+  // Original-language embedding — secondary scoring signal
   const origText = buildEmbeddingText(wishText, enrichment)
-  const embeddingOrig = await generateEmbedding(origText, wishId)
+  const orig = await generateEmbedding(origText, wishId)
 
   await withDbRetry(
     async () => supabase
@@ -174,8 +178,8 @@ export async function generateAndStoreEmbedding(
       .upsert(
         {
           wish_id:            wishId,
-          embedding:          embeddingEn,
-          embedding_original: embeddingOrig,
+          embedding:          en,
+          embedding_original: orig,
           created_at:         new Date().toISOString(),
         },
         { onConflict: 'wish_id' }
@@ -183,5 +187,5 @@ export async function generateAndStoreEmbedding(
     'Failed to store embedding'
   )
 
-  return embeddingEn
+  return { en, orig }
 }
