@@ -195,11 +195,10 @@ export async function processWishForMatching(
         domainMatch          = (enrichment.primary_domain && enrichment.primary_domain === candidateEnrichment.primary_domain) ? 1 : 0
       }
 
-      // Relevance gate (v9): reject only if all three signals are below thresholds
+      // Relevance gate (v12): reject only if both signals are below thresholds
       const passesRelevanceGate =
         candidate.similarityEn >= 0.30 ||
-        complementarityScore   >= 0.20 ||
-        structuralSimilarity   >= 0.25
+        complementarityScore   >= 0.20
 
       if (!passesRelevanceGate) {
         logEntries.push({
@@ -217,7 +216,7 @@ export async function processWishForMatching(
           match_type:            null,
           passed_threshold:      false,
           gate_passed:           false,
-          gate_reason:           'low_semantic_low_complementarity_low_structural',
+          gate_reason:           'low_semantic_low_complementarity',
         })
         continue
       }
@@ -225,7 +224,6 @@ export async function processWishForMatching(
       const score = computeMatchScore(
         candidate.similarityEn,
         complementarityScore,
-        structuralSimilarity,
       )
 
       // Soft geo penalty
