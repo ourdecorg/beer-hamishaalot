@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import ReviewMatchesClient, {
   type AttemptRow,
   type WishStub,
+  type WishEnrichmentStub,
   type ExistingReview,
 } from '@/components/admin/ReviewMatchesClient'
 
@@ -38,6 +39,7 @@ export default async function ReviewMatchesPage({
   const cancelledFilter = typeof sp.cancelled === 'string' ? sp.cancelled : 'hide'
   const sortKey         = typeof sp.sort      === 'string' && SORT_COLUMNS[sp.sort] ? sp.sort : 'match_score'
   const page            = Math.max(1, parseInt(typeof sp.page === 'string' ? sp.page : '1') || 1)
+  const searchFilter    = typeof sp.search    === 'string' ? sp.search.trim() : ''
 
   const admin = createAdminClient()
 
@@ -45,6 +47,17 @@ export default async function ReviewMatchesPage({
   const col = SORT_COLUMNS[sortKey]
   const from = (page - 1) * PAGE_SIZE
   const to   = page * PAGE_SIZE - 1
+
+  // If searching, find wish IDs matching the text first
+  let searchWishIds: string[] | null = null
+  if (searchFilter) {
+    const { data: matchingWishes } = await admin
+      .from('wishes')
+      .select('id')
+      .ilike('original_text', `%${searchFilter}%`)
+    searchWishIds = (matchingWishes ?? []).map((w: { id: string }) => w.id)
+    if (searchWishIds.length === 0) searchWishIds = ['00000000-0000-0000-0000-000000000000'] // no results
+  }
 
   let query = admin
     .from('match_attempts_log')
@@ -57,6 +70,7 @@ export default async function ReviewMatchesPage({
   if (typeFilter === 'rejected') query = query.eq('passed_threshold', false)
   if (gateFilter === 'failed')   query = query.eq('gate_passed', false)
   if (nearFilter === '1')        query = query.gte('match_score', 0.40).lte('match_score', 0.55)
+  if (searchWishIds)             query = query.or(`wish_id.in.(${searchWishIds.join(',')}),candidate_wish_id.in.(${searchWishIds.join(',')})`)
 
   const { data: rawAttempts, count } = await query
   let attempts = (rawAttempts ?? []) as AttemptRow[]
@@ -76,7 +90,15 @@ export default async function ReviewMatchesPage({
   const wishMap: Record<string, WishStub> = {}
   for (const w of wishRows ?? []) wishMap[w.id] = w as WishStub
 
-  // ── 3. Fetch connections ──────────────────────────────────────────────────
+  // ── 3. Fetch enrichment stubs (needs + skills_offered) ───────────────────
+  const { data: enrichmentRows } = wishIds.length > 0
+    ? await admin.from('wish_enrichment').select('wish_id, needs, skills_offered').in('wish_id', wishIds)
+    : { data: [] }
+
+  const enrichmentMap: Record<string, WishEnrichmentStub> = {}
+  for (const e of enrichmentRows ?? []) enrichmentMap[e.wish_id] = e as WishEnrichmentStub
+
+  // ── 4. Fetch connections ──────────────────────────────────────────────────
   const { data: connRows } = wishIds.length > 0
     ? await admin
         .from('wish_connections')
@@ -90,7 +112,7 @@ export default async function ReviewMatchesPage({
     connectionMap[key] = c.id
   }
 
-  // ── 4. Fetch existing reviews ─────────────────────────────────────────────
+  // ── 5. Fetch existing reviews ─────────────────────────────────────────────
   const { data: reviewRows } = attempts.length > 0
     ? await admin
         .from('match_reviews')
@@ -104,7 +126,7 @@ export default async function ReviewMatchesPage({
     reviewMap[`${r.wish_id}:${r.candidate_wish_id}`] = r as ExistingReview
   }
 
-  // ── 5. Apply cancelled filter ─────────────────────────────────────────────
+  // ── 6. Apply cancelled filter ─────────────────────────────────────────────
   if (cancelledFilter !== 'show') {
     attempts = attempts.filter(a =>
       wishMap[a.wish_id]?.status !== 'cancelled' &&
@@ -112,7 +134,7 @@ export default async function ReviewMatchesPage({
     )
   }
 
-  // ── 6. Apply reviewed filter ──────────────────────────────────────────────
+  // ── 7. Apply reviewed filter ──────────────────────────────────────────────
   if (reviewedFilter === 'yes') {
     attempts = attempts.filter(a => reviewMap[`${a.wish_id}:${a.candidate_wish_id}`])
   } else if (reviewedFilter === 'no') {
@@ -123,11 +145,13 @@ export default async function ReviewMatchesPage({
     <ReviewMatchesClient
       attempts={attempts}
       wishMap={wishMap}
+      enrichmentMap={enrichmentMap}
       connectionMap={connectionMap}
       reviewMap={reviewMap}
       userEmail={user.email!}
       filters={{ type: typeFilter, reviewed: reviewedFilter, gate: gateFilter, near: nearFilter, cancelled: cancelledFilter }}
       sort={sortKey}
+      search={searchFilter}
       page={page}
       totalPages={totalPages}
       totalCount={totalCount}
