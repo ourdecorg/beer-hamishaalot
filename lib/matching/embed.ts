@@ -19,10 +19,8 @@ function getOpenAI() {
 }
 
 /**
- * Builds the text that will be embedded.
- * Appending structured domain fields focuses the vector on the topical "what"
- * of the wish rather than surface phrasing.  All fields are optional so this
- * is safe to call with partial enrichment or none at all.
+ * Builds the text that will be embedded for the original-language embedding.
+ * Appends structured domain fields to focus the vector on topical "what".
  */
 export function buildEmbeddingText(
   wishText: string,
@@ -38,7 +36,7 @@ export function buildEmbeddingText(
 
   const lines: string[] = [wishText]
 
-  if (enrichment.primary_domain) {
+  /*if (enrichment.primary_domain) {
     lines.push(`Domain: ${enrichment.primary_domain}`)
   }
   if (enrichment.themes?.length) {
@@ -53,8 +51,31 @@ export function buildEmbeddingText(
   }
   if (enrichment.intent) {
     lines.push(`Intent: ${enrichment.intent}`)
-  }
+  }*/
 
+  return lines.join('\n')
+}
+
+/**
+ * Builds the English embedding text from the translated wish + enum-only enrichment.
+ * All parts are in English, producing a language-agnostic embedding space.
+ */
+function buildEnglishEmbeddingText(
+  translationEn: string,
+  enrichment?: {
+    primary_domain?: string | null
+    intent?: string | null
+    collaboration_type?: string | null
+    themes?: string[]
+  }
+): string {
+  const lines: string[] = [translationEn]
+  if (enrichment?.themes?.length) {
+    lines.push(`Themes: ${enrichment.themes.join(', ')}`)
+  }
+  /*if (enrichment?.primary_domain) lines.push(`Domain: ${enrichment.primary_domain}`)
+  if (enrichment?.intent)         lines.push(`Intent: ${enrichment.intent}`)
+  if (enrichment?.collaboration_type) lines.push(`Collaboration: ${enrichment.collaboration_type}`)*/
   return lines.join('\n')
 }
 
@@ -112,37 +133,59 @@ async function withDbRetry<T>(fn: () => Promise<T>, label: string, maxRetries = 
   throw new Error(`${label}: max retries exceeded`)
 }
 
+export interface DualEmbedding {
+  en:   number[]   // English-based embedding (primary, used for ANN)
+  orig: number[]   // original-language embedding
+}
+
 export async function generateAndStoreEmbedding(
   wishId: string,
   wishText: string,
-  enrichment?: Parameters<typeof buildEmbeddingText>[1],
+  enrichment?: Parameters<typeof buildEmbeddingText>[1] & {
+    translation_en?: string | null
+    collaboration_type?: string | null
+  },
   { force = false }: { force?: boolean } = {}
-): Promise<number[]> {
+): Promise<DualEmbedding> {
   const supabase = createAdminClient()
 
-  // Skip generation if embedding already exists (mirrors analyzeAndStoreWish behaviour)
+  // Skip if both embeddings already exist
   if (!force) {
     const { data: existing } = await supabase
       .from('wish_embeddings')
-      .select('embedding')
+      .select('embedding, embedding_original')
       .eq('wish_id', wishId)
       .maybeSingle()
-    if (existing?.embedding) return existing.embedding as number[]
+    if (existing?.embedding && existing?.embedding_original) {
+      const parse = (raw: unknown) => typeof raw === 'string' ? JSON.parse(raw) : (raw as number[])
+      return { en: parse(existing.embedding), orig: parse(existing.embedding_original) }
+    }
   }
 
-  const text = buildEmbeddingText(wishText, enrichment)
-  const embedding = await generateEmbedding(text, wishId)
+  const translationEn = enrichment?.translation_en || wishText
 
-  // Supabase expects the vector as a plain JS array — pgvector handles the cast
+  // English embedding (primary) — language-agnostic, used for ANN search
+  const enText = buildEnglishEmbeddingText(translationEn, enrichment)
+  const en = await generateEmbedding(enText, wishId)
+
+  // Original-language embedding — secondary scoring signal
+  const origText = buildEmbeddingText(wishText, enrichment)
+  const orig = await generateEmbedding(origText, wishId)
+
   await withDbRetry(
     async () => supabase
       .from('wish_embeddings')
       .upsert(
-        { wish_id: wishId, embedding, created_at: new Date().toISOString() },
+        {
+          wish_id:            wishId,
+          embedding:          en,
+          embedding_original: orig,
+          created_at:         new Date().toISOString(),
+        },
         { onConflict: 'wish_id' }
       ),
     'Failed to store embedding'
   )
 
-  return embedding
+  return { en, orig }
 }

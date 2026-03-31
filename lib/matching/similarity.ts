@@ -85,42 +85,54 @@ export async function findStructuredCandidates(
   return (data ?? []) as StructuredCandidate[]
 }
 
+function cosineSim(a: number[], b: number[]): number {
+  let dot = 0, normA = 0, normB = 0
+  for (let i = 0; i < a.length; i++) {
+    dot   += a[i] * b[i]
+    normA += a[i] ** 2
+    normB += b[i] ** 2
+  }
+  const sim = normA === 0 || normB === 0 ? 0 : dot / (Math.sqrt(normA) * Math.sqrt(normB))
+  return Number.isFinite(sim) ? Math.max(0, Math.min(1, sim)) : 0
+}
+
+function parseVec(raw: unknown): number[] | null {
+  if (!raw) return null
+  return typeof raw === 'string' ? JSON.parse(raw) : (raw as number[])
+}
+
+export interface DualSimilarityMaps {
+  en:   Map<string, number>   // English-embedding similarity
+  orig: Map<string, number>   // original-language embedding similarity
+}
+
 /**
- * Computes cosine similarity between a query embedding and a set of wish embeddings
- * already stored in wish_embeddings. Used to back-fill similarity for structured-only
- * candidates that did not come from the ANN recall path.
- *
- * Returns a Map<wish_id, similarity>. Missing IDs (no embedding) are absent from the map.
+ * Computes cosine similarity between query embeddings and stored wish embeddings.
+ * Fetches both `embedding` (English) and `embedding_original` in a single DB query.
+ * Returns two Maps. Missing or null embeddings are absent from the respective map.
  */
 export async function computeSimilaritiesForIds(
-  queryEmbedding: number[],
+  queryEmbeddingEn: number[],
+  queryEmbeddingOrig: number[] | null,
   wishIds: string[],
-): Promise<Map<string, number>> {
-  if (wishIds.length === 0) return new Map()
+): Promise<DualSimilarityMaps> {
+  if (wishIds.length === 0) return { en: new Map(), orig: new Map() }
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('wish_embeddings')
-    .select('wish_id, embedding')
+    .select('wish_id, embedding, embedding_original')
     .in('wish_id', wishIds)
   if (error) {
     console.warn('[similarity] computeSimilaritiesForIds failed:', error.message)
-    return new Map()
+    return { en: new Map(), orig: new Map() }
   }
-  const result = new Map<string, number>()
+  const enMap   = new Map<string, number>()
+  const origMap = new Map<string, number>()
   for (const row of data ?? []) {
-    // Supabase may return pgvector as a JSON string in some configurations
-    const emb: number[] = typeof row.embedding === 'string'
-      ? JSON.parse(row.embedding)
-      : (row.embedding as number[])
-    let dot = 0, normA = 0, normB = 0
-    for (let i = 0; i < queryEmbedding.length; i++) {
-      dot   += queryEmbedding[i] * emb[i]
-      normA += queryEmbedding[i] ** 2
-      normB += emb[i] ** 2
-    }
-    const sim = normA === 0 || normB === 0 ? 0
-      : dot / (Math.sqrt(normA) * Math.sqrt(normB))
-    result.set(row.wish_id, Math.max(0, Math.min(1, sim)))
+    const embEn   = parseVec(row.embedding)
+    const embOrig = parseVec((row as Record<string, unknown>).embedding_original)
+    if (embEn)                          enMap.set(row.wish_id, cosineSim(queryEmbeddingEn, embEn))
+    if (embOrig && queryEmbeddingOrig)  origMap.set(row.wish_id, cosineSim(queryEmbeddingOrig, embOrig))
   }
-  return result
+  return { en: enMap, orig: origMap }
 }

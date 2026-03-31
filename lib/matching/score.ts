@@ -1,14 +1,10 @@
 /**
- * Match Scoring Engine (v8 — 4 signals)
+ * Match Scoring Engine (v10 — 3 signals)
  *
  * Formula:
- *   match_score = 0.35 × semantic_similarity
- *               + 0.30 × complementarity
- *               + 0.15 × intent_compatibility
- *               + 0.20 × structural_similarity
- *
- * structural_similarity = computeStructuralSimilarity(a, b) in keywords.ts
- *   Counts field-level overlaps (needs↔skills, entities, primary_domain) / 4, capped at 1.
+ *   match_score = 0.55 × semantic_similarity   (English embedding — cross-lingual ANN)
+ *               + 0.25 × complementarity        (needs ↔ skills bidirectional)
+ *               + 0.20 × structural_similarity  (field-level overlap: entities, domain)
  *
  * Weights sum to exactly 1.00.
  */
@@ -22,20 +18,17 @@ export interface MatchScore {
   match_type: MatchType
   semantic_similarity: number
   complementarity: number
-  intent_compatibility: number
   structural_similarity: number
 }
 
 export function computeMatchScore(
   semanticSimilarity: number,
   complementarityScore: number,
-  intentCompatibility: number,
   structuralSimilarity: number,
 ): MatchScore {
   const match_score = Math.min(1,
-    0.35 * semanticSimilarity +
-    0.30 * complementarityScore +
-    0.15 * intentCompatibility +
+    0.55 * semanticSimilarity  +
+    0.25 * complementarityScore +
     0.20 * structuralSimilarity,
   )
 
@@ -47,9 +40,8 @@ export function computeMatchScore(
   return {
     match_score,
     match_type,
-    semantic_similarity:   semanticSimilarity,
-    complementarity:       complementarityScore,
-    intent_compatibility:  intentCompatibility,
+    semantic_similarity:  semanticSimilarity,
+    complementarity:      complementarityScore,
     structural_similarity: structuralSimilarity,
   }
 }

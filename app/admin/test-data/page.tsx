@@ -40,16 +40,12 @@ export default function TestDataPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-well-900" style={{ fontFamily: 'var(--font-frank-ruhl)' }}>
-          טעינת TEST DATA
-        </h1>
-        <p className="text-sm text-well-500 mt-1">
-          טען קובץ CSV של משאלות לסביבת הפיתוח.
-        </p>
+        <h1 className="text-2xl font-bold text-slate-900">טעינת TEST DATA</h1>
+        <p className="text-sm text-slate-500 mt-1">טען קובץ CSV של משאלות לסביבת הפיתוח.</p>
       </div>
 
-      <div className="bg-white rounded-2xl border border-sand-200 p-6 shadow-sm space-y-4">
-        <p className="text-xs text-well-500">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+        <p className="text-xs text-slate-500">
           פורמט עמודות: שם, עיר, אזור, מספר בית, טלפון, אימייל, משאלה
         </p>
 
@@ -58,7 +54,7 @@ export default function TestDataPage() {
             ref={fileRef}
             type="file"
             accept=".csv,text/csv"
-            className="text-sm text-well-700 file:ml-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-sand-300 file:text-sm file:bg-sand-50 file:text-well-700 hover:file:bg-sand-100"
+            className="text-sm text-slate-700 file:ml-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-300 file:text-sm file:bg-slate-50 file:text-slate-700 hover:file:bg-slate-100"
           />
           <button
             onClick={handleUpload}

@@ -12,22 +12,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="min-h-screen bg-sand-50" dir="rtl">
+    <div className="min-h-screen bg-slate-50" dir="rtl">
       {/* Top bar */}
-      <div className="bg-white border-b border-sand-200 px-4 h-12 flex items-center justify-between">
-        <Link href="/" className="text-sm text-well-500 hover:text-well-700 transition-colors">
+      <div className="bg-white border-b border-slate-200 px-4 h-12 flex items-center justify-between">
+        <Link href="/" className="text-sm text-slate-500 hover:text-slate-700 transition-colors">
           ← חזרה לאתר
         </Link>
-        <span className="text-xs font-semibold uppercase tracking-widest text-sand-400">
+        <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">
           ניהול
         </span>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-8 flex gap-8 items-start">
-        {/* Sidebar */}
         <AdminNav />
-
-        {/* Content */}
         <main className="flex-1 min-w-0">{children}</main>
       </div>
     </div>
