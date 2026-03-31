@@ -1,5 +1,5 @@
 /**
- * Wish Resonance Engine — Orchestrator (v11 — embedding-based complementarity)
+ * Wish Resonance Engine — Orchestrator (v13 — semantic-only scoring)
  *
  * processWishForMatching(wishId, wishText) is the single entry point.
  * Pipeline:
@@ -10,8 +10,10 @@
  *   3b. Structural recall → candidates with anchor_keywords overlap
  *   3c. Merge both channels, back-fill English similarity for structural-only candidates
  *   3d. Pre-load all term embeddings for batch (one DB query)
- *   4. Score          → 0.55×semantic_en + 0.25×complementarity + 0.20×structural
- *   5. Relevance gate → reject if semantic_en<0.30 AND complementarity<0.20 AND structural<0.25
+ *   4. Score          → match_score = semantic_en (sole ranking signal)
+ *                    → complementarity logged for observability only
+ *                    → structural logged for observability only
+ *   5. Relevance gate → reject if semantic_en < 0.30
  *   6. Geo            → soft distance penalty (exp(-d/50))
  *   7. Date range     → hard filter
  *   8. Persist        → wish_connections (finalScore ≥ MATCH_THRESHOLD)
@@ -195,10 +197,8 @@ export async function processWishForMatching(
         domainMatch          = (enrichment.primary_domain && enrichment.primary_domain === candidateEnrichment.primary_domain) ? 1 : 0
       }
 
-      // Relevance gate (v12): reject only if both signals are below thresholds
-      const passesRelevanceGate =
-        candidate.similarityEn >= 0.30 ||
-        complementarityScore   >= 0.20
+      // Relevance gate (v13): semantic-only — complementarity does not rescue a candidate
+      const passesRelevanceGate = candidate.similarityEn >= 0.30
 
       if (!passesRelevanceGate) {
         logEntries.push({
@@ -216,15 +216,12 @@ export async function processWishForMatching(
           match_type:            null,
           passed_threshold:      false,
           gate_passed:           false,
-          gate_reason:           'low_semantic_low_complementarity',
+          gate_reason:           'low_semantic',
         })
         continue
       }
 
-      const score = computeMatchScore(
-        candidate.similarityEn,
-        complementarityScore,
-      )
+      const score = computeMatchScore(candidate.similarityEn)
 
       // Soft geo penalty
       const geoPenalty = candidateEnrichment ? distanceScore(enrichment, candidateEnrichment) : 1
