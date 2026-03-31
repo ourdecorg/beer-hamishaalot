@@ -10,7 +10,7 @@
  */
 import type { MatchType } from '@/lib/types'
 
-export const MATCH_THRESHOLD = 0.48   // minimum final_score to persist a connection
+export const MATCH_THRESHOLD = 0.55   // minimum final_score to persist a connection
 export const MIN_SIMILARITY  = 0.30   // minimum cosine similarity for ANN recall
 
 export interface MatchScore {

@@ -23,7 +23,7 @@ describe('computeMatchScore v13 — semantic-only', () => {
     expect(computeMatchScore(0.3).match_type).toBe('similar')
   })
 
-  test('MATCH_THRESHOLD is 0.48', () => {
-    expect(MATCH_THRESHOLD).toBe(0.48)
+  test('MATCH_THRESHOLD is 0.55', () => {
+    expect(MATCH_THRESHOLD).toBe(0.55)
   })
 })

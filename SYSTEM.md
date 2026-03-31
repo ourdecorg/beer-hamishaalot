@@ -349,7 +349,7 @@ UNIQUE(wish_id, user_id)
 
 שלב 5: Persistence
   ├── match_attempts_log INSERT
-  └── wish_connections UPSERT (finalScore ≥ 0.48, ignoreDuplicates)
+  └── wish_connections UPSERT (finalScore ≥ 0.55, ignoreDuplicates)
 ```
 
 ### נוסחת הציון (v13)
@@ -361,7 +361,7 @@ final_score = match_score × exp(-distance_km / 50)
             (= match_score כשאין מיקום לאחת המשאלות)
 ```
 
-**ציון סף:** ≥ 0.48 · **שער רלוונטיות:** semantic_en ≥ 0.30
+**ציון סף:** ≥ 0.55 · **שער רלוונטיות:** semantic_en ≥ 0.30
 
 ### סיווג סוג ההתאמה
 
