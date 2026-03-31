@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -46,6 +46,7 @@ export interface ReviewMatchesProps {
   userEmail: string
   filters: { type: string; reviewed: string; gate: string; near: string; cancelled: string }
   sort: string
+  search: string
   page: number
   totalPages: number
   totalCount: number
@@ -88,6 +89,7 @@ function buildUrl(
   pathname: string,
   filters: ReviewMatchesProps['filters'],
   sort: string,
+  search: string,
   page: number,
   overrides: Record<string, string> = {}
 ) {
@@ -97,6 +99,7 @@ function buildUrl(
     sort, page: String(page),
     ...overrides,
   })
+  if (search) params.set('search', search)
   return `${pathname}?${params}`
 }
 
@@ -105,9 +108,11 @@ function buildUrl(
 function FilterBar({
   filters,
   sort,
+  search,
 }: {
   filters: ReviewMatchesProps['filters']
   sort: string
+  search: string
 }) {
   const pathname = usePathname()
 
@@ -115,7 +120,7 @@ function FilterBar({
     return (
       <Link
         key={value}
-        href={buildUrl(pathname, filters, sort, 1, { [key]: value })}
+        href={buildUrl(pathname, filters, sort, search, 1, { [key]: value })}
         className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
           active
             ? 'bg-indigo-600 text-white border-indigo-600'
@@ -158,7 +163,7 @@ function FilterBar({
         {SORT_OPTIONS.map(opt => (
           <Link
             key={opt.key}
-            href={buildUrl(pathname, filters, opt.key, 1)}
+            href={buildUrl(pathname, filters, opt.key, search, 1)}
             className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
               sort === opt.key
                 ? 'bg-slate-800 text-white border-slate-800'
@@ -181,12 +186,14 @@ function Pagination({
   totalCount,
   filters,
   sort,
+  search,
 }: {
   page: number
   totalPages: number
   totalCount: number
   filters: ReviewMatchesProps['filters']
   sort: string
+  search: string
 }) {
   const pathname = usePathname()
   if (totalPages <= 1) return null
@@ -199,7 +206,7 @@ function Pagination({
       <div className="flex gap-2">
         {page > 1 ? (
           <Link
-            href={buildUrl(pathname, filters, sort, page - 1)}
+            href={buildUrl(pathname, filters, sort, search, page - 1)}
             className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
           >
             ← הקודם
@@ -209,7 +216,7 @@ function Pagination({
         )}
         {page < totalPages ? (
           <Link
-            href={buildUrl(pathname, filters, sort, page + 1)}
+            href={buildUrl(pathname, filters, sort, search, page + 1)}
             className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
           >
             הבא →
@@ -381,10 +388,12 @@ function ReviewCard({
 // ── Main client component ─────────────────────────────────────────────────────
 
 export default function ReviewMatchesClient({
-  attempts, wishMap, connectionMap, reviewMap, userEmail, filters, sort, page, totalPages, totalCount,
+  attempts, wishMap, connectionMap, reviewMap, userEmail, filters, sort, search, page, totalPages, totalCount,
 }: ReviewMatchesProps) {
 
-  const [searchQuery, setSearchQuery] = useState('')
+  const pathname = usePathname()
+  const router   = useRouter()
+  const [searchInput, setSearchInput] = useState(search)
 
   const reviewed   = attempts.filter(a => reviewMap[`${a.wish_id}:${a.candidate_wish_id}`])
   const unreviewed = attempts.filter(a => !reviewMap[`${a.wish_id}:${a.candidate_wish_id}`])
@@ -392,14 +401,9 @@ export default function ReviewMatchesClient({
   const maybe = reviewed.filter(a => reviewMap[`${a.wish_id}:${a.candidate_wish_id}`]?.label === 'maybe').length
   const bad   = reviewed.filter(a => reviewMap[`${a.wish_id}:${a.candidate_wish_id}`]?.label === 'bad').length
 
-  const q = searchQuery.trim().toLowerCase()
-  const visibleAttempts = q
-    ? attempts.filter(a => {
-        const textA = wishMap[a.wish_id]?.original_text?.toLowerCase() ?? ''
-        const textB = wishMap[a.candidate_wish_id]?.original_text?.toLowerCase() ?? ''
-        return textA.includes(q) || textB.includes(q)
-      })
-    : attempts
+  function submitSearch(value: string) {
+    router.push(buildUrl(pathname, filters, sort, value.trim(), 1))
+  }
 
   return (
     <div className="space-y-5">
@@ -410,7 +414,8 @@ export default function ReviewMatchesClient({
         <p className="text-sm text-slate-500 mt-1">סקירה ידנית של התאמות לצורך כיוונון המערכת</p>
         <div className="flex gap-4 mt-3 flex-wrap">
           {[
-            ['בעמוד זה', attempts.length,  'text-slate-700'],
+            ['סה"כ', totalCount,        'text-slate-700'],
+            ['בעמוד זה', attempts.length, 'text-slate-500'],
             ['לא סוקרו', unreviewed.length, 'text-slate-400'],
             ['סוקרו',    reviewed.length,   'text-slate-600'],
             ['טוב',      good,              'text-emerald-600'],
@@ -425,41 +430,40 @@ export default function ReviewMatchesClient({
       </div>
 
       {/* Filters + Sort */}
-      <FilterBar filters={filters} sort={sort} />
+      <FilterBar filters={filters} sort={sort} search={search} />
 
       {/* Search */}
-      <div className="relative">
+      <form
+        onSubmit={e => { e.preventDefault(); submitSearch(searchInput) }}
+        className="relative"
+      >
         <input
           type="search"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          placeholder="חיפוש לפי טקסט משאלה…"
+          value={searchInput}
+          onChange={e => setSearchInput(e.target.value)}
+          placeholder="חיפוש לפי טקסט משאלה (Enter לחיפוש)…"
           dir="rtl"
           className="w-full text-sm rounded-xl border border-slate-200 px-4 py-2.5 text-slate-800 placeholder-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-400"
         />
-        {q && (
+        {searchInput && (
           <button
-            onClick={() => setSearchQuery('')}
+            type="button"
+            onClick={() => { setSearchInput(''); submitSearch('') }}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
           >
             ✕
           </button>
         )}
-      </div>
+      </form>
 
       {/* Cards */}
-      {visibleAttempts.length === 0 ? (
+      {attempts.length === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-400 text-sm">
-          {q ? `אין תוצאות לחיפוש "${searchQuery}"` : 'אין רשומות התואמות את הסינון הנוכחי'}
+          {search ? `אין תוצאות לחיפוש "${search}"` : 'אין רשומות התואמות את הסינון הנוכחי'}
         </div>
       ) : (
         <div className="space-y-4">
-          {q && (
-            <p className="text-xs text-slate-400">
-              {visibleAttempts.length} תוצאות מתוך {attempts.length} בעמוד
-            </p>
-          )}
-          {visibleAttempts.map(attempt => {
+          {attempts.map(attempt => {
             const connKey = canonicalKey(attempt.wish_id, attempt.candidate_wish_id)
             return (
               <ReviewCard
@@ -484,6 +488,7 @@ export default function ReviewMatchesClient({
         totalCount={totalCount}
         filters={filters}
         sort={sort}
+        search={search}
       />
 
     </div>

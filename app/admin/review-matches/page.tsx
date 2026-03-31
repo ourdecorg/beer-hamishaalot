@@ -38,6 +38,7 @@ export default async function ReviewMatchesPage({
   const cancelledFilter = typeof sp.cancelled === 'string' ? sp.cancelled : 'hide'
   const sortKey         = typeof sp.sort      === 'string' && SORT_COLUMNS[sp.sort] ? sp.sort : 'match_score'
   const page            = Math.max(1, parseInt(typeof sp.page === 'string' ? sp.page : '1') || 1)
+  const searchFilter    = typeof sp.search    === 'string' ? sp.search.trim() : ''
 
   const admin = createAdminClient()
 
@@ -45,6 +46,17 @@ export default async function ReviewMatchesPage({
   const col = SORT_COLUMNS[sortKey]
   const from = (page - 1) * PAGE_SIZE
   const to   = page * PAGE_SIZE - 1
+
+  // If searching, find wish IDs matching the text first
+  let searchWishIds: string[] | null = null
+  if (searchFilter) {
+    const { data: matchingWishes } = await admin
+      .from('wishes')
+      .select('id')
+      .ilike('original_text', `%${searchFilter}%`)
+    searchWishIds = (matchingWishes ?? []).map((w: { id: string }) => w.id)
+    if (searchWishIds.length === 0) searchWishIds = ['00000000-0000-0000-0000-000000000000'] // no results
+  }
 
   let query = admin
     .from('match_attempts_log')
@@ -57,6 +69,7 @@ export default async function ReviewMatchesPage({
   if (typeFilter === 'rejected') query = query.eq('passed_threshold', false)
   if (gateFilter === 'failed')   query = query.eq('gate_passed', false)
   if (nearFilter === '1')        query = query.gte('match_score', 0.40).lte('match_score', 0.55)
+  if (searchWishIds)             query = query.or(`wish_id.in.(${searchWishIds.join(',')}),candidate_wish_id.in.(${searchWishIds.join(',')})`)
 
   const { data: rawAttempts, count } = await query
   let attempts = (rawAttempts ?? []) as AttemptRow[]
@@ -128,6 +141,7 @@ export default async function ReviewMatchesPage({
       userEmail={user.email!}
       filters={{ type: typeFilter, reviewed: reviewedFilter, gate: gateFilter, near: nearFilter, cancelled: cancelledFilter }}
       sort={sortKey}
+      search={searchFilter}
       page={page}
       totalPages={totalPages}
       totalCount={totalCount}
