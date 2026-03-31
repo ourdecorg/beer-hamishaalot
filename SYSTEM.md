@@ -233,7 +233,7 @@ UNIQUE(wish_a, wish_b), CHECK(wish_a < wish_b)
 id                       uuid PK
 wish_id                  uuid
 candidate_wish_id        uuid
-semantic_similarity      float NOT NULL  ← English embedding similarity (v12: ×0.70)
+semantic_similarity      float NOT NULL  ← English embedding similarity (v13: sole ranking signal)
 semantic_similarity_orig float           ← original-language similarity (migration 035); נכתב NULL ב-v10
 complementarity_score    float NOT NULL
 theme_overlap            float NOT NULL  ← תמיד 0 (legacy NOT NULL)
@@ -292,7 +292,7 @@ UNIQUE(wish_id, user_id)
 
 ---
 
-## 4. מנגנון ההפגשה (Resonance Engine v12 — 2 signals)
+## 4. מנגנון ההפגשה (Resonance Engine v13 — semantic-only)
 
 ### pipeline ראשי — `processWishForMatching(wishId, wishText, {onlyLowerId?, explicitCandidateIds?})`
 
@@ -342,9 +342,9 @@ UNIQUE(wish_id, user_id)
   ├── אם יש enrichment למועמד:
   │     ├── computeEmbeddingComplementarity(termVecMap, A, B) → complementarityScore
   │     └── computeStructuralSimilarity() → structuralSimilarity (observability בלבד)
-  ├── [שער רלוונטיות] semantic_en ≥ 0.30 OR complementarity ≥ 0.20
-  │     נכשל → gate_passed=false → דלג
-  ├── computeMatchScore(semanticEn, complementarity) → match_score
+  ├── [שער רלוונטיות] semantic_en ≥ 0.30
+  │     נכשל → gate_passed=false, gate_reason='low_semantic' → דלג
+  ├── computeMatchScore(semanticEn) → match_score
   └── geo soft penalty: finalScore × exp(-distance_km / 50)
 
 שלב 5: Persistence
@@ -352,27 +352,29 @@ UNIQUE(wish_id, user_id)
   └── wish_connections UPSERT (finalScore ≥ 0.48, ignoreDuplicates)
 ```
 
-### נוסחת הציון (v12)
+### נוסחת הציון (v13)
 
 ```
-match_score = 0.70 × semantic_similarity      (English embedding — cross-lingual)
-            + 0.30 × complementarity           (needs ↔ skills pairwise embedding similarity)
+match_score = semantic_similarity      (English embedding — cross-lingual, sole ranking signal)
 
 final_score = match_score × exp(-distance_km / 50)
             (= match_score כשאין מיקום לאחת המשאלות)
 ```
 
-**ציון סף:** ≥ 0.48 · **שער רלוונטיות:** semantic_en ≥ 0.30 **או** complementarity ≥ 0.20
+**ציון סף:** ≥ 0.48 · **שער רלוונטיות:** semantic_en ≥ 0.30
 
 ### סיווג סוג ההתאמה
 
 | match_type | תנאי |
 |---|---|
 | `strong` | final_score ≥ 0.75 |
-| `complementary` | complementarity > 0.50 |
 | `similar` | כל השאר |
 
-### חישוב Complementarity — embedding-based (`lib/matching/complementEmbed.ts`)
+`complementary` — ערך legacy בשורות DB ישנות; לא נוצר בניקוד v13.
+
+### חישוב Complementarity — observability בלבד (`lib/matching/complementEmbed.ts`)
+
+נחשב ונרשם ב-`match_attempts_log.complementarity_score` אך **אינו משתתף בנוסחת הציון (v13)**.
 
 כל `need` וכל `skill_offered` מוטמע כיחידה סמנטית עצמאית ב-`wish_term_embeddings`.
 בזמן ריצה: pairwise cosine similarity, ללא קריאת OpenAI.
@@ -390,7 +392,7 @@ score = max cosine(needVec, skillVec)
 
 ### Structural Similarity (`lib/matching/keywords.ts`) — observability בלבד
 
-נחשב ונרשם ב-`match_attempts_log.structural_similarity` אך **אינו משתתף בנוסחת הציון (v12)**.
+נחשב ונרשם ב-`match_attempts_log.structural_similarity` אך **אינו משתתף בנוסחת הציון (v13)**.
 מאפשר ניתוח רטרואקטיבי בלבד.
 
 ### חישוב Anchor Keywords (`lib/matching/keywords.ts`)
@@ -421,7 +423,7 @@ WHERE e.wish_id != source_wish_id
 | סינון | סוג | תנאי |
 |-------|-----|------|
 | טווח תאריכים | קשה (hard) | אין חפיפה → דחייה |
-| שער רלוונטיות | קשה | semantic < 0.30 **וגם** complementarity < 0.20 → דחייה |
+| שער רלוונטיות | קשה | semantic_en < 0.30 → דחייה |
 | מרחק גיאוגרפי | רך (soft) | `final_score × exp(-km/50)` |
 | status cancelled | קשה | מסונן ב-RLS + ב-RPCs |
 
@@ -469,7 +471,7 @@ fallback → 1000 × 2^attempt (עד 4 ניסיונות)
 
 | עמודה | בנוי מ | מטרה |
 |-------|--------|------|
-| `embedding` | `translation_en` + `themes` | ANN cross-lingual (ראשי) + ניקוד semantic v12 |
+| `embedding` | `translation_en` + `themes` | ANN cross-lingual (ראשי) + ניקוד semantic v13 |
 | `embedding_original` | `wishText` + `themes` | נשמר בלבד — לא בשימוש בניקוד |
 
 **skip-if-exists:** שני ה-embeddings קיימים → מחזיר `{ en, orig }` ללא קריאת OpenAI
@@ -648,14 +650,14 @@ ORDER BY embedding <=> query_embedding
 
 | קובץ | פונקציות |
 |------|---------|
-| index.ts | `processWishForMatching()`, `prepareWishForMatching()` — orchestrator v12 |
+| index.ts | `processWishForMatching()`, `prepareWishForMatching()` — orchestrator v13 |
 | analyze.ts | `analyzeWishText()`, `analyzeAndStoreWish()` — enrichment + translation_en |
 | embed.ts | `buildEmbeddingText()`, `buildEnglishEmbeddingText()`, `generateEmbedding()`, `generateAndStoreEmbedding()` → `DualEmbedding` |
 | similarity.ts | `findSimilarWishes()`, `findStructuredCandidates()`, `computeSimilaritiesForIds()` → `DualSimilarityMaps` |
 | keywords.ts | `buildAnchorKeywords()`, `computeStructuralSimilarity()` |
-| score.ts | `computeMatchScore(semantic, complementarity)` — v12: 0.70×semantic + 0.30×complementarity |
+| score.ts | `computeMatchScore(semantic)` — v13: match_score = semantic_similarity |
 | complementEmbed.ts | `generateAndStoreTermEmbeddings()`, `loadTermVecsForWishes()`, `computeEmbeddingComplementarity()` |
-| complement.ts | `computeComplementarity()` — legacy keyword-based (לא בשימוש ב-v12, נשמר) |
+| complement.ts | `computeComplementarity()` — legacy keyword-based (לא בשימוש ב-v13, נשמר) |
 | intent.ts | `computeIntentCompatibility()` — לא בשימוש (נשמר) |
 | geo.ts | `haversineKm()` — soft penalty exp(-km/50) |
 | timeRange.ts | `dateRangesOverlap()` |
