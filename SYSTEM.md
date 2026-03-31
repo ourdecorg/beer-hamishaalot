@@ -233,7 +233,7 @@ UNIQUE(wish_a, wish_b), CHECK(wish_a < wish_b)
 id                       uuid PK
 wish_id                  uuid
 candidate_wish_id        uuid
-semantic_similarity      float NOT NULL  ← English embedding similarity (v10: ×0.55)
+semantic_similarity      float NOT NULL  ← English embedding similarity (v12: ×0.70)
 semantic_similarity_orig float           ← original-language similarity (migration 035); נכתב NULL ב-v10
 complementarity_score    float NOT NULL
 theme_overlap            float NOT NULL  ← תמיד 0 (legacy NOT NULL)
@@ -292,7 +292,7 @@ UNIQUE(wish_id, user_id)
 
 ---
 
-## 4. מנגנון ההפגשה (Resonance Engine v10 — 3 signals)
+## 4. מנגנון ההפגשה (Resonance Engine v12 — 2 signals)
 
 ### pipeline ראשי — `processWishForMatching(wishId, wishText, {onlyLowerId?, explicitCandidateIds?})`
 
@@ -308,10 +308,14 @@ UNIQUE(wish_id, user_id)
   ├── English embedding (ראשי):
   │     buildEnglishEmbeddingText(translation_en, { themes })
   │     → text-embedding-3-small → wish_embeddings.embedding
-  └── Original embedding (נשמר, לא בשימוש בניקוד v10):
+  └── Original embedding (נשמר, לא בשימוש בניקוד):
         buildEmbeddingText(wishText, { themes })
         → text-embedding-3-small → wish_embeddings.embedding_original
   מדלג אם שני ה-embeddings קיימים
+
+שלב 2b: generateAndStoreTermEmbeddings() — per-term embeddings
+  └── כל need + skill_offered מוטמע בנפרד (batch call אחד ל-OpenAI)
+  └── → wish_term_embeddings (skip-if-exists)
 
 שלב 3a: findSimilarWishes(embeddingEn) — ANN recall
   └── match_wishes() RPC → HNSW ANN search על embedding (אנגלית) → candidates (similarity ≥ 0.30)
@@ -324,7 +328,9 @@ UNIQUE(wish_id, user_id)
   └── מועמדים: ANN בלבד / Structural בלבד / שניהם (recallSource)
   └── computeSimilaritiesForIds(embeddingEn, null, ids) →
       DualSimilarityMaps { en: Map, orig: Map (ריק) }
-      (queryEmbeddingOrig=null — נטענת embedding_original מה-DB אך לא בשימוש)
+
+שלב 3d: loadTermVecsForWishes(allWishIds) — pre-load term embeddings
+  └── שאילתה אחת לכל המשאלות בבאץ' → TermVecMap { wish_id → { needs[][], skills[][] } }
 
 **מצב Full-scan** (≤ 300 משאלות):
   └── IDs ממוינים; wish[i] מקבל explicitCandidateIds = sortedIds.slice(0, i)
@@ -334,11 +340,11 @@ UNIQUE(wish_id, user_id)
 שלב 4: ניקוד וסינון
   ├── [filter קשה] dateRangesOverlap()
   ├── אם יש enrichment למועמד:
-  │     ├── computeComplementarity()      → complementarityScore
-  │     └── computeStructuralSimilarity() → structuralSimilarity
-  ├── [שער רלוונטיות] semantic_en ≥ 0.30 OR complementarity ≥ 0.20 OR structural ≥ 0.25
+  │     ├── computeEmbeddingComplementarity(termVecMap, A, B) → complementarityScore
+  │     └── computeStructuralSimilarity() → structuralSimilarity (observability בלבד)
+  ├── [שער רלוונטיות] semantic_en ≥ 0.30 OR complementarity ≥ 0.20
   │     נכשל → gate_passed=false → דלג
-  ├── computeMatchScore(semanticEn, complementarity, structural) → match_score
+  ├── computeMatchScore(semanticEn, complementarity) → match_score
   └── geo soft penalty: finalScore × exp(-distance_km / 50)
 
 שלב 5: Persistence
@@ -346,18 +352,17 @@ UNIQUE(wish_id, user_id)
   └── wish_connections UPSERT (finalScore ≥ 0.48, ignoreDuplicates)
 ```
 
-### נוסחת הציון (v10)
+### נוסחת הציון (v12)
 
 ```
-match_score = 0.55 × semantic_similarity      (English embedding — cross-lingual)
-            + 0.25 × complementarity           (needs ↔ skills bidirectional)
-            + 0.20 × structural_similarity     (field overlap: entities, domain)
+match_score = 0.70 × semantic_similarity      (English embedding — cross-lingual)
+            + 0.30 × complementarity           (needs ↔ skills pairwise embedding similarity)
 
 final_score = match_score × exp(-distance_km / 50)
             (= match_score כשאין מיקום לאחת המשאלות)
 ```
 
-**ציון סף:** ≥ 0.48 · **שער רלוונטיות:** semantic_en ≥ 0.30 **או** complementarity ≥ 0.20 **או** structural ≥ 0.25
+**ציון סף:** ≥ 0.48 · **שער רלוונטיות:** semantic_en ≥ 0.30 **או** complementarity ≥ 0.20
 
 ### סיווג סוג ההתאמה
 
@@ -367,50 +372,35 @@ final_score = match_score × exp(-distance_km / 50)
 | `complementary` | complementarity > 0.50 |
 | `similar` | כל השאר |
 
-### חישוב Complementarity (`lib/matching/complement.ts`)
+### חישוב Complementarity — embedding-based (`lib/matching/complementEmbed.ts`)
 
-ללא קריאת AI — השוואה טהורה של `needs` ↔ `skills_offered`.
+כל `need` וכל `skill_offered` מוטמע כיחידה סמנטית עצמאית ב-`wish_term_embeddings`.
+בזמן ריצה: pairwise cosine similarity, ללא קריאת OpenAI.
 
-**שלב 1 — קנוניזציה:** שני הצדדים עוברים `canonicalize()` — מיפוי מילים נרדפות ("investment"→"funding" וכו').
-
-**שלב 2 — ציון דו-כיווני:**
+**שלב 1 — כיווניות:**
 ```
-aOffersWhatBNeeds = max(jaccard(skillsA, needsB), softOverlap(skillsA, needsB))
-bOffersWhatANeeds = max(jaccard(skillsB, needsA), softOverlap(skillsB, needsA))
-```
-- `jaccard` — חיתוך/איחוד קבוצות (exact match לאחר lowercase+trim)
-- `softOverlap` — token substring match (טוקנים > 3 תווים) לטיפול בהתאמות חלקיות כמו "technical help" ↔ "technical skills"
+c1 = directionalScore(A.needs, B.skills)   // A צריך — B מציע
+c2 = directionalScore(B.needs, A.skills)   // B צריך — A מציע
 
-**שלב 3 — ציון סופי:**
+directionalScore(needs, skills):
+  לכל need: best = max cosine(needVec, skillVec) מעל כל skills
+  best < 0.35 → מתאפס (noise floor)
+  return mean(best values)
+```
+
+**שלב 2 — ציון סופי (asymmetric boost נשמר):**
 
 | מצב | נוסחה |
 |-----|-------|
 | פרק↔מבקש טהור (`maxDir > 0.4` ו-`minDir < 0.15`) | `min(1, maxDir × 1.3)` |
-| שניהם תורמים | `min(1, avg(max, min) × 1.2)` |
+| שניהם תורמים | `min(1, avg(c1, c2) × 1.2)` |
 
-הגיון: כשרק כיוון אחד חזק זו ההשלמה הטובה ביותר — לכן מתוגמלת ישירות במקום להידלל בממוצע.
+**סף רעש:** cosine < 0.35 מטופל כ-0 — מונע תרומה של התאמות חלשות לציון.
 
-### חישוב Structural Similarity (`lib/matching/keywords.ts`)
+### Structural Similarity (`lib/matching/keywords.ts`) — observability בלבד
 
-בדיקה של 5 שדות עצמאיים. ציון = מספר ההתאמות / 4, מקסימום 1.
-
-| שדה | כיוון | שיטה |
-|-----|-------|------|
-| A.needs ↔ B.skills_offered | cross-field | `canonicalize()` — synonym-aware |
-| A.skills_offered ↔ B.needs | cross-field | `canonicalize()` — synonym-aware |
-| subject_entities | same-field | lowercase exact match |
-| domain_entities | same-field | lowercase exact match |
-| primary_domain | same-field | enum equality |
-
-**למה cross-field ולא same-field על needs?** שני אנשים שצריכים את אותו הדבר אינם משלימים אחד את השני. המטרה לגלות: A צריך מה ש-B מציע, ולהפך.
-
-**למה canonicalize() לneeds/skills?** עברית: יחיד/רבים, ה הידיעה, זכר/נקבה — `canonicalize()` ממפה מילים נרדפות ל-canonical ID אחיד ("מימון"/"השקעה" → `'funding'`), ומונע החמצות בגלל הבדלי צורה.
-
-דוגמאות ציון:
-- 0 התאמות → 0.00
-- 1 התאמה (למשל רק primary_domain זהה) → 0.25
-- 2 התאמות → 0.50
-- 4+ התאמות → 1.00 (capped)
+נחשב ונרשם ב-`match_attempts_log.structural_similarity` אך **אינו משתתף בנוסחת הציון (v12)**.
+מאפשר ניתוח רטרואקטיבי בלבד.
 
 ### חישוב Anchor Keywords (`lib/matching/keywords.ts`)
 
@@ -440,7 +430,7 @@ WHERE e.wish_id != source_wish_id
 | סינון | סוג | תנאי |
 |-------|-----|------|
 | טווח תאריכים | קשה (hard) | אין חפיפה → דחייה |
-| שער רלוונטיות | קשה | semantic < 0.30 **וגם** complementarity < 0.20 **וגם** structural < 0.25 → דחייה |
+| שער רלוונטיות | קשה | semantic < 0.30 **וגם** complementarity < 0.20 → דחייה |
 | מרחק גיאוגרפי | רך (soft) | `final_score × exp(-km/50)` |
 | status cancelled | קשה | מסונן ב-RLS + ב-RPCs |
 
@@ -484,16 +474,29 @@ fallback → 1000 × 2^attempt (עד 4 ניסיונות)
 
 **מודל:** `text-embedding-3-small` (1536 ממדים)
 
-**שני embeddings לכל משאלה:**
+**שני embeddings לכל משאלה (`wish_embeddings`):**
 
 | עמודה | בנוי מ | מטרה |
 |-------|--------|------|
-| `embedding` | `translation_en` + `themes` | ANN cross-lingual (ראשי) + ניקוד v10 |
-| `embedding_original` | `wishText` + `themes` | נשמר בלבד — לא בשימוש בניקוד v10 |
+| `embedding` | `translation_en` + `themes` | ANN cross-lingual (ראשי) + ניקוד semantic v12 |
+| `embedding_original` | `wishText` + `themes` | נשמר בלבד — לא בשימוש בניקוד |
 
 **skip-if-exists:** שני ה-embeddings קיימים → מחזיר `{ en, orig }` ללא קריאת OpenAI
 
 **return type:** `DualEmbedding { en: number[], orig: number[] }`
+
+**per-term embeddings (`wish_term_embeddings`, migration 036):**
+
+כל `need` וכל `skill_offered` מוטמע בנפרד. batch call אחד ל-OpenAI לכל המונחים החסרים.
+
+| עמודה | תוכן |
+|-------|------|
+| `wish_id` | FK→wishes |
+| `term_type` | `'need'` \| `'skill'` |
+| `term_text` | המונח הגולמי מה-enrichment |
+| `embedding` | vector(1536) |
+
+**skip-if-exists:** בדיקת `(wish_id, term_type, term_text)` לפני כל insert
 
 ---
 
@@ -521,7 +524,7 @@ ORDER BY embedding <=> query_embedding
 
 ### `computeSimilaritiesForIds` — Back-fill similarity
 
-מביא `embedding` + `embedding_original` ב**שאילתה אחת** ומחשב cosine similarity ב-JavaScript. כשמועבר `queryEmbeddingOrig=null` (כפי שנקרא ב-v10) — מחזיר `orig: Map` ריק. מחזיר `DualSimilarityMaps { en: Map<wish_id, similarity>, orig: Map<wish_id, similarity> }`.
+מביא `embedding` + `embedding_original` ב**שאילתה אחת** ומחשב cosine similarity ב-JavaScript. קריאה עם `queryEmbeddingOrig=null` מחזירה `orig: Map` ריק. מחזיר `DualSimilarityMaps { en: Map<wish_id, similarity>, orig: Map<wish_id, similarity> }`.
 
 ---
 
@@ -630,6 +633,7 @@ ORDER BY embedding <=> query_embedding
 | 033 | gate_passed + gate_reason ב-match_attempts_log; טבלת match_reviews |
 | 034 | translation_en ב-wish_enrichment; embedding_original (vector 1536) ב-wish_embeddings |
 | 035 | semantic_similarity_orig ב-match_attempts_log |
+| 036 | wish_term_embeddings — per-term embeddings לחישוב complementarity |
 
 ---
 
@@ -653,14 +657,15 @@ ORDER BY embedding <=> query_embedding
 
 | קובץ | פונקציות |
 |------|---------|
-| index.ts | `processWishForMatching()`, `prepareWishForMatching()` — orchestrator v10 |
+| index.ts | `processWishForMatching()`, `prepareWishForMatching()` — orchestrator v12 |
 | analyze.ts | `analyzeWishText()`, `analyzeAndStoreWish()` — enrichment + translation_en |
 | embed.ts | `buildEmbeddingText()`, `buildEnglishEmbeddingText()`, `generateEmbedding()`, `generateAndStoreEmbedding()` → `DualEmbedding` |
 | similarity.ts | `findSimilarWishes()`, `findStructuredCandidates()`, `computeSimilaritiesForIds()` → `DualSimilarityMaps` |
 | keywords.ts | `buildAnchorKeywords()`, `computeStructuralSimilarity()` |
-| score.ts | `computeMatchScore(semantic, complementarity, structural)` — v10: 0.55×semantic + 0.25×comp + 0.20×struct |
-| complement.ts | `computeComplementarity()` |
-| intent.ts | `computeIntentCompatibility()` — לא בשימוש בנוסחה v10 (נשמר) |
+| score.ts | `computeMatchScore(semantic, complementarity)` — v12: 0.70×semantic + 0.30×complementarity |
+| complementEmbed.ts | `generateAndStoreTermEmbeddings()`, `loadTermVecsForWishes()`, `computeEmbeddingComplementarity()` |
+| complement.ts | `computeComplementarity()` — legacy keyword-based (לא בשימוש ב-v12, נשמר) |
+| intent.ts | `computeIntentCompatibility()` — לא בשימוש (נשמר) |
 | geo.ts | `haversineKm()` — soft penalty exp(-km/50) |
 | timeRange.ts | `dateRangesOverlap()` |
 | canonicalize.ts | `canonicalize()`, `canonicalizeSubjectType()`, `canonicalizeAction()` |
