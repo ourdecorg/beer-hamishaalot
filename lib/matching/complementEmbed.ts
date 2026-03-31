@@ -60,21 +60,6 @@ function parseVec(raw: unknown): number[] | null {
   }
 }
 
-/**
- * How well does `skills` cover `needs`?
- * For each need: find the best matching skill (max cosine), clamp below threshold to 0.
- * Returns the mean across all needs.
- */
-function directionalScore(needs: number[][], skills: number[][]): number {
-  if (needs.length === 0 || skills.length === 0) return 0
-  let total = 0
-  for (const needVec of needs) {
-    const best = Math.max(...skills.map(s => cosineSim(needVec, s)))
-    total += best >= SIMILARITY_THRESHOLD ? best : 0
-  }
-  return total / needs.length
-}
-
 // ── Enrichment-time: generate + store term embeddings ─────────────────────────
 
 /**
@@ -174,9 +159,10 @@ export async function loadTermVecsForWishes(wishIds: string[]): Promise<TermVecM
 // ── Runtime scoring (pure JS, no DB, no OpenAI) ───────────────────────────────
 
 /**
- * Computes bidirectional complementarity from pre-loaded term vectors.
- * Preserves the asymmetric boost from the original formula:
- *   pure provider↔seeker pair → ×1.3 reward instead of penalising via average.
+ * Computes complementarity from pre-loaded term vectors.
+ * Score = max cosine similarity across all valid cross-direction pairs
+ * (A.needs vs B.skills and B.needs vs A.skills).
+ * Pairs below SIMILARITY_THRESHOLD are ignored. Returns 0 if none qualify.
  */
 export function computeEmbeddingComplementarity(
   termVecMap: TermVecMap,
@@ -186,15 +172,21 @@ export function computeEmbeddingComplementarity(
   const a = termVecMap.get(wishIdA) ?? { needs: [], skills: [] }
   const b = termVecMap.get(wishIdB) ?? { needs: [], skills: [] }
 
-  const c1 = directionalScore(a.needs, b.skills)  // A needs ← B skills
-  const c2 = directionalScore(b.needs, a.skills)  // B needs ← A skills
+  let best = 0
 
-  const maxDir = Math.max(c1, c2)
-  const minDir = Math.min(c1, c2)
+  for (const needVec of a.needs) {
+    for (const skillVec of b.skills) {
+      const sim = cosineSim(needVec, skillVec)
+      if (sim >= SIMILARITY_THRESHOLD && sim > best) best = sim
+    }
+  }
 
-  const score = (maxDir > 0.4 && minDir < 0.15)
-    ? Math.min(1, maxDir * 1.3)                        // asymmetric: pure offer/seek
-    : Math.min(1, ((maxDir + minDir) / 2) * 1.2)       // symmetric: both contribute
+  for (const needVec of b.needs) {
+    for (const skillVec of a.skills) {
+      const sim = cosineSim(needVec, skillVec)
+      if (sim >= SIMILARITY_THRESHOLD && sim > best) best = sim
+    }
+  }
 
-  return { score, c1, c2 }
+  return { score: best, c1: 0, c2: 0 }
 }
