@@ -377,25 +377,16 @@ final_score = match_score × exp(-distance_km / 50)
 כל `need` וכל `skill_offered` מוטמע כיחידה סמנטית עצמאית ב-`wish_term_embeddings`.
 בזמן ריצה: pairwise cosine similarity, ללא קריאת OpenAI.
 
-**שלב 1 — כיווניות:**
+**לוגיקה:**
 ```
-c1 = directionalScore(A.needs, B.skills)   // A צריך — B מציע
-c2 = directionalScore(B.needs, A.skills)   // B צריך — A מציע
-
-directionalScore(needs, skills):
-  לכל need: best = max cosine(needVec, skillVec) מעל כל skills
-  best < 0.35 → מתאפס (noise floor)
-  return mean(best values)
+score = max cosine(needVec, skillVec)
+        מעל כל הזוגות: A.needs × B.skills  ו-  B.needs × A.skills
+        בתנאי cosine ≥ 0.35 (noise floor)
+        אם אין זוג שעובר את הסף → 0
 ```
-
-**שלב 2 — ציון סופי (asymmetric boost נשמר):**
-
-| מצב | נוסחה |
-|-----|-------|
-| פרק↔מבקש טהור (`maxDir > 0.4` ו-`minDir < 0.15`) | `min(1, maxDir × 1.3)` |
-| שניהם תורמים | `min(1, avg(c1, c2) × 1.2)` |
 
 **סף רעש:** cosine < 0.35 מטופל כ-0 — מונע תרומה של התאמות חלשות לציון.
+אין ממוצע, אין asymmetric boost — ציון אחד: ה-maximum הגבוה ביותר שנמצא.
 
 ### Structural Similarity (`lib/matching/keywords.ts`) — observability בלבד
 
