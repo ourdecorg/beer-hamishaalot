@@ -1,13 +1,15 @@
 /**
- * Wish Resonance Engine — Orchestrator (v10 — 3 signals)
+ * Wish Resonance Engine — Orchestrator (v11 — embedding-based complementarity)
  *
  * processWishForMatching(wishId, wishText) is the single entry point.
  * Pipeline:
  *   1. Deep analysis  → wish_enrichment (skip-if-exists)
  *   2. Embedding      → wish_embeddings English + original stored (skip-if-exists)
+ *                    → wish_term_embeddings per-term needs/skills (skip-if-exists)
  *   3a. Semantic recall  → ANN candidates via English embedding (similarity ≥ MIN_SIMILARITY)
  *   3b. Structural recall → candidates with anchor_keywords overlap
  *   3c. Merge both channels, back-fill English similarity for structural-only candidates
+ *   3d. Pre-load all term embeddings for batch (one DB query)
  *   4. Score          → 0.55×semantic_en + 0.25×complementarity + 0.20×structural
  *   5. Relevance gate → reject if semantic_en<0.30 AND complementarity<0.20 AND structural<0.25
  *   6. Geo            → soft distance penalty (exp(-d/50))
@@ -19,8 +21,8 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { analyzeAndStoreWish } from './analyze'
 import { generateAndStoreEmbedding } from './embed'
+import { generateAndStoreTermEmbeddings, loadTermVecsForWishes, computeEmbeddingComplementarity } from './complementEmbed'
 import { findSimilarWishes, findStructuredCandidates, computeSimilaritiesForIds } from './similarity'
-import { computeComplementarity } from './complement'
 import { buildAnchorKeywords, computeStructuralSimilarity } from './keywords'
 import { computeMatchScore, MATCH_THRESHOLD } from './score'
 import { haversineKm } from './geo'
@@ -61,6 +63,7 @@ export async function prepareWishForMatching(
   try {
     const enrichment = await analyzeAndStoreWish(wishId, wishText)
     await generateAndStoreEmbedding(wishId, wishText, enrichment)
+    await generateAndStoreTermEmbeddings(wishId, enrichment.needs, enrichment.skills_offered)
   } catch (err) {
     console.error('[ResonanceEngine] prepareWishForMatching failed:', err)
   }
@@ -84,6 +87,9 @@ export async function processWishForMatching(
 
     // Step 2 — Generate + store both embeddings (original stored for future use, not used in scoring)
     const { en: embeddingEn } = await generateAndStoreEmbedding(wishId, wishText, enrichment)
+
+    // Step 2b — Generate + store per-term embeddings for needs and skills (skip-if-exists)
+    await generateAndStoreTermEmbeddings(wishId, enrichment.needs, enrichment.skills_offered)
 
     // Step 3 — Recall
     let annEnMap: Map<string, number>
@@ -136,6 +142,9 @@ export async function processWishForMatching(
       .select('*')
       .in('wish_id', merged.map(c => c.wish_id))
 
+    // Step 3d — Pre-load term embeddings for source + all candidates (one query)
+    const termVecMap = await loadTermVecsForWishes([wishId, ...merged.map(c => c.wish_id)])
+
     const enrichmentMap = new Map<string, WishEnrichment>(
       (enrichments ?? []).map((e) => [e.wish_id, e as WishEnrichment])
     )
@@ -181,7 +190,7 @@ export async function processWishForMatching(
       let domainMatch = 0
 
       if (candidateEnrichment) {
-        complementarityScore = computeComplementarity(enrichment, candidateEnrichment).score
+        complementarityScore = computeEmbeddingComplementarity(termVecMap, wishId, candidate.wish_id).score
         structuralSimilarity = computeStructuralSimilarity(enrichment, candidateEnrichment)
         domainMatch          = (enrichment.primary_domain && enrichment.primary_domain === candidateEnrichment.primary_domain) ? 1 : 0
       }

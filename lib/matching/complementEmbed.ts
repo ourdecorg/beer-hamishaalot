@@ -1,0 +1,200 @@
+/**
+ * Embedding-based Complementarity Scoring (v11)
+ *
+ * Replaces the keyword/Jaccard-based complement.ts with pairwise cosine similarity
+ * between individual need and skill embeddings.
+ *
+ * Pipeline:
+ *   Enrichment time: generateAndStoreTermEmbeddings() — one batch OpenAI call per wish
+ *   Scoring time:    loadTermVecsForWishes() — one DB query for all wishes in batch
+ *                    computeEmbeddingComplementarity() — pure JS, no DB, no OpenAI
+ */
+
+import OpenAI from 'openai'
+import { createAdminClient } from '@/lib/supabase/admin'
+
+const openai = new OpenAI()
+
+// Cosine similarity below this threshold is treated as 0 (noise floor).
+const SIMILARITY_THRESHOLD = 0.35
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type TermType = 'need' | 'skill'
+
+export interface TermVecs {
+  needs:  number[][]
+  skills: number[][]
+}
+
+/** Map from wish_id → pre-loaded term vectors. Built once per batch before scoring loop. */
+export type TermVecMap = Map<string, TermVecs>
+
+export interface ComplementarityResult {
+  score: number   // final 0–1
+  c1:    number   // A needs ← B skills
+  c2:    number   // B needs ← A skills
+}
+
+// ── Internal helpers ──────────────────────────────────────────────────────────
+
+function cosineSim(a: number[], b: number[]): number {
+  let dot = 0, normA = 0, normB = 0
+  for (let i = 0; i < a.length; i++) {
+    dot   += a[i] * b[i]
+    normA += a[i] * a[i]
+    normB += b[i] * b[i]
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB)
+  if (denom === 0) return 0
+  const sim = dot / denom
+  return Number.isFinite(sim) ? Math.max(0, Math.min(1, sim)) : 0
+}
+
+function parseVec(raw: unknown): number[] | null {
+  if (!raw) return null
+  try {
+    return typeof raw === 'string' ? JSON.parse(raw) : (raw as number[])
+  } catch {
+    return null
+  }
+}
+
+/**
+ * How well does `skills` cover `needs`?
+ * For each need: find the best matching skill (max cosine), clamp below threshold to 0.
+ * Returns the mean across all needs.
+ */
+function directionalScore(needs: number[][], skills: number[][]): number {
+  if (needs.length === 0 || skills.length === 0) return 0
+  let total = 0
+  for (const needVec of needs) {
+    const best = Math.max(...skills.map(s => cosineSim(needVec, s)))
+    total += best >= SIMILARITY_THRESHOLD ? best : 0
+  }
+  return total / needs.length
+}
+
+// ── Enrichment-time: generate + store term embeddings ─────────────────────────
+
+/**
+ * Generates embeddings for each individual need and skill_offered of a wish.
+ * Uses a single batch OpenAI call for all missing terms.
+ * Safe to call multiple times — skips terms already stored.
+ */
+export async function generateAndStoreTermEmbeddings(
+  wishId: string,
+  needs: string[],
+  skillsOffered: string[],
+): Promise<void> {
+  if (needs.length === 0 && skillsOffered.length === 0) return
+
+  const admin = createAdminClient()
+
+  // Check which terms are already stored
+  const { data: existing } = await admin
+    .from('wish_term_embeddings')
+    .select('term_type, term_text')
+    .eq('wish_id', wishId)
+
+  const existingKeys = new Set(
+    (existing ?? []).map((r: { term_type: string; term_text: string }) =>
+      `${r.term_type}:${r.term_text}`
+    )
+  )
+
+  const toEmbed: { text: string; type: TermType }[] = []
+  for (const text of needs) {
+    if (text.trim() && !existingKeys.has(`need:${text}`)) {
+      toEmbed.push({ text, type: 'need' })
+    }
+  }
+  for (const text of skillsOffered) {
+    if (text.trim() && !existingKeys.has(`skill:${text}`)) {
+      toEmbed.push({ text, type: 'skill' })
+    }
+  }
+
+  if (toEmbed.length === 0) return
+
+  const response = await openai.embeddings.create({
+    model: 'text-embedding-3-small',
+    input: toEmbed.map(t => t.text),
+  })
+
+  const rows = response.data.map((item, i) => ({
+    wish_id:   wishId,
+    term_type: toEmbed[i].type,
+    term_text: toEmbed[i].text,
+    embedding: JSON.stringify(item.embedding),
+  }))
+
+  const { error } = await admin.from('wish_term_embeddings').insert(rows)
+  if (error) {
+    console.error('[complementEmbed] insert term embeddings failed:', error.message)
+  }
+}
+
+// ── Batch pre-load (called once before scoring loop) ──────────────────────────
+
+/**
+ * Loads all term embeddings for the given wish IDs in a single DB query.
+ * Returns a Map from wish_id → { needs: number[][], skills: number[][] }.
+ */
+export async function loadTermVecsForWishes(wishIds: string[]): Promise<TermVecMap> {
+  const map: TermVecMap = new Map()
+  if (wishIds.length === 0) return map
+
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from('wish_term_embeddings')
+    .select('wish_id, term_type, embedding')
+    .in('wish_id', wishIds)
+
+  if (error) {
+    console.warn('[complementEmbed] loadTermVecsForWishes failed:', error.message)
+    return map
+  }
+
+  for (const row of data ?? []) {
+    const vec = parseVec(row.embedding)
+    if (!vec) continue
+
+    if (!map.has(row.wish_id)) {
+      map.set(row.wish_id, { needs: [], skills: [] })
+    }
+    const entry = map.get(row.wish_id)!
+    if (row.term_type === 'need')  entry.needs.push(vec)
+    if (row.term_type === 'skill') entry.skills.push(vec)
+  }
+
+  return map
+}
+
+// ── Runtime scoring (pure JS, no DB, no OpenAI) ───────────────────────────────
+
+/**
+ * Computes bidirectional complementarity from pre-loaded term vectors.
+ * Preserves the asymmetric boost from the original formula:
+ *   pure provider↔seeker pair → ×1.3 reward instead of penalising via average.
+ */
+export function computeEmbeddingComplementarity(
+  termVecMap: TermVecMap,
+  wishIdA: string,
+  wishIdB: string,
+): ComplementarityResult {
+  const a = termVecMap.get(wishIdA) ?? { needs: [], skills: [] }
+  const b = termVecMap.get(wishIdB) ?? { needs: [], skills: [] }
+
+  const c1 = directionalScore(a.needs, b.skills)  // A needs ← B skills
+  const c2 = directionalScore(b.needs, a.skills)  // B needs ← A skills
+
+  const maxDir = Math.max(c1, c2)
+  const minDir = Math.min(c1, c2)
+
+  const score = (maxDir > 0.4 && minDir < 0.15)
+    ? Math.min(1, maxDir * 1.3)                        // asymmetric: pure offer/seek
+    : Math.min(1, ((maxDir + minDir) / 2) * 1.2)       // symmetric: both contribute
+
+  return { score, c1, c2 }
+}
