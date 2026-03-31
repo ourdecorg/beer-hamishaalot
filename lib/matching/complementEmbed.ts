@@ -72,7 +72,11 @@ export async function generateAndStoreTermEmbeddings(
   needs: string[],
   skillsOffered: string[],
 ): Promise<void> {
-  if (needs.length === 0 && skillsOffered.length === 0) return
+  // Filter out null/undefined/empty strings defensively — GPT may return dirty arrays
+  const cleanNeeds   = needs.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+  const cleanSkills  = skillsOffered.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+
+  if (cleanNeeds.length === 0 && cleanSkills.length === 0) return
 
   const admin = createAdminClient()
 
@@ -89,13 +93,13 @@ export async function generateAndStoreTermEmbeddings(
   )
 
   const toEmbed: { text: string; type: TermType }[] = []
-  for (const text of needs) {
-    if (text.trim() && !existingKeys.has(`need:${text}`)) {
+  for (const text of cleanNeeds) {
+    if (!existingKeys.has(`need:${text}`)) {
       toEmbed.push({ text, type: 'need' })
     }
   }
-  for (const text of skillsOffered) {
-    if (text.trim() && !existingKeys.has(`skill:${text}`)) {
+  for (const text of cleanSkills) {
+    if (!existingKeys.has(`skill:${text}`)) {
       toEmbed.push({ text, type: 'skill' })
     }
   }
@@ -114,9 +118,20 @@ export async function generateAndStoreTermEmbeddings(
     embedding: JSON.stringify(item.embedding),
   }))
 
-  const { error } = await admin.from('wish_term_embeddings').insert(rows)
-  if (error) {
+  // Retry on transient Supabase errors (502, timeout) — safe because rows were pre-checked above
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { error } = await admin.from('wish_term_embeddings').insert(rows)
+    if (!error) break
+    const isTransient = error.message.includes('timeout')
+      || error.message.includes('upstream')
+      || error.message.includes('502')
+      || error.message.includes('Bad gateway')
+    if (isTransient && attempt < 2) {
+      await new Promise(r => setTimeout(r, 2000 * (attempt + 1)))
+      continue
+    }
     console.error('[complementEmbed] insert term embeddings failed:', error.message)
+    break
   }
 }
 
