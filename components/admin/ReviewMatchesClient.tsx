@@ -85,7 +85,7 @@ const labelConfig: Record<Label, { label: string; active: string; idle: string }
 const SORT_OPTIONS: { key: string; label: string }[] = [
   { key: 'match_score',     label: 'ציון סופי' },
   { key: 'semantic_en',     label: 'סמנטי' },
-  { key: 'complementarity', label: 'משלים' },
+  { key: 'complementarity', label: 'משלים (obs.)' },
   { key: 'structural',      label: 'מבני (obs.)' },
   { key: 'geo',             label: 'גיאו' },
 ]
@@ -298,8 +298,8 @@ function ReviewCard({
   // Score components in display order with active sort highlighted
   const signals: { key: string; label: string; value: string }[] = [
     { key: 'match_score',     label: 'ציון',       value: pct(attempt.match_score) },
-    { key: 'semantic_en',     label: 'סמנטי ×0.7', value: pct(attempt.semantic_similarity) },
-    { key: 'complementarity', label: 'משלים ×0.3', value: pct(attempt.complementarity_score) },
+    { key: 'semantic_en',     label: 'סמנטי',        value: pct(attempt.semantic_similarity) },
+    { key: 'complementarity', label: 'משלים (obs.)', value: pct(attempt.complementarity_score) },
     { key: 'structural',      label: 'מבני (obs.)', value: pct(attempt.structural_similarity) },
     { key: 'geo',             label: 'גיאו',        value: pct(attempt.geo_penalty) },
   ]

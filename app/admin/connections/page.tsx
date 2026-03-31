@@ -406,13 +406,13 @@ export default function ConnectionsDebugPage() {
                       </span>
                     )}
 
-                    {/* Score breakdown — v12: semantic×0.70 + complementarity×0.30 */}
+                    {/* Score breakdown — v13: match_score = semantic_similarity */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       <Pill label="ציון כולל" value={
                         <span className="text-base font-black text-indigo-700">{pct(log.match_score)}</span>
                       } />
-                      <Pill label="סמנטי (×0.70)" value={pct(log.semantic_similarity)} />
-                      <Pill label="משלימות (×0.30)" value={pct(log.complementarity_score)} />
+                      <Pill label="סמנטי" value={pct(log.semantic_similarity)} />
+                      <Pill label="משלימות (obs.)" value={pct(log.complementarity_score)} />
                       <Pill label="מבנה (obs.)" value={log.structural_similarity != null ? pct(log.structural_similarity) : '—'} />
                       <Pill label="עונש מרחק" value={
                         log.geo_penalty != null && log.geo_penalty < 1
