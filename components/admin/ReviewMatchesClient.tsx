@@ -30,6 +30,12 @@ export interface WishStub {
   status?: string | null
 }
 
+export interface WishEnrichmentStub {
+  wish_id: string
+  needs: string[] | null
+  skills_offered: string[] | null
+}
+
 export interface ExistingReview {
   wish_id: string
   candidate_wish_id: string
@@ -41,6 +47,7 @@ export interface ExistingReview {
 export interface ReviewMatchesProps {
   attempts: AttemptRow[]
   wishMap: Record<string, WishStub>
+  enrichmentMap: Record<string, WishEnrichmentStub>
   connectionMap: Record<string, string | null>
   reviewMap: Record<string, ExistingReview>
   userEmail: string
@@ -245,6 +252,8 @@ function ReviewCard({
   attempt,
   wishA,
   wishB,
+  enrichA,
+  enrichB,
   connectionId,
   existingReview,
   userEmail,
@@ -253,6 +262,8 @@ function ReviewCard({
   attempt: AttemptRow
   wishA: WishStub | undefined
   wishB: WishStub | undefined
+  enrichA: WishEnrichmentStub | undefined
+  enrichB: WishEnrichmentStub | undefined
   connectionId: string | null
   existingReview: ExistingReview | undefined
   userEmail: string
@@ -343,6 +354,45 @@ function ReviewCard({
         </div>
       </div>
 
+      {/* Complementarity raw data */}
+      {(enrichA || enrichB) && (
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          {[
+            { label: 'צריך', keyA: enrichA?.needs,         keyB: enrichB?.needs },
+            { label: 'מציע', keyA: enrichA?.skills_offered, keyB: enrichB?.skills_offered },
+          ].map(({ label, keyA, keyB }) => (
+            <div key={label} className="col-span-2 grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{label} (א׳)</p>
+                <div className="flex flex-wrap gap-1">
+                  {(keyA ?? []).map(t => (
+                    <span key={t} className={`px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 ${
+                      (keyB ?? []).some(b => b.toLowerCase().includes(t.toLowerCase()) || t.toLowerCase().includes(b.toLowerCase()))
+                        ? 'ring-1 ring-indigo-400 bg-indigo-50 text-indigo-700'
+                        : ''
+                    }`}>{t}</span>
+                  ))}
+                  {(!keyA || keyA.length === 0) && <span className="text-slate-300 italic">—</span>}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{label} (ב׳)</p>
+                <div className="flex flex-wrap gap-1">
+                  {(keyB ?? []).map(t => (
+                    <span key={t} className={`px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 ${
+                      (keyA ?? []).some(a => a.toLowerCase().includes(t.toLowerCase()) || t.toLowerCase().includes(a.toLowerCase()))
+                        ? 'ring-1 ring-indigo-400 bg-indigo-50 text-indigo-700'
+                        : ''
+                    }`}>{t}</span>
+                  ))}
+                  {(!keyB || keyB.length === 0) && <span className="text-slate-300 italic">—</span>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Score signals */}
       <div className="flex flex-wrap gap-1.5">
         {signals.map(s => (
@@ -388,7 +438,7 @@ function ReviewCard({
 // ── Main client component ─────────────────────────────────────────────────────
 
 export default function ReviewMatchesClient({
-  attempts, wishMap, connectionMap, reviewMap, userEmail, filters, sort, search, page, totalPages, totalCount,
+  attempts, wishMap, enrichmentMap, connectionMap, reviewMap, userEmail, filters, sort, search, page, totalPages, totalCount,
 }: ReviewMatchesProps) {
 
   const pathname = usePathname()
@@ -471,6 +521,8 @@ export default function ReviewMatchesClient({
                 attempt={attempt}
                 wishA={wishMap[attempt.wish_id]}
                 wishB={wishMap[attempt.candidate_wish_id]}
+                enrichA={enrichmentMap[attempt.wish_id]}
+                enrichB={enrichmentMap[attempt.candidate_wish_id]}
                 connectionId={connectionMap[connKey] ?? null}
                 existingReview={reviewMap[`${attempt.wish_id}:${attempt.candidate_wish_id}`]}
                 userEmail={userEmail}

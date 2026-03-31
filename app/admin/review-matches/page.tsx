@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import ReviewMatchesClient, {
   type AttemptRow,
   type WishStub,
+  type WishEnrichmentStub,
   type ExistingReview,
 } from '@/components/admin/ReviewMatchesClient'
 
@@ -89,7 +90,15 @@ export default async function ReviewMatchesPage({
   const wishMap: Record<string, WishStub> = {}
   for (const w of wishRows ?? []) wishMap[w.id] = w as WishStub
 
-  // ── 3. Fetch connections ──────────────────────────────────────────────────
+  // ── 3. Fetch enrichment stubs (needs + skills_offered) ───────────────────
+  const { data: enrichmentRows } = wishIds.length > 0
+    ? await admin.from('wish_enrichment').select('wish_id, needs, skills_offered').in('wish_id', wishIds)
+    : { data: [] }
+
+  const enrichmentMap: Record<string, WishEnrichmentStub> = {}
+  for (const e of enrichmentRows ?? []) enrichmentMap[e.wish_id] = e as WishEnrichmentStub
+
+  // ── 4. Fetch connections ──────────────────────────────────────────────────
   const { data: connRows } = wishIds.length > 0
     ? await admin
         .from('wish_connections')
@@ -103,7 +112,7 @@ export default async function ReviewMatchesPage({
     connectionMap[key] = c.id
   }
 
-  // ── 4. Fetch existing reviews ─────────────────────────────────────────────
+  // ── 5. Fetch existing reviews ─────────────────────────────────────────────
   const { data: reviewRows } = attempts.length > 0
     ? await admin
         .from('match_reviews')
@@ -117,7 +126,7 @@ export default async function ReviewMatchesPage({
     reviewMap[`${r.wish_id}:${r.candidate_wish_id}`] = r as ExistingReview
   }
 
-  // ── 5. Apply cancelled filter ─────────────────────────────────────────────
+  // ── 6. Apply cancelled filter ─────────────────────────────────────────────
   if (cancelledFilter !== 'show') {
     attempts = attempts.filter(a =>
       wishMap[a.wish_id]?.status !== 'cancelled' &&
@@ -125,7 +134,7 @@ export default async function ReviewMatchesPage({
     )
   }
 
-  // ── 6. Apply reviewed filter ──────────────────────────────────────────────
+  // ── 7. Apply reviewed filter ──────────────────────────────────────────────
   if (reviewedFilter === 'yes') {
     attempts = attempts.filter(a => reviewMap[`${a.wish_id}:${a.candidate_wish_id}`])
   } else if (reviewedFilter === 'no') {
@@ -136,6 +145,7 @@ export default async function ReviewMatchesPage({
     <ReviewMatchesClient
       attempts={attempts}
       wishMap={wishMap}
+      enrichmentMap={enrichmentMap}
       connectionMap={connectionMap}
       reviewMap={reviewMap}
       userEmail={user.email!}
