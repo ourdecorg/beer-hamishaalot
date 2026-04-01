@@ -1,8 +1,5 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-const FROM   = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev'
-
 export interface WishOwner {
   wishText:     string
   contactName:  string
@@ -19,6 +16,14 @@ export async function sendConnectionEmail(
   ownerA: WishOwner,
   ownerB: WishOwner,
 ): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    console.warn('[sendConnectionEmail] RESEND_API_KEY is not set — skipping email')
+    return
+  }
+  const resend = new Resend(apiKey)
+  const FROM   = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev'
+
   await Promise.all([
     resend.emails.send({
       from:    FROM,
