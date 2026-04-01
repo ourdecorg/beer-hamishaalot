@@ -286,23 +286,37 @@ export async function processWishForMatching(
     }
 
     // Send connection emails (fire-and-forget — never blocks the pipeline)
+    console.log(`[email] ${connections.length} new connection(s) — starting email notify`)
     if (connections.length > 0 && !upsertError) {
       ;(async () => {
         try {
           const wishIds = connections.flatMap(c => [c.wish_a, c.wish_b])
-          const { data: wishes } = await supabase
+          const { data: wishes, error: wishFetchErr } = await supabase
             .from('wishes')
             .select('id, original_text, contact_name, contact_email, contact_phone, contact_city')
             .in('id', wishIds)
 
-          if (!wishes) return
+          if (wishFetchErr) {
+            console.error('[email] fetch wishes failed:', wishFetchErr.message)
+            return
+          }
+          if (!wishes || wishes.length === 0) {
+            console.warn('[email] no wish rows returned for ids:', wishIds)
+            return
+          }
+          console.log(`[email] fetched ${wishes.length} wish row(s)`)
+
           const wishMap = new Map(wishes.map(w => [w.id, w]))
 
           for (const conn of connections) {
             const wA = wishMap.get(conn.wish_a)
             const wB = wishMap.get(conn.wish_b)
-            if (!wA?.contact_email || !wB?.contact_email) continue
+            if (!wA?.contact_email || !wB?.contact_email) {
+              console.warn(`[email] skipping ${conn.wish_a}↔${conn.wish_b}: missing contact_email (A=${wA?.contact_email ?? 'null'} B=${wB?.contact_email ?? 'null'})`)
+              continue
+            }
 
+            console.log(`[email] sending to ${wA.contact_email} + ${wB.contact_email}`)
             await sendConnectionEmail(
               {
                 wishText:     wA.original_text,
@@ -319,6 +333,7 @@ export async function processWishForMatching(
                 contactCity:  wB.contact_city  ?? null,
               },
             )
+            console.log(`[email] sent OK`)
           }
         } catch (err) {
           console.error('[ResonanceEngine] sendConnectionEmail failed:', err)
