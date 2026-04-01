@@ -22,7 +22,8 @@ export async function sendConnectionEmail(
     return
   }
   const resend = new Resend(apiKey)
-  const FROM   = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev'
+  const addr   = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev'
+  const FROM   = `Well of Wishes <${addr}>`
 
   const [resA, resB] = await Promise.all([
     resend.emails.send({
