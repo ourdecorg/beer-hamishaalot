@@ -29,6 +29,7 @@ import { buildAnchorKeywords, computeStructuralSimilarity } from './keywords'
 import { computeMatchScore, MATCH_THRESHOLD } from './score'
 import { haversineKm } from './geo'
 import { dateRangesOverlap } from './timeRange'
+import { sendConnectionEmail } from '@/lib/email/sendConnectionEmail'
 import type { WishEnrichment } from '@/lib/types'
 
 type RecallSource = 'semantic' | 'structured' | 'both'
@@ -282,6 +283,47 @@ export async function processWishForMatching(
       .upsert(connections, { onConflict: 'wish_a,wish_b', ignoreDuplicates: true })
     if (upsertError) {
       console.error('[ResonanceEngine] upsert failed:', upsertError.message)
+    }
+
+    // Send connection emails (fire-and-forget — never blocks the pipeline)
+    if (connections.length > 0 && !upsertError) {
+      ;(async () => {
+        try {
+          const wishIds = connections.flatMap(c => [c.wish_a, c.wish_b])
+          const { data: wishes } = await supabase
+            .from('wishes')
+            .select('id, original_text, contact_name, contact_email, contact_phone, contact_city')
+            .in('id', wishIds)
+
+          if (!wishes) return
+          const wishMap = new Map(wishes.map(w => [w.id, w]))
+
+          for (const conn of connections) {
+            const wA = wishMap.get(conn.wish_a)
+            const wB = wishMap.get(conn.wish_b)
+            if (!wA?.contact_email || !wB?.contact_email) continue
+
+            await sendConnectionEmail(
+              {
+                wishText:     wA.original_text,
+                contactName:  wA.contact_name  ?? '',
+                contactEmail: wA.contact_email,
+                contactPhone: wA.contact_phone ?? null,
+                contactCity:  wA.contact_city  ?? null,
+              },
+              {
+                wishText:     wB.original_text,
+                contactName:  wB.contact_name  ?? '',
+                contactEmail: wB.contact_email,
+                contactPhone: wB.contact_phone ?? null,
+                contactCity:  wB.contact_city  ?? null,
+              },
+            )
+          }
+        } catch (err) {
+          console.error('[ResonanceEngine] sendConnectionEmail failed:', err)
+        }
+      })()
     }
 
   } catch (err) {
