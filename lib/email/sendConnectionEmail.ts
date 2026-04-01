@@ -24,7 +24,7 @@ export async function sendConnectionEmail(
   const resend = new Resend(apiKey)
   const FROM   = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev'
 
-  await Promise.all([
+  const [resA, resB] = await Promise.all([
     resend.emails.send({
       from:    FROM,
       to:      ownerA.contactEmail,
@@ -38,6 +38,9 @@ export async function sendConnectionEmail(
       html:    buildHtml(ownerB, ownerA),
     }),
   ])
+
+  if (resA.error) throw new Error(`Resend (A): ${resA.error.message}`)
+  if (resB.error) throw new Error(`Resend (B): ${resB.error.message}`)
 }
 
 function buildHtml(recipient: WishOwner, other: WishOwner): string {
