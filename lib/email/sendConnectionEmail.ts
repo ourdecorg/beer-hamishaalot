@@ -41,6 +41,7 @@ export async function sendConnectionEmail(
 
   if (resA.error) throw new Error(`Resend (A): ${resA.error.message}`)
   if (resB.error) throw new Error(`Resend (B): ${resB.error.message}`)
+  console.log(`[email] Resend IDs: A=${resA.data?.id} B=${resB.data?.id}`)
 }
 
 function buildHtml(recipient: WishOwner, other: WishOwner): string {

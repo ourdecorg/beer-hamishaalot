@@ -333,7 +333,7 @@ export async function processWishForMatching(
                 contactCity:  wB.contact_city  ?? null,
               },
             )
-            console.log(`[email] sent OK`)
+            console.log(`[email] sent OK — from: ${process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev'}`)
           }
         } catch (err) {
           console.error('[ResonanceEngine] sendConnectionEmail failed:', err)
