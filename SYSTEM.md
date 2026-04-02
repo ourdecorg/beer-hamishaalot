@@ -99,8 +99,8 @@ GroupedMatch {
 ### מסך `/admin/review-matches`
 
 Server component שטוען עד 60 רשומות מ-`match_attempts_log`, מציג אותן כ-cards עם:
-- טקסטי שתי המשאלות + סיגנלים: ציון · סמנטי (×0.55) · משלים (×0.25) · מבני (×0.20) · גיאו
-- Badge: נוצר חיבור / נפסל בשער / לא נוצר חיבור
+- טקסטי שתי המשאלות + סיגנלים: ציון · סמנטי · משלים (obs.) · מבני (obs.) · גיאו
+- Badge: נוצר חיבור / 📅 אין חפיפת זמן / נפסל בשער / לא נוצר חיבור
 - כפתורי label: טוב / אולי / לא טוב + שדה הערה → POST `/api/admin/review-matches`
 
 **סינונים (URL searchParams → server re-fetch):** סוג (עבר/לא עבר סף) · סקירה (סוקרו/לא) · שער · קרוב לסף · כולל מבוטלות (ברירת מחדל: מסתיר)
@@ -333,23 +333,28 @@ UNIQUE(wish_id, user_id)
   └── שאילתה אחת לכל המשאלות בבאץ' → TermVecMap { wish_id → { needs[][], skills[][] } }
 
 **מצב Full-scan** (≤ 300 משאלות):
-  └── IDs ממוינים; wish[i] מקבל explicitCandidateIds = sortedIds.slice(0, i)
+  └── batch admin: IDs ממוינים; wish[i] מקבל explicitCandidateIds = sortedIds.slice(0, i)
+  └── API (משאלה חדשה): אוטומטי — שולף כל wish_ids מ-wish_embeddings → explicitCandidateIds
   └── מדלג ANN + structural — computeSimilaritiesForIds ישירות על כל הזוגות
-  └── מבטיח כיסוי 100% (N×(N-1)/2 זוגות)
+  └── מבטיח כיסוי 100%
 
 שלב 4: ניקוד וסינון
   ├── [filter קשה] dateRangesOverlap()
+  │     נכשל → gate_passed=false, gate_reason='date_range_mismatch' → נרשם ב-log + דלג
   ├── אם יש enrichment למועמד:
   │     ├── computeEmbeddingComplementarity(termVecMap, A, B) → complementarityScore
   │     └── computeStructuralSimilarity() → structuralSimilarity (observability בלבד)
   ├── [שער רלוונטיות] semantic_en ≥ 0.30
-  │     נכשל → gate_passed=false, gate_reason='low_semantic' → דלג
+  │     נכשל → gate_passed=false, gate_reason='low_semantic' → נרשם ב-log + דלג
   ├── computeMatchScore(semanticEn) → match_score
   └── geo soft penalty: finalScore × exp(-distance_km / 50)
 
 שלב 5: Persistence
-  ├── match_attempts_log INSERT
+  ├── match_attempts_log INSERT (כל המועמדים — כולל שנפסלו בתאריך/שער)
   └── wish_connections UPSERT (finalScore ≥ 0.55, ignoreDuplicates)
+
+שלב 6: Email notification
+  └── sendConnectionEmail() — שולח אימייל ל-2 הבעלים עם פרטי שתי המשאלות (Resend)
 ```
 
 ### נוסחת הציון (v13)
@@ -420,12 +425,12 @@ WHERE e.wish_id != source_wish_id
 
 ### סינונים
 
-| סינון | סוג | תנאי |
-|-------|-----|------|
-| טווח תאריכים | קשה (hard) | אין חפיפה → דחייה |
-| שער רלוונטיות | קשה | semantic_en < 0.30 → דחייה |
-| מרחק גיאוגרפי | רך (soft) | `final_score × exp(-km/50)` |
-| status cancelled | קשה | מסונן ב-RLS + ב-RPCs |
+| סינון | סוג | gate_reason | תנאי |
+|-------|-----|-------------|------|
+| טווח תאריכים | קשה (hard) | `date_range_mismatch` | אין חפיפה → נרשם + דחייה |
+| שער רלוונטיות | קשה | `low_semantic` | semantic_en < 0.30 → נרשם + דחייה |
+| מרחק גיאוגרפי | רך (soft) | — | `final_score × exp(-km/50)` |
+| status cancelled | קשה | — | מסונן ב-RLS + ב-RPCs |
 
 ---
 
@@ -532,7 +537,10 @@ ORDER BY embedding <=> query_embedding
 | `ADMIN_EMAIL` | סודי | Admin guard (API routes) |
 | `NEXT_PUBLIC_ADMIN_EMAIL` | ציבורי | Admin guard (Header client component) |
 | `NEXT_PUBLIC_ENV` | ציבורי | `'dev'` בסביבת פיתוח — מציג badge בכותרת |
+| `NEXT_PUBLIC_SITE_URL` | ציבורי | בסיס ה-URL לצורך metadataBase (OG image) |
 | `APP_URL` | Runtime | Auth redirects |
+| `RESEND_API_KEY` | סודי | שליחת אימיילי חיבור (Resend) |
+| `RESEND_FROM_EMAIL` | Runtime | כתובת שולח — חייב להיות מדומיין מאומת ב-Resend |
 
 ---
 
@@ -613,7 +621,7 @@ ORDER BY embedding <=> query_embedding
 | 020 | only_lower_id ב-match_wishes (אופטימיזציית batch) |
 | 021 | match_type enum → text, ביטול enum |
 | 022 | geo_penalty בלוג |
-| 023 | MATCH_THRESHOLD 0.55 → 0.48 |
+| 023 | MATCH_THRESHOLD 0.48 (הועלה ל-0.55 בקוד ב-v13) |
 | 024 | domain_match בלוג (observability) |
 | 025 | anchor_entities ב-enrichment, anchor_overlap בלוג (deprecated) |
 | 026 | anchor_keywords + GIN index ב-enrichment, find_structured_candidates RPC, structural_similarity + recall_source בלוג |
@@ -639,6 +647,7 @@ ORDER BY embedding <=> query_embedding
 | @supabase/supabase-js | ^2.99.1 | DB + Auth |
 | @supabase/ssr | ^0.9.0 | Cookie auth |
 | openai | ^6.27.0 | GPT + Embeddings |
+| resend | ^6.10.0 | אימיילי חיבור |
 | @vercel/functions | ^3.4.3 | waitUntil() |
 | tailwindcss | ^3.4.1 | Styling |
 | typescript | ^5 | Types |
@@ -650,7 +659,7 @@ ORDER BY embedding <=> query_embedding
 
 | קובץ | פונקציות |
 |------|---------|
-| index.ts | `processWishForMatching()`, `prepareWishForMatching()` — orchestrator v13 |
+| index.ts | `processWishForMatching()`, `prepareWishForMatching()` — orchestrator v13; auto full-scan ≤ 300 |
 | analyze.ts | `analyzeWishText()`, `analyzeAndStoreWish()` — enrichment + translation_en |
 | embed.ts | `buildEmbeddingText()`, `buildEnglishEmbeddingText()`, `generateEmbedding()`, `generateAndStoreEmbedding()` → `DualEmbedding` |
 | similarity.ts | `findSimilarWishes()`, `findStructuredCandidates()`, `computeSimilaritiesForIds()` → `DualSimilarityMaps` |
@@ -664,6 +673,12 @@ ORDER BY embedding <=> query_embedding
 | canonicalize.ts | `canonicalize()`, `canonicalizeSubjectType()`, `canonicalizeAction()` |
 | openaiLog.ts | `logOpenAICall(entry)` |
 | anchor.ts | `computeAnchorOverlap()` — לא בשימוש ב-pipeline (נשמר) |
+
+### lib/email
+
+| קובץ | תיאור |
+|------|-------|
+| sendConnectionEmail.ts | `sendConnectionEmail(ownerA, ownerB)` — שולח 2 אימיילים (Resend) עם פרטי שתי המשאלות |
 | objectAlignment.ts | `computeObjectAlignment()` — לא בשימוש ב-pipeline (נשמר) |
 | domain.ts | `computeDomainMatch()` — לא בשימוש ב-pipeline (נשמר) |
 | __tests__/ | keywords.test.ts, score.test.ts |
