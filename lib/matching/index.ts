@@ -32,6 +32,9 @@ import { dateRangesOverlap } from './timeRange'
 import { sendConnectionEmail } from '@/lib/email/sendConnectionEmail'
 import type { WishEnrichment } from '@/lib/types'
 
+/** Below this wish count, skip ANN and evaluate all pairs directly (same as admin batch full-scan). */
+const FULL_SCAN_MAX = 300
+
 type RecallSource = 'semantic' | 'structured' | 'both'
 
 interface MergedCandidate {
@@ -85,6 +88,20 @@ export async function processWishForMatching(
   try {
     const supabase = createAdminClient()
 
+    // Auto full-scan: when DB is small (≤ FULL_SCAN_MAX), skip ANN threshold and evaluate
+    // all existing wishes directly — same code path as the admin batch runner.
+    // Only include wishes that already have an embedding (wish_embeddings row exists),
+    // otherwise computeSimilaritiesForIds will silently skip them and produce an empty result.
+    if (explicitCandidateIds === undefined) {
+      const { data: allWishes } = await supabase
+        .from('wish_embeddings')
+        .select('wish_id')
+        .neq('wish_id', wishId)
+      if (allWishes && allWishes.length <= FULL_SCAN_MAX) {
+        explicitCandidateIds = allWishes.map((w: { wish_id: string }) => w.wish_id)
+      }
+    }
+
     // Step 1 — Deep analysis
     const enrichment = await analyzeAndStoreWish(wishId, wishText)
 
@@ -98,6 +115,8 @@ export async function processWishForMatching(
     let annEnMap: Map<string, number>
     let structuredSet: Set<string>
 
+    console.log(`[matching] wishId=${wishId} explicitCandidates=${explicitCandidateIds?.length ?? 'none (ANN)'}`)
+
     if (explicitCandidateIds !== undefined) {
       // Full-scan: compute English similarity for all explicit candidates directly —
       // bypasses ANN threshold so every pair is evaluated regardless of similarity floor.
@@ -105,8 +124,10 @@ export async function processWishForMatching(
       if (explicitCandidateIds.length > 0) {
         const dual = await computeSimilaritiesForIds(embeddingEn, null, explicitCandidateIds)
         annEnMap = dual.en
+        console.log(`[matching] computeSimilaritiesForIds returned ${annEnMap.size} entries for ${explicitCandidateIds.length} candidates`)
       } else {
         annEnMap = new Map()
+        console.log(`[matching] no candidates (first wish or empty explicit list)`)
       }
       structuredSet = new Set()
     } else {
@@ -124,6 +145,7 @@ export async function processWishForMatching(
     // Step 3c — Merge both recall channels
     const allIds = new Set([...annEnMap.keys(), ...structuredSet])
 
+    console.log(`[matching] allIds.size=${allIds.size}`)
     if (allIds.size === 0) return
 
     // Back-fill English similarity for structural-only candidates
@@ -186,7 +208,26 @@ export async function processWishForMatching(
       if (!dateRangesOverlap(
         enrichment.date_range_start, enrichment.date_range_end,
         candidateEnrichment?.date_range_start, candidateEnrichment?.date_range_end,
-      )) continue
+      )) {
+        logEntries.push({
+          wish_id:               wishId,
+          candidate_wish_id:     candidate.wish_id,
+          semantic_similarity:   Math.round(candidate.similarityEn * 1000) / 1000,
+          complementarity_score: 0,
+          theme_overlap:         0,
+          intent_compatibility:  0,
+          domain_match:          0,
+          structural_similarity: 0,
+          recall_source:         candidate.recallSource,
+          geo_penalty:           1,
+          match_score:           0,
+          match_type:            null,
+          passed_threshold:      false,
+          gate_passed:           false,
+          gate_reason:           'date_range_mismatch',
+        })
+        continue
+      }
 
       let complementarityScore = 0
       let structuralSimilarity = 0
@@ -260,6 +301,7 @@ export async function processWishForMatching(
     }
 
     // Write log entries (fire-and-forget with retry)
+    console.log(`[matching] logEntries=${logEntries.length} connections=${connections.length}`)
     if (logEntries.length > 0) {
       ;(async () => {
         for (let attempt = 0; attempt < 3; attempt++) {

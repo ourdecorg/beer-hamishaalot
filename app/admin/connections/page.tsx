@@ -29,7 +29,8 @@ type LogEntry = {
   match_score: number
   match_type: string | null
   passed_threshold: boolean
-  failed_date_range: boolean
+  gate_passed: boolean | null
+  gate_reason: string | null
   created_at: string
 }
 
@@ -400,9 +401,13 @@ export default function ConnectionsDebugPage() {
                       <span className="text-xs text-slate-400">{fmt(log.created_at)}</span>
                     </div>
 
-                    {log.failed_date_range && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-                        📅 נכשל — אין חפיפת זמן
+                    {log.gate_passed === false && (
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                        log.gate_reason === 'date_range_mismatch'
+                          ? 'bg-purple-50 text-purple-700 border-purple-200'
+                          : 'bg-red-50 text-red-700 border-red-200'
+                      }`}>
+                        {log.gate_reason === 'date_range_mismatch' ? '📅 אין חפיפת זמן' : `⛔ ${log.gate_reason}`}
                       </span>
                     )}
 
