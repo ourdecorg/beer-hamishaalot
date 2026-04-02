@@ -90,15 +90,15 @@ export async function processWishForMatching(
 
     // Auto full-scan: when DB is small (≤ FULL_SCAN_MAX), skip ANN threshold and evaluate
     // all existing wishes directly — same code path as the admin batch runner.
-    // This ensures every pair is scored and logged, even those with similarity < MIN_SIMILARITY.
+    // Only include wishes that already have an embedding (wish_embeddings row exists),
+    // otherwise computeSimilaritiesForIds will silently skip them and produce an empty result.
     if (explicitCandidateIds === undefined) {
       const { data: allWishes } = await supabase
-        .from('wishes')
-        .select('id')
-        .neq('id', wishId)
-        .neq('status', 'cancelled')
+        .from('wish_embeddings')
+        .select('wish_id')
+        .neq('wish_id', wishId)
       if (allWishes && allWishes.length <= FULL_SCAN_MAX) {
-        explicitCandidateIds = allWishes.map((w: { id: string }) => w.id)
+        explicitCandidateIds = allWishes.map((w: { wish_id: string }) => w.wish_id)
       }
     }
 
