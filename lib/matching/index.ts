@@ -115,6 +115,8 @@ export async function processWishForMatching(
     let annEnMap: Map<string, number>
     let structuredSet: Set<string>
 
+    console.log(`[matching] wishId=${wishId} explicitCandidates=${explicitCandidateIds?.length ?? 'none (ANN)'}`)
+
     if (explicitCandidateIds !== undefined) {
       // Full-scan: compute English similarity for all explicit candidates directly —
       // bypasses ANN threshold so every pair is evaluated regardless of similarity floor.
@@ -122,8 +124,10 @@ export async function processWishForMatching(
       if (explicitCandidateIds.length > 0) {
         const dual = await computeSimilaritiesForIds(embeddingEn, null, explicitCandidateIds)
         annEnMap = dual.en
+        console.log(`[matching] computeSimilaritiesForIds returned ${annEnMap.size} entries for ${explicitCandidateIds.length} candidates`)
       } else {
         annEnMap = new Map()
+        console.log(`[matching] no candidates (first wish or empty explicit list)`)
       }
       structuredSet = new Set()
     } else {
@@ -141,6 +145,7 @@ export async function processWishForMatching(
     // Step 3c — Merge both recall channels
     const allIds = new Set([...annEnMap.keys(), ...structuredSet])
 
+    console.log(`[matching] allIds.size=${allIds.size}`)
     if (allIds.size === 0) return
 
     // Back-fill English similarity for structural-only candidates
@@ -277,6 +282,7 @@ export async function processWishForMatching(
     }
 
     // Write log entries (fire-and-forget with retry)
+    console.log(`[matching] logEntries=${logEntries.length} connections=${connections.length}`)
     if (logEntries.length > 0) {
       ;(async () => {
         for (let attempt = 0; attempt < 3; attempt++) {
