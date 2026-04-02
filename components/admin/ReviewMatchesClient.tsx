@@ -310,8 +310,12 @@ function ReviewCard({
       {/* Top row */}
       <div className="flex items-center gap-2 flex-wrap">
         {gateBlocked ? (
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">
-            נפסל בשער
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+            attempt.gate_reason === 'date_range_mismatch'
+              ? 'bg-purple-50 border-purple-200 text-purple-700'
+              : 'bg-red-50 border-red-200 text-red-700'
+          }`}>
+            {attempt.gate_reason === 'date_range_mismatch' ? '📅 אין חפיפת זמן' : 'נפסל בשער'}
           </span>
         ) : hasConnection ? (
           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">

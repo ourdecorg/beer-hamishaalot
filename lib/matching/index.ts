@@ -203,14 +203,29 @@ export async function processWishForMatching(
 
     for (const candidate of merged) {
       const candidateEnrichment = enrichmentMap.get(candidate.wish_id)
-      console.log(`[matching] loop candidate=${candidate.wish_id} hasEnrichment=${!!candidateEnrichment} src_dates=[${enrichment.date_range_start},${enrichment.date_range_end}] cand_dates=[${candidateEnrichment?.date_range_start},${candidateEnrichment?.date_range_end}] overlap=${dateRangesOverlap(enrichment.date_range_start,enrichment.date_range_end,candidateEnrichment?.date_range_start,candidateEnrichment?.date_range_end)}`)
 
       // Date-range hard filter
       if (!dateRangesOverlap(
         enrichment.date_range_start, enrichment.date_range_end,
         candidateEnrichment?.date_range_start, candidateEnrichment?.date_range_end,
       )) {
-        console.log(`[matching] date-range skip`)
+        logEntries.push({
+          wish_id:               wishId,
+          candidate_wish_id:     candidate.wish_id,
+          semantic_similarity:   Math.round(candidate.similarityEn * 1000) / 1000,
+          complementarity_score: 0,
+          theme_overlap:         0,
+          intent_compatibility:  0,
+          domain_match:          0,
+          structural_similarity: 0,
+          recall_source:         candidate.recallSource,
+          geo_penalty:           1,
+          match_score:           0,
+          match_type:            null,
+          passed_threshold:      false,
+          gate_passed:           false,
+          gate_reason:           'date_range_mismatch',
+        })
         continue
       }
 
