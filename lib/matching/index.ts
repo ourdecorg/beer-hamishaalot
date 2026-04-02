@@ -32,6 +32,9 @@ import { dateRangesOverlap } from './timeRange'
 import { sendConnectionEmail } from '@/lib/email/sendConnectionEmail'
 import type { WishEnrichment } from '@/lib/types'
 
+/** Below this wish count, skip ANN and evaluate all pairs directly (same as admin batch full-scan). */
+const FULL_SCAN_MAX = 300
+
 type RecallSource = 'semantic' | 'structured' | 'both'
 
 interface MergedCandidate {
@@ -84,6 +87,20 @@ export async function processWishForMatching(
 ): Promise<void> {
   try {
     const supabase = createAdminClient()
+
+    // Auto full-scan: when DB is small (≤ FULL_SCAN_MAX), skip ANN threshold and evaluate
+    // all existing wishes directly — same code path as the admin batch runner.
+    // This ensures every pair is scored and logged, even those with similarity < MIN_SIMILARITY.
+    if (explicitCandidateIds === undefined) {
+      const { data: allWishes } = await supabase
+        .from('wishes')
+        .select('id')
+        .neq('id', wishId)
+        .neq('status', 'cancelled')
+      if (allWishes && allWishes.length <= FULL_SCAN_MAX) {
+        explicitCandidateIds = allWishes.map((w: { id: string }) => w.id)
+      }
+    }
 
     // Step 1 — Deep analysis
     const enrichment = await analyzeAndStoreWish(wishId, wishText)
