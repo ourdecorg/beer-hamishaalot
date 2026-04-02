@@ -208,7 +208,10 @@ export async function processWishForMatching(
       if (!dateRangesOverlap(
         enrichment.date_range_start, enrichment.date_range_end,
         candidateEnrichment?.date_range_start, candidateEnrichment?.date_range_end,
-      )) continue
+      )) {
+        console.log(`[matching] date-range skip: src=[${enrichment.date_range_start},${enrichment.date_range_end}] cand=[${candidateEnrichment?.date_range_start},${candidateEnrichment?.date_range_end}]`)
+        continue
+      }
 
       let complementarityScore = 0
       let structuralSimilarity = 0
