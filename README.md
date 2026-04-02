@@ -1,8 +1,8 @@
 # באר המשאלות — Well of Wishes
 
-> *A sacred space to cast your deepest wishes into the universe.*
+> *A platform for connecting people through collaborative wishes, intentions, and resonance.*
 
-An MVP web application where people can submit personal wishes, have them enriched by AI, and share them with a community that can "resonate" in response.
+People submit wishes — what they want to achieve and what they offer — and the system finds meaningful matches using AI enrichment, vector embeddings, and semantic scoring.
 
 ---
 
@@ -13,23 +13,43 @@ An MVP web application where people can submit personal wishes, have them enrich
 | Framework | Next.js 14 (App Router) |
 | Language | TypeScript |
 | Styling | Tailwind CSS |
-| Auth & DB | Supabase (magic link auth + PostgreSQL) |
-| AI | OpenAI (`gpt-4o`) |
-| Fonts | Heebo + Frank Ruhl Libre (Google Fonts) |
+| Auth & DB | Supabase (PostgreSQL + pgvector + Auth) |
+| AI | OpenAI (GPT-5.2 + text-embedding-3-small) |
+| Email | Resend |
+| Hosting | Railway |
+| Fonts | Heebo + Rubik (Google Fonts) |
 
 ---
 
 ## Features
 
-- **Home page** — Landing page explaining the product (Hebrew + English)
+- **Submit a wish** — Freeform text describing what you want and what you offer
+- **AI enrichment** — GPT extracts themes, needs, skills, intent, location, and date range
+- **Semantic matching** — Vector embeddings (English cross-lingual) find relevant matches across all wishes
+- **Complementarity scoring** — Per-term embeddings compare needs ↔ skills between wish pairs (observability)
+- **Connection emails** — When a match is created, both owners receive an email with each other's contact details (Resend)
+- **Admin tools** — Run batch matching, review match quality, debug connection scoring
 - **Magic link auth** — Passwordless email authentication via Supabase
-- **Submit a wish** — Freeform text with visibility control
-- **Wish visibility** — `private` / `anonymous` / `open`
-- **AI enrichment** — Claude generates a poetic summary, tags, and an intention statement
-- **Wish detail page** — Full wish view with AI-enriched content
-- **Public feed** — Browse anonymous and open wishes
-- **Resonance** — Authenticated users can "resonate" with public wishes
 - **RTL-first design** — Full Hebrew direction support
+
+---
+
+## Matching Engine (v13)
+
+Matches are scored using a single signal:
+
+```
+match_score = semantic_similarity   (English embedding cosine similarity)
+final_score = match_score × exp(-distance_km / 50)
+```
+
+**Threshold:** `final_score ≥ 0.55` to create a `wish_connection`
+
+**Relevance gate:** `semantic_similarity ≥ 0.30` — candidates below this are logged but not scored
+
+**Full-scan mode:** When the DB has ≤ 300 wishes, all pairs are evaluated directly (no ANN threshold). Activated automatically on both API submission and admin batch run.
+
+**Logged signals (observability only):** `complementarity_score`, `structural_similarity`, `geo_penalty`
 
 ---
 
@@ -38,40 +58,45 @@ An MVP web application where people can submit personal wishes, have them enrich
 ```
 beer-hamishaalot/
 ├── app/
-│   ├── (auth)/login/          # Magic link login page
-│   ├── auth/callback/         # Supabase auth callback handler
-│   ├── wishes/
-│   │   ├── new/               # Submit a new wish
-│   │   ├── [id]/              # Wish detail page
-│   │   └── feed/              # Public wish feed
-│   ├── api/wishes/
-│   │   ├── route.ts           # POST (create) / GET (list own)
-│   │   └── [id]/
-│   │       ├── route.ts       # GET / PATCH / DELETE
-│   │       ├── resonate/      # POST / DELETE / GET resonance
-│   │       └── enrich/        # POST re-trigger AI enrichment
-│   ├── layout.tsx             # Root layout (RTL, fonts)
-│   ├── page.tsx               # Home/landing page
-│   └── globals.css
+│   ├── (auth)/login/              # Magic link login
+│   ├── admin/
+│   │   ├── connections/           # Debug connection scoring
+│   │   ├── review-matches/        # Match quality feedback
+│   │   ├── run-matching/          # Trigger batch matching
+│   │   ├── settlements/           # Load city data
+│   │   └── test-data/             # Load test wishes
+│   ├── api/
+│   │   ├── wishes/                # CRUD + matching pipeline
+│   │   ├── connections/           # Connection state machine
+│   │   ├── admin/                 # Admin-only endpoints
+│   │   └── getUserMatches/        # Webhook
+│   ├── matches/                   # User's matches page
+│   ├── wishes/[id]/               # Wish detail
+│   ├── opengraph-image.tsx        # OG image 1200×630 (next/og)
+│   └── layout.tsx
 ├── components/
-│   ├── layout/
-│   │   ├── Header.tsx
-│   │   └── Footer.tsx
-│   └── wishes/
-│       ├── WishCard.tsx       # Reusable wish card component
-│       ├── WishForm.tsx       # New wish form (client component)
-│       └── ResonanceButton.tsx # Toggle resonance (client component)
+│   ├── admin/                     # ReviewMatchesClient, AdminNav
+│   ├── wishes/                    # WishForm, WishCard, SettlementPicker
+│   └── layout/                    # Header, Footer
 ├── lib/
-│   ├── supabase/
-│   │   ├── client.ts          # Browser Supabase client
-│   │   └── server.ts          # Server Supabase client
-│   ├── claude.ts              # Claude enrichment function
-│   └── types.ts               # Domain types
-├── middleware.ts              # Auth protection + session refresh
-├── supabase/
-│   └── migrations/
-│       └── 001_initial.sql    # Full schema with RLS
-└── tailwind.config.ts
+│   ├── matching/                  # Full matching engine
+│   │   ├── index.ts               # Orchestrator (processWishForMatching)
+│   │   ├── analyze.ts             # GPT enrichment
+│   │   ├── embed.ts               # Dual embeddings
+│   │   ├── complementEmbed.ts     # Per-term embeddings + complementarity
+│   │   ├── similarity.ts          # ANN recall + cosine similarity
+│   │   ├── score.ts               # Scoring formula (v13)
+│   │   ├── keywords.ts            # Anchor keywords + structural similarity
+│   │   ├── geo.ts                 # Haversine distance penalty
+│   │   └── timeRange.ts           # Date range overlap filter
+│   ├── email/
+│   │   └── sendConnectionEmail.ts # Resend email on new connection
+│   ├── supabase/                  # client / server / admin clients
+│   └── types.ts
+├── public/
+│   └── logo.png
+├── supabase/migrations/           # 036 migrations
+└── SYSTEM.md                      # Full technical documentation
 ```
 
 ---
@@ -86,38 +111,26 @@ cd beer-hamishaalot
 npm install
 ```
 
-### 2. Configure environment variables
+### 2. Environment variables
 
 ```bash
 cp .env.local.example .env.local
 ```
 
-Fill in `.env.local`:
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | ✓ | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✓ | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✓ | Supabase service role (bypasses RLS) |
+| `OPENAI_API_KEY` | ✓ | GPT + embeddings |
+| `ADMIN_EMAIL` | ✓ | Admin guard (server-side) |
+| `NEXT_PUBLIC_ADMIN_EMAIL` | ✓ | Admin guard (client-side) |
+| `RESEND_API_KEY` | ✓ | Connection notification emails |
+| `RESEND_FROM_EMAIL` | ✓ | Sender address (verified Resend domain) |
+| `NEXT_PUBLIC_SITE_URL` | ✓ | Production URL (for OG image metadataBase) |
+| `NEXT_PUBLIC_ENV` | | `dev` to show environment badge |
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-OPENAI_API_KEY=sk-...
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-```
-
-### 3. Set up Supabase
-
-1. Create a new project at [supabase.com](https://supabase.com)
-2. Go to **SQL Editor** and run the migration:
-   ```
-   supabase/migrations/001_initial.sql
-   ```
-3. Go to **Authentication → URL Configuration** and add:
-   - Site URL: `http://localhost:3000`
-   - Redirect URLs: `http://localhost:3000/auth/callback`
-4. Go to **Authentication → Email** and ensure **Magic Link** is enabled
-
-### 4. Get OpenAI API key
-
-Sign up at [platform.openai.com](https://platform.openai.com/api-keys) and create an API key.
-
-### 5. Run locally
+### 3. Run locally
 
 ```bash
 npm run dev
@@ -125,85 +138,30 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
----
-
-## Database Schema
-
-### `wishes`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | Primary key |
-| user_id | uuid | FK → auth.users |
-| original_text | text | User's raw wish |
-| ai_summary | text | Claude-generated poetic summary |
-| ai_tags | text[] | Claude-generated topic tags |
-| intention_statement | text | Claude-generated intention sentence |
-| visibility | enum | `private` / `anonymous` / `open` |
-| is_ai_enriched | boolean | Whether Claude has processed it |
-| created_at | timestamptz | |
-| updated_at | timestamptz | Auto-updated via trigger |
-
-### `wish_resonances`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | Primary key |
-| wish_id | uuid | FK → wishes |
-| user_id | uuid | FK → auth.users |
-| created_at | timestamptz | |
-
-### `collaborations` *(reserved for future use)*
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | Primary key |
-| wish_id | uuid | FK → wishes |
-| collaborator_id | uuid | FK → auth.users |
-| role | text | `collaborator` / `advisor` |
-| status | text | `pending` / `accepted` / `declined` |
-
-All tables have **Row Level Security (RLS)** enabled with appropriate policies.
+Verify the OG image at [http://localhost:3000/opengraph-image](http://localhost:3000/opengraph-image)
 
 ---
 
-## API Reference
+## Deployment
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `POST` | `/api/wishes` | Required | Create wish + AI enrichment |
-| `GET` | `/api/wishes` | Required | List own wishes |
-| `GET` | `/api/wishes/[id]` | Optional | Get single wish |
-| `PATCH` | `/api/wishes/[id]` | Required (owner) | Update wish |
-| `DELETE` | `/api/wishes/[id]` | Required (owner) | Delete wish |
-| `POST` | `/api/wishes/[id]/resonate` | Required | Add resonance |
-| `DELETE` | `/api/wishes/[id]/resonate` | Required | Remove resonance |
-| `GET` | `/api/wishes/[id]/resonate` | Optional | Get resonance count |
-| `POST` | `/api/wishes/[id]/enrich` | Required (owner) | Re-trigger AI enrichment |
+The app is hosted on **Railway** connected to a GitHub repo. Every push to the `dev` branch triggers an automatic deploy.
+
+Set all environment variables in Railway → Service → Variables.
 
 ---
 
-## Deployment (Vercel)
+## Admin Tools
 
-```bash
-npx vercel
-```
-
-Set the same environment variables in your Vercel project settings. Update Supabase URL configuration to include your production domain in the redirect allowlist.
-
----
-
-## Design Principles
-
-- **RTL-first** — Hebrew direction throughout (`dir="rtl"` on `<html>`)
-- **Warm & minimal** — Sand + well-blue + amber color palette
-- **Server Components** — Data fetching in RSC where possible; Client Components only for interactivity
-- **Clean architecture** — Supabase logic isolated in `lib/supabase/`, AI in `lib/claude.ts`, types in `lib/types.ts`
+| Screen | Path | Description |
+|--------|------|-------------|
+| Run Matching | `/admin/run-matching` | Batch match all wishes (full-scan for ≤ 300) |
+| Review Matches | `/admin/review-matches` | Browse `match_attempts_log`, label quality |
+| Connections | `/admin/connections` | Debug scoring for a specific wish pair |
+| Test Data | `/admin/test-data` | Load CSV of test wishes |
+| Settlements | `/admin/settlements` | Load Israeli city data (CBS format) |
 
 ---
 
-## Roadmap
+## Documentation
 
-- [ ] User profile page with personal wish history
-- [ ] Collaboration invitations between users
-- [ ] Admin dashboard for content moderation
-- [ ] Email notifications on resonance
-- [ ] Wish categorization and search
-- [ ] Multi-language support
+See [SYSTEM.md](SYSTEM.md) for the full technical reference: pipeline steps, scoring formula, DB schema, migrations history, and all lib/matching modules.
