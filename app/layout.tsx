@@ -21,6 +21,13 @@ const rubik = Rubik({
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL
+      ? /^https?:\/\//.test(process.env.NEXT_PUBLIC_SITE_URL)
+        ? process.env.NEXT_PUBLIC_SITE_URL
+        : `https://${process.env.NEXT_PUBLIC_SITE_URL}`
+      : 'http://localhost:3000'
+  ),
   title: 'באר המשאלות — Well of Wishes',
   description: 'A sacred space to release your deepest wishes into the universe.',
   openGraph: {
