@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Heebo, Rubik } from 'next/font/google'
 import './globals.css'
 import LangProvider from '@/components/LangProvider'
+import Footer from '@/components/layout/Footer'
 import { getLang } from '@/lib/i18n/server'
 
 const heebo = Heebo({
@@ -46,8 +47,11 @@ export default async function RootLayout({
   const dir = lang === 'he' ? 'rtl' : 'ltr'
   return (
     <html lang={lang} dir={dir} className={`${heebo.variable} ${rubik.variable}`}>
-      <body className="antialiased">
-        <LangProvider lang={lang}>{children}</LangProvider>
+      <body className="antialiased flex flex-col min-h-screen">
+        <LangProvider lang={lang}>
+          <div className="flex flex-col flex-1">{children}</div>
+          <Footer />
+        </LangProvider>
       </body>
     </html>
   )

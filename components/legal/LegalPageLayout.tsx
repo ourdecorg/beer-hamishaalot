@@ -1,5 +1,4 @@
 import Header from '@/components/layout/Header'
-import Footer from '@/components/layout/Footer'
 
 interface LegalSection {
   heading: string
@@ -20,7 +19,7 @@ export default function LegalPageLayout({
   sections,
 }: LegalPageLayoutProps) {
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <div className="flex flex-col bg-white">
       <Header />
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-12">
@@ -40,8 +39,6 @@ export default function LegalPageLayout({
           ))}
         </div>
       </main>
-
-      <Footer />
     </div>
   )
 }
