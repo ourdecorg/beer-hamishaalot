@@ -19,6 +19,7 @@ export interface Wish {
   contact_address: string | null
   contact_phone: string | null
   user_email: string | null
+  consent_to_match_sharing?: boolean
 }
 
 export interface WishWithResonance extends Wish {
@@ -57,6 +58,7 @@ export interface CreateWishInput {
   original_text: string
   visibility: WishVisibility
   contact?: WishContactInfo
+  consent_to_match_sharing?: boolean
 }
 
 export interface ApiError {

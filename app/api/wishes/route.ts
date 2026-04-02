@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const { original_text, visibility, contact } = body
+  const { original_text, visibility, contact, consent_to_match_sharing } = body
 
   if (!original_text?.trim()) {
     return NextResponse.json({ error: 'original_text is required' }, { status: 400 })
@@ -34,6 +34,9 @@ export async function POST(request: NextRequest) {
   }
   if (visibility !== 'open') {
     return NextResponse.json({ error: 'Invalid visibility value' }, { status: 400 })
+  }
+  if (!consent_to_match_sharing) {
+    return NextResponse.json({ error: 'Consent to match sharing is required' }, { status: 400 })
   }
 
   // Validate contact info
@@ -57,6 +60,7 @@ export async function POST(request: NextRequest) {
       contact_city: contact?.contact_city?.trim() || null,
       contact_address: contact?.contact_address?.trim() || null,
       contact_phone: contact?.contact_phone?.trim() || null,
+      consent_to_match_sharing: true,
     })
     .select()
     .single()
