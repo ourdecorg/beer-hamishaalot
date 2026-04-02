@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type { WishContactInfo } from '@/lib/types'
 import SettlementPicker from './SettlementPicker'
 import { useLang } from '@/components/LangProvider'
@@ -25,6 +26,8 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
 
   const [text, setText] = useState(initialText)
   const [contact, setContact] = useState<WishContactInfo>(emptyContact)
+  const [consent, setConsent] = useState(false)
+  const [consentError, setConsentError] = useState(false)
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const router = useRouter()
@@ -37,10 +40,20 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
     e.preventDefault()
     if (!text.trim() || status === 'loading') return
 
+    if (!consent) {
+      setConsentError(true)
+      return
+    }
+
     setStatus('loading')
     setErrorMsg('')
 
-    const body: Record<string, unknown> = { original_text: text.trim(), visibility: 'open', contact }
+    const body: Record<string, unknown> = {
+      original_text: text.trim(),
+      visibility: 'open',
+      contact,
+      consent_to_match_sharing: true,
+    }
 
     const res = await fetch('/api/wishes', {
       method: 'POST',
@@ -93,6 +106,7 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
             {charCount}/1000
           </span>
         </div>
+        <p className="text-xs text-slate-400 mt-2">{tr.consentHelper}</p>
       </div>
 
       <div className="card p-6 space-y-4 bg-slate-50">
@@ -154,6 +168,40 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
             />
           </div>
         </div>
+      </div>
+
+      {/* Consent checkbox */}
+      <div
+        className={`rounded-xl border p-4 ${
+          consentError ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50'
+        }`}
+      >
+        <label className="flex gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            id="consent-checkbox"
+            checked={consent}
+            onChange={(e) => {
+              setConsent(e.target.checked)
+              if (e.target.checked) setConsentError(false)
+            }}
+            disabled={status === 'loading'}
+            aria-describedby={consentError ? 'consent-error' : undefined}
+            aria-invalid={consentError}
+            className="mt-0.5 h-4 w-4 flex-shrink-0 accent-indigo-600 cursor-pointer"
+          />
+          <span className="text-sm text-slate-700 leading-relaxed">
+            {tr.consentLabel}{' '}
+            <Link href="/privacy" className="text-indigo-600 hover:underline" target="_blank">
+              {t(lang).footer.privacy}
+            </Link>
+          </span>
+        </label>
+        {consentError && (
+          <p id="consent-error" role="alert" className="mt-2 text-sm text-amber-700">
+            {tr.consentError}
+          </p>
+        )}
       </div>
 
       {status === 'error' && (

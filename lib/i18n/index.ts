@@ -119,6 +119,14 @@ const en = {
     submitting: 'Sending...',
     afterSubmit: 'After sending, the engine will search for matches and update you on the wish page',
     errorGeneric: 'An error occurred. Please try again.',
+    consentHelper: 'Your wish may be shared with relevant matches to enable meaningful connections.',
+    consentLabel: 'I understand that my wish, including any personal information I choose to include, may be shared with relevant matches when resonance is identified.',
+    consentError: 'Please confirm your understanding before submitting.',
+  },
+
+  footer: {
+    privacy: 'Privacy Policy',
+    terms: 'Terms of Service',
   },
 
   myWishes: {
@@ -314,6 +322,14 @@ const he: typeof en = {
     submitting: 'שולח...',
     afterSubmit: 'לאחר השליחה, המנוע יחפש התאמות ויעדכן אותך בדף המשאלה',
     errorGeneric: 'אירעה שגיאה. נסה שוב.',
+    consentHelper: 'המשאלה שלך עשויה להיות משותפת עם התאמות רלוונטיות כדי לאפשר חיבורים משמעותיים.',
+    consentLabel: 'אני מבין/ה שהמשאלה שלי, כולל כל מידע אישי שאבחר לכלול, עשויה להיות משותפת עם התאמות רלוונטיות כאשר מזוהה הדהוד.',
+    consentError: 'אנא אשר/י את הסכמתך לפני השליחה.',
+  },
+
+  footer: {
+    privacy: 'מדיניות פרטיות',
+    terms: 'תנאי שימוש',
   },
 
   myWishes: {
