@@ -37,7 +37,8 @@ export default async function ReviewMatchesPage({
   const reviewedFilter  = typeof sp.reviewed  === 'string' ? sp.reviewed  : 'all'
   const gateFilter      = typeof sp.gate      === 'string' ? sp.gate      : 'all'
   const nearFilter      = typeof sp.near      === 'string' ? sp.near      : '0'
-  const cancelledFilter = typeof sp.cancelled === 'string' ? sp.cancelled : 'hide'
+  const cancelledFilter  = typeof sp.cancelled  === 'string' ? sp.cancelled  : 'hide'
+  const publishedFilter  = typeof sp.published  === 'string' ? sp.published  : 'all'
   const sortKey         = typeof sp.sort      === 'string' && SORT_COLUMNS[sp.sort] ? sp.sort : 'match_score'
   const page            = Math.max(1, parseInt(typeof sp.page === 'string' ? sp.page : '1') || 1)
   const searchFilter    = typeof sp.search    === 'string' ? sp.search.trim() : ''
@@ -168,6 +169,19 @@ export default async function ReviewMatchesPage({
     attempts = attempts.filter(a => !reviewMap[`${a.wish_id}:${a.candidate_wish_id}`])
   }
 
+  // ── 8. Apply published filter ─────────────────────────────────────────────
+  if (publishedFilter === 'yes') {
+    attempts = attempts.filter(a => {
+      const key = a.wish_id < a.candidate_wish_id ? `${a.wish_id}:${a.candidate_wish_id}` : `${a.candidate_wish_id}:${a.wish_id}`
+      return connectionMap[key] != null && connPublishedMap[key] === true
+    })
+  } else if (publishedFilter === 'no') {
+    attempts = attempts.filter(a => {
+      const key = a.wish_id < a.candidate_wish_id ? `${a.wish_id}:${a.candidate_wish_id}` : `${a.candidate_wish_id}:${a.wish_id}`
+      return connectionMap[key] != null && connPublishedMap[key] === false
+    })
+  }
+
   return (
     <ReviewMatchesClient
       attempts={attempts}
@@ -178,7 +192,7 @@ export default async function ReviewMatchesPage({
       connPublishedMap={connPublishedMap}
       reviewMap={reviewMap}
       userEmail={user.email!}
-      filters={{ type: typeFilter, reviewed: reviewedFilter, gate: gateFilter, near: nearFilter, cancelled: cancelledFilter }}
+      filters={{ type: typeFilter, reviewed: reviewedFilter, gate: gateFilter, near: nearFilter, cancelled: cancelledFilter, published: publishedFilter }}
       sort={sortKey}
       search={searchFilter}
       page={page}

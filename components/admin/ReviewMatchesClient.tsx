@@ -64,7 +64,7 @@ export interface ReviewMatchesProps {
   connPublishedMap: Record<string, boolean>
   reviewMap: Record<string, ExistingReview>
   userEmail: string
-  filters: { type: string; reviewed: string; gate: string; near: string; cancelled: string }
+  filters: { type: string; reviewed: string; gate: string; near: string; cancelled: string; published: string }
   sort: string
   search: string
   page: number
@@ -138,7 +138,7 @@ function buildUrl(
 ) {
   const params = new URLSearchParams({
     type: filters.type, reviewed: filters.reviewed, gate: filters.gate,
-    near: filters.near, cancelled: filters.cancelled,
+    near: filters.near, cancelled: filters.cancelled, published: filters.published,
     sort, page: String(page),
     ...overrides,
   })
@@ -198,6 +198,11 @@ function FilterBar({
 
         {filterLink('cancelled', filters.cancelled === 'show' ? 'hide' : 'show',
           filters.cancelled === 'show' ? '× כולל מבוטלות' : 'כולל מבוטלות', filters.cancelled === 'show')}
+
+        <span className="font-semibold text-slate-700 mr-1">פרסום:</span>
+        {filterLink('published', 'all', 'הכל',       filters.published === 'all')}
+        {filterLink('published', 'yes', 'פורסמו',     filters.published === 'yes')}
+        {filterLink('published', 'no',  'לא פורסמו',  filters.published === 'no')}
       </div>
 
       {/* Sort */}
