@@ -35,6 +35,9 @@ import type { WishEnrichment } from '@/lib/types'
 /** Below this wish count, skip ANN and evaluate all pairs directly (same as admin batch full-scan). */
 const FULL_SCAN_MAX = 300
 
+/** Maximum connections created per wish run — keep only the top-N by match_score. */
+const MAX_CONNECTIONS_PER_WISH = 3
+
 type RecallSource = 'semantic' | 'structured' | 'both'
 
 interface MergedCandidate {
@@ -300,8 +303,16 @@ export async function processWishForMatching(
       })
     }
 
+    // Cap to top-N connections by match_score
+    const topConnections = connections
+      .sort((a, b) => b.match_score - a.match_score)
+      .slice(0, MAX_CONNECTIONS_PER_WISH)
+    if (topConnections.length < connections.length) {
+      console.log(`[matching] capped connections ${connections.length} → ${topConnections.length} (MAX_CONNECTIONS_PER_WISH=${MAX_CONNECTIONS_PER_WISH})`)
+    }
+
     // Write log entries (fire-and-forget with retry)
-    console.log(`[matching] logEntries=${logEntries.length} connections=${connections.length}`)
+    console.log(`[matching] logEntries=${logEntries.length} connections=${topConnections.length}`)
     if (logEntries.length > 0) {
       ;(async () => {
         for (let attempt = 0; attempt < 3; attempt++) {
@@ -318,21 +329,21 @@ export async function processWishForMatching(
       })()
     }
 
-    if (connections.length === 0) return
+    if (topConnections.length === 0) return
 
     const { error: upsertError } = await supabase
       .from('wish_connections')
-      .upsert(connections, { onConflict: 'wish_a,wish_b', ignoreDuplicates: true })
+      .upsert(topConnections, { onConflict: 'wish_a,wish_b', ignoreDuplicates: true })
     if (upsertError) {
       console.error('[ResonanceEngine] upsert failed:', upsertError.message)
     }
 
     // Send connection emails (fire-and-forget — never blocks the pipeline)
-    console.log(`[email] ${connections.length} new connection(s) — starting email notify`)
-    if (connections.length > 0 && !upsertError) {
+    console.log(`[email] ${topConnections.length} new connection(s) — starting email notify`)
+    if (topConnections.length > 0 && !upsertError) {
       ;(async () => {
         try {
-          const wishIds = connections.flatMap(c => [c.wish_a, c.wish_b])
+          const wishIds = topConnections.flatMap(c => [c.wish_a, c.wish_b])
           const { data: wishes, error: wishFetchErr } = await supabase
             .from('wishes')
             .select('id, original_text, contact_name, contact_email, contact_phone, contact_city')
@@ -350,7 +361,7 @@ export async function processWishForMatching(
 
           const wishMap = new Map(wishes.map(w => [w.id, w]))
 
-          for (const conn of connections) {
+          for (const conn of topConnections) {
             const wA = wishMap.get(conn.wish_a)
             const wB = wishMap.get(conn.wish_b)
             if (!wA?.contact_email || !wB?.contact_email) {
