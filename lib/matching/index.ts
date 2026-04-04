@@ -101,7 +101,16 @@ export async function processWishForMatching(
         .select('wish_id')
         .neq('wish_id', wishId)
       if (allWishes && allWishes.length <= FULL_SCAN_MAX) {
-        explicitCandidateIds = allWishes.map((w: { wish_id: string }) => w.wish_id)
+        // Filter out cancelled wishes — wish_embeddings has no status column so we
+        // cross-reference with wishes. The admin client bypasses RLS, making this
+        // necessary explicitly (the RPCs already do this via their JOIN + WHERE).
+        const embeddedIds = allWishes.map((w: { wish_id: string }) => w.wish_id)
+        const { data: activeWishes } = await supabase
+          .from('wishes')
+          .select('id')
+          .in('id', embeddedIds)
+          .neq('status', 'cancelled')
+        explicitCandidateIds = (activeWishes ?? []).map((w: { id: string }) => w.id)
       }
     }
 
