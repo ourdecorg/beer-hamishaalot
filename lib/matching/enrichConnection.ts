@@ -19,10 +19,14 @@
 import OpenAI from 'openai'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { logOpenAICall } from './openaiLog'
+import { sendConnectionEmail } from '@/lib/email/sendConnectionEmail'
 import type { WishEnrichment } from '@/lib/types'
 
 const PROMPT_VERSION = 'v1'
 const MODEL = 'gpt-4o'
+
+/** Connections with overall_connection_score above this threshold are published and trigger emails. */
+export const PUBLISH_THRESHOLD = 70
 
 // ── Lazy OpenAI singleton ────────────────────────────────────────────────────
 
@@ -350,7 +354,63 @@ export async function enrichConnection(
     return
   }
 
-  console.log(`[ConnectionEnrichment] success ${wish_a_id}↔${wish_b_id} — overall=${result.overall_connection_score} type=${result.relationship_type}`)
+  const published = result.overall_connection_score > PUBLISH_THRESHOLD
+
+  console.log(
+    published
+      ? `[ConnectionEnrichment] published=true ${wish_a_id}↔${wish_b_id} — overall=${result.overall_connection_score} type=${result.relationship_type}`
+      : `[ConnectionEnrichment] below threshold ${wish_a_id}↔${wish_b_id} — overall=${result.overall_connection_score} (threshold=${PUBLISH_THRESHOLD}) — not published`
+  )
+
+  if (!published) return
+
+  // Mark the wish_connection row as published
+  const { error: publishError } = await supabase
+    .from('wish_connections')
+    .update({ published: true })
+    .eq('wish_a', wish_a_id)
+    .eq('wish_b', wish_b_id)
+
+  if (publishError) {
+    console.error(`[ConnectionEnrichment] publish update failed ${wish_a_id}↔${wish_b_id}:`, publishError.message)
+    return
+  }
+
+  // Send notification emails to both wish owners
+  try {
+    const { data: wishRows } = await supabase
+      .from('wishes')
+      .select('id, original_text, contact_name, contact_email, contact_phone, contact_city')
+      .in('id', [wish_a_id, wish_b_id])
+
+    const wA = (wishRows ?? []).find((w: { id: string }) => w.id === wish_a_id)
+    const wB = (wishRows ?? []).find((w: { id: string }) => w.id === wish_b_id)
+
+    if (!wA?.contact_email || !wB?.contact_email) {
+      console.warn(`[ConnectionEnrichment] skipping email ${wish_a_id}↔${wish_b_id}: missing contact_email (A=${wA?.contact_email ?? 'null'} B=${wB?.contact_email ?? 'null'})`)
+      return
+    }
+
+    await sendConnectionEmail(
+      {
+        wishText:     wA.original_text,
+        contactName:  wA.contact_name  ?? '',
+        contactEmail: wA.contact_email,
+        contactPhone: wA.contact_phone ?? null,
+        contactCity:  wA.contact_city  ?? null,
+      },
+      {
+        wishText:     wB.original_text,
+        contactName:  wB.contact_name  ?? '',
+        contactEmail: wB.contact_email,
+        contactPhone: wB.contact_phone ?? null,
+        contactCity:  wB.contact_city  ?? null,
+      },
+    )
+    console.log(`[ConnectionEnrichment] email sent ${wish_a_id}↔${wish_b_id}`)
+  } catch (emailErr) {
+    console.error(`[ConnectionEnrichment] email failed ${wish_a_id}↔${wish_b_id}:`, emailErr)
+  }
 }
 
 /**

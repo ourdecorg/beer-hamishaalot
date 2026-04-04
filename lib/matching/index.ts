@@ -29,7 +29,6 @@ import { buildAnchorKeywords, computeStructuralSimilarity } from './keywords'
 import { computeMatchScore, MATCH_THRESHOLD } from './score'
 import { haversineKm } from './geo'
 import { dateRangesOverlap } from './timeRange'
-import { sendConnectionEmail } from '@/lib/email/sendConnectionEmail'
 import { enrichConnections, type ConnectionPair } from './enrichConnection'
 import type { WishEnrichment } from '@/lib/types'
 
@@ -399,62 +398,6 @@ export async function processWishForMatching(
         console.error('[ResonanceEngine] enrichConnections failed:', err)
       }
     })()
-
-    // Send connection emails (fire-and-forget — never blocks the pipeline)
-    console.log(`[email] ${topConnections.length} new connection(s) — starting email notify`)
-    if (topConnections.length > 0 && !upsertError) {
-      ;(async () => {
-        try {
-          const wishIds = topConnections.flatMap(c => [c.wish_a, c.wish_b])
-          const { data: wishes, error: wishFetchErr } = await supabase
-            .from('wishes')
-            .select('id, original_text, contact_name, contact_email, contact_phone, contact_city')
-            .in('id', wishIds)
-
-          if (wishFetchErr) {
-            console.error('[email] fetch wishes failed:', wishFetchErr.message)
-            return
-          }
-          if (!wishes || wishes.length === 0) {
-            console.warn('[email] no wish rows returned for ids:', wishIds)
-            return
-          }
-          console.log(`[email] fetched ${wishes.length} wish row(s)`)
-
-          const wishMap = new Map(wishes.map(w => [w.id, w]))
-
-          for (const conn of topConnections) {
-            const wA = wishMap.get(conn.wish_a)
-            const wB = wishMap.get(conn.wish_b)
-            if (!wA?.contact_email || !wB?.contact_email) {
-              console.warn(`[email] skipping ${conn.wish_a}↔${conn.wish_b}: missing contact_email (A=${wA?.contact_email ?? 'null'} B=${wB?.contact_email ?? 'null'})`)
-              continue
-            }
-
-            console.log(`[email] sending to ${wA.contact_email} + ${wB.contact_email}`)
-            await sendConnectionEmail(
-              {
-                wishText:     wA.original_text,
-                contactName:  wA.contact_name  ?? '',
-                contactEmail: wA.contact_email,
-                contactPhone: wA.contact_phone ?? null,
-                contactCity:  wA.contact_city  ?? null,
-              },
-              {
-                wishText:     wB.original_text,
-                contactName:  wB.contact_name  ?? '',
-                contactEmail: wB.contact_email,
-                contactPhone: wB.contact_phone ?? null,
-                contactCity:  wB.contact_city  ?? null,
-              },
-            )
-            console.log(`[email] sent OK — from: ${process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev'}`)
-          }
-        } catch (err) {
-          console.error('[ResonanceEngine] sendConnectionEmail failed:', err)
-        }
-      })()
-    }
 
   } catch (err) {
     console.error('[ResonanceEngine] processWishForMatching failed:', err)
