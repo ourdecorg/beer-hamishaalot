@@ -25,7 +25,11 @@ import type { WishEnrichment } from '@/lib/types'
 const PROMPT_VERSION = 'v1'
 const MODEL = 'gpt-4o'
 
-/** Connections with overall_connection_score above this threshold are published and trigger emails. */
+/**
+ * Connections with overall_connection_score above this threshold are auto-published.
+ * Additionally, the highest-scoring connection in a batch is always published,
+ * even if its score is below this threshold.
+ */
 export const PUBLISH_THRESHOLD = 70
 
 // ── Lazy OpenAI singleton ────────────────────────────────────────────────────
@@ -266,6 +270,12 @@ export interface ConnectionPair {
   complementarity_score: number
 }
 
+interface EnrichResult {
+  score: number
+  published: boolean
+  result: ConnectionEnrichmentResult
+}
+
 /**
  * Enriches a single connection pair. Idempotent — skips if already enriched.
  * Retries once on JSON validation failure with a stricter repair prompt.
@@ -276,7 +286,7 @@ export async function enrichConnection(
   translations: Map<string, string | null>,
   enrichments: Map<string, WishEnrichment>,
   { force = false }: { force?: boolean } = {},
-): Promise<void> {
+): Promise<EnrichResult | null> {
   const supabase = createAdminClient()
   const { wish_a_id, wish_b_id } = pair
 
@@ -289,7 +299,7 @@ export async function enrichConnection(
       .maybeSingle()
     if (existing) {
       console.log(`[ConnectionEnrichment] skipping ${wish_a_id}↔${wish_b_id} — already enriched`)
-      return
+      return null
     }
   }
 
@@ -325,7 +335,7 @@ export async function enrichConnection(
         prompt + '\n\nIMPORTANT: Your previous response was invalid. Return ONLY valid JSON. No extra text.')
     } catch (err2) {
       console.error(`[ConnectionEnrichment] failed ${wish_a_id}↔${wish_b_id}:`, (err2 as Error).message)
-      return
+      return null
     }
   }
 
@@ -351,20 +361,33 @@ export async function enrichConnection(
 
   if (error) {
     console.error(`[ConnectionEnrichment] DB upsert failed ${wish_a_id}↔${wish_b_id}:`, error.message)
-    return
+    return null
   }
 
-  const published = result.overall_connection_score > PUBLISH_THRESHOLD
+  const aboveThreshold = result.overall_connection_score > PUBLISH_THRESHOLD
 
   console.log(
-    published
-      ? `[ConnectionEnrichment] published=true ${wish_a_id}↔${wish_b_id} — overall=${result.overall_connection_score} type=${result.relationship_type}`
-      : `[ConnectionEnrichment] below threshold ${wish_a_id}↔${wish_b_id} — overall=${result.overall_connection_score} (threshold=${PUBLISH_THRESHOLD}) — not published`
+    aboveThreshold
+      ? `[ConnectionEnrichment] above threshold ${wish_a_id}↔${wish_b_id} — overall=${result.overall_connection_score} type=${result.relationship_type}`
+      : `[ConnectionEnrichment] below threshold ${wish_a_id}↔${wish_b_id} — overall=${result.overall_connection_score} (threshold=${PUBLISH_THRESHOLD})`
   )
 
-  if (!published) return
+  return { score: result.overall_connection_score, published: false, result }
+}
 
-  // Mark the wish_connection row as published
+// ── Publish + email helper ────────────────────────────────────────────────────
+
+/**
+ * Marks a connection as published and sends notification emails.
+ * Called when a connection crosses the threshold OR is the best in its batch.
+ */
+async function publishAndEmail(
+  wish_a_id: string,
+  wish_b_id: string,
+  result: ConnectionEnrichmentResult,
+): Promise<void> {
+  const supabase = createAdminClient()
+
   const { error: publishError } = await supabase
     .from('wish_connections')
     .update({ published: true })
@@ -376,7 +399,8 @@ export async function enrichConnection(
     return
   }
 
-  // Send notification emails to both wish owners
+  console.log(`[ConnectionEnrichment] published=true ${wish_a_id}↔${wish_b_id} — overall=${result.overall_connection_score}`)
+
   try {
     const [wishRowsRes, enrichRowsRes] = await Promise.all([
       supabase
@@ -444,8 +468,38 @@ export async function enrichConnections(
 ): Promise<void> {
   if (pairs.length === 0) return
   console.log(`[ConnectionEnrichment] starting batch of ${pairs.length} pair(s)`)
+
+  // Track enrichment results so we can guarantee the best pair is always published
+  const enriched: Array<{ pair: ConnectionPair; res: EnrichResult }> = []
+
   for (const pair of pairs) {
-    await enrichConnection(pair, wishTexts, translations, enrichments)
+    const res = await enrichConnection(pair, wishTexts, translations, enrichments)
+    if (res) enriched.push({ pair, res })
   }
+
+  // Publish all pairs that crossed the threshold
+  let anyPublished = false
+  let bestEntry: { pair: ConnectionPair; res: EnrichResult } | null = null
+
+  for (const entry of enriched) {
+    if (entry.res.score > PUBLISH_THRESHOLD) {
+      await publishAndEmail(entry.pair.wish_a_id, entry.pair.wish_b_id, entry.res.result)
+      entry.res.published = true
+      anyPublished = true
+    }
+    if (!bestEntry || entry.res.score > bestEntry.res.score) {
+      bestEntry = entry
+    }
+  }
+
+  // If nothing crossed the threshold, always publish the highest-scoring connection
+  if (!anyPublished && bestEntry) {
+    console.log(
+      `[ConnectionEnrichment] no pair crossed threshold — force-publishing best: ` +
+      `${bestEntry.pair.wish_a_id}↔${bestEntry.pair.wish_b_id} score=${bestEntry.res.score}`
+    )
+    await publishAndEmail(bestEntry.pair.wish_a_id, bestEntry.pair.wish_b_id, bestEntry.res.result)
+  }
+
   console.log(`[ConnectionEnrichment] batch complete`)
 }
