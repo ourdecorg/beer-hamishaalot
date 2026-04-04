@@ -202,6 +202,7 @@ export async function processWishForMatching(
       passed_threshold: boolean
       gate_passed: boolean
       gate_reason: string
+      connection_rank: number | null
     }> = []
 
     for (const candidate of merged) {
@@ -228,6 +229,7 @@ export async function processWishForMatching(
           passed_threshold:      false,
           gate_passed:           false,
           gate_reason:           'date_range_mismatch',
+          connection_rank:       null,
         })
         continue
       }
@@ -262,6 +264,7 @@ export async function processWishForMatching(
           passed_threshold:      false,
           gate_passed:           false,
           gate_reason:           'low_semantic',
+          connection_rank:       null,
         })
         continue
       }
@@ -289,6 +292,7 @@ export async function processWishForMatching(
         passed_threshold:      passed,
         gate_passed:           true,
         gate_reason:           'passed',
+        connection_rank:       null,  // assigned after loop once all scores are known
       })
 
       if (!passed) continue
@@ -302,6 +306,12 @@ export async function processWishForMatching(
         status:      'connected',
       })
     }
+
+    // Assign connection_rank to all threshold-passing log entries (sorted by match_score desc)
+    const passingEntries = logEntries
+      .filter(e => e.passed_threshold)
+      .sort((a, b) => b.match_score - a.match_score)
+    passingEntries.forEach((e, i) => { e.connection_rank = i + 1 })
 
     // Cap to top-N connections by match_score
     const topConnections = connections
