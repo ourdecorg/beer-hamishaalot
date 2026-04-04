@@ -21,7 +21,8 @@ Next.js 14 App Router (Railway)
         │
         ├── Supabase (PostgreSQL + pgvector)
         │     ├── wishes, wish_enrichment, wish_embeddings
-        │     ├── wish_connections, match_attempts_log
+        │     ├── wish_connections (published), match_attempts_log (connection_rank)
+        │     ├── connection_enrichment
         │     ├── openai_api_log
         │     └── settlements
         │
@@ -44,13 +45,15 @@ Next.js 14 App Router (Railway)
 | URL | קובץ | סוג |
 |-----|------|-----|
 | `/` | app/page.tsx | Server Component — דף הבית |
-| `/wishes/new` | app/wishes/new/page.tsx | Server Component — יצירת משאלה |
-| `/wishes/my` | app/wishes/my/page.tsx | Server Component — המשאלות שלי |
+| `/wishes/new` | app/wishes/new/page.tsx | Server Component — יצירת משאלה (עם checkbox הסכמה) |
+| `/wishes/my` | app/wishes/my/page.tsx | Server Component — המשאלות שלי (עם enrichment tags, ציון GPT) |
 | `/wishes/[id]` | app/wishes/[id]/page.tsx | Server Component — פרטי משאלה |
-| `/matches` | app/matches/page.tsx | Server Component — ההתאמות שלי (מקובצות לפי משאלה חיצונית) |
+| `/matches` | app/matches/page.tsx | Server Component — ההתאמות שלי (published בלבד, enrichment GPT) |
+| `/privacy` | app/privacy/page.tsx | Server Component — מדיניות פרטיות |
+| `/terms` | app/terms/page.tsx | Server Component — תנאי שימוש |
 | `/(auth)/login` | app/(auth)/login/page.tsx | דף התחברות (magic link) |
 | `/admin` | app/admin/layout.tsx | Layout עם sidebar + auth guard |
-| `/admin/connections` | app/admin/connections/page.tsx | Client Component — תחקור חיבורים |
+| `/admin/connections` | app/admin/connections/page.tsx | Client Component — תחקור חיבורים + connection_enrichment |
 | `/admin/test-data` | app/admin/test-data/page.tsx | Client Component — טעינת נתוני מבחן |
 | `/admin/run-matching` | app/admin/run-matching/page.tsx | הרצת MATCHES |
 | `/admin/settlements` | app/admin/settlements/page.tsx | העלאת קובץ ישובים |
@@ -72,7 +75,7 @@ Next.js 14 App Router (Railway)
 | `/auth/callback` | GET | OAuth callback מ-Supabase |
 | `/api/admin/run-matching` | POST | הפעלת batch matching (admin בלבד) |
 | `/api/admin/load-test-data` | POST | ייבוא CSV (admin בלבד) |
-| `/api/admin/connections` | GET | נתוני debug לזוג משאלות |
+| `/api/admin/connections` | GET | נתוני debug לזוג משאלות (כולל connection_enrichment) |
 | `/api/admin/seed-settlements` | POST | העלאת קובץ ישובים CBS (admin בלבד, Windows-1255) |
 | `/api/admin/review-matches` | POST | upsert לטבלת match_reviews (admin בלבד) |
 | `/api/getUserMatches` | POST | webhook — קבלת התאמות לפי email |
@@ -80,34 +83,53 @@ Next.js 14 App Router (Railway)
 
 ### דף `/matches` — היגיון עיבוד
 
-**שלב 1:** שליפת כל משאלות המשתמש + ה-wish_connections שלהן (ללא `status='deleted'`)
+מציג רק חיבורים עם `published = true` (overall_connection_score > 70, או הטוב ביותר בריצה).
 
-**שלב 2:** איסוף ה-IDs של המשאלות התואמות + שליפת wish_enrichment (themes) + פרטי קשר
+**שלב 1:** שליפת `wish_connections` (published=true, ללא deleted)
+
+**שלב 2 (parallel):** wish_enrichment (themes+needs+skills לכל הצדדים) · connection_enrichment (ציוני GPT, opportunity, shared_basis) · פרטי קשר
 
 **שלב 3:** קיבוץ לפי `theirWishId` — כרטיס אחד לכל משאלה חיצונית, עם כל המשאלות של המשתמש שתואמות אותה
 
-**StructuredMatch:**
+**ממוין לפי:** `maxOverallScore` desc (fallback: `maxScore × 100`)
+
+**GroupedMatch:**
 ```
 GroupedMatch {
   theirWishId, theirWishText, theirName, theirEmail, theirPhone
-  maxScore, maxMatchType       // מהחיבור בציון הגבוה ביותר
-  myMatches[]                  // ממוינות לפי match_score desc
-  allSharedThemes              // איחוד ה-themes מכל myMatches
+  theirNeeds[], theirSkills[]          // מ-wish_enrichment של הצד השני
+  maxScore, maxOverallScore            // overall_connection_score מ-connection_enrichment
+  relationshipType                     // סוג הקשר לפי GPT
+  opportunityText, sharedBasisText     // טקסטים מ-connection_enrichment (שפת UI)
+  myMatches[] {                        // ממוינות לפי match_score desc
+    myNeeds[], mySkills[]              // מ-wish_enrichment של המשאלה שלי
+    overallScore, relationshipType
+    opportunityText, sharedBasisText
+  }
 }
 ```
 
 ### מסך `/admin/review-matches`
 
 Server component שטוען עד 60 רשומות מ-`match_attempts_log`, מציג אותן כ-cards עם:
-- טקסטי שתי המשאלות + סיגנלים: ציון · סמנטי · משלים (obs.) · מבני (obs.) · גיאו
-- Badge: נוצר חיבור / 📅 אין חפיפת זמן / נפסל בשער / לא נוצר חיבור
+- טקסטי שתי המשאלות + theme pills (מ-wish_enrichment) לכל צד
+- סיגנלים: ציון · סמנטי · משלים (obs.) · מבני (obs.) · גיאו
+- GPT enrichment (כשיש connection): overall/100 · relationship_type · R/C scores · פורסם/לא פורסם
+- needs/skills מושווים (cross-highlighted) לכל צד
+- Badge: נוצר חיבור / 📅 אין חפיפת זמן / נפסל בשער / לא נוצר חיבור · rank badge (#1/#N/נחתך)
 - כפתורי label: טוב / אולי / לא טוב + שדה הערה → POST `/api/admin/review-matches`
 
-**סינונים (URL searchParams → server re-fetch):** סוג (עבר/לא עבר סף) · סקירה (סוקרו/לא) · שער · קרוב לסף · כולל מבוטלות (ברירת מחדל: מסתיר)
+**סינונים (URL searchParams → server re-fetch):**
+- סוג: הכל / עברו סף / לא עברו סף
+- סקירה: הכל / סוקרו / לא סוקרו
+- שער: הכל / נפסלו בשער
+- קרוב לסף (40%-55%)
+- כולל מבוטלות (ברירת מחדל: מסתיר)
+- **פרסום: הכל / פורסמו / לא פורסמו** ← post-filter לפי `wish_connections.published`
 
 **מיון (URL param `sort`):** match_score · semantic_en · complementarity · structural · geo — server-side ORDER BY
 
-**דפדוף:** server-side pagination, 60 רשומות לעמוד · prev/next Links · "עמוד X מתוך Y · N רשומות"
+**דפדוף:** server-side pagination, 60 רשומות לעמוד · prev/next Links
 
 **חיפוש טקסט:** client-side, מסנן כרטיסים לפי תוכן משאלות ללא round-trip לשרת
 
@@ -118,9 +140,12 @@ Server component שטוען עד 60 רשומות מ-`match_attempts_log`, מצי
 | מודול | קבצים | מטרה |
 |-------|-------|------|
 | Supabase clients | lib/supabase/client.ts, server.ts, admin.ts | חיבורים ל-DB |
-| Matching engine | lib/matching/*.ts | כל pipeline ההפגשה |
+| Matching engine | lib/matching/index.ts | pipeline ראשי |
+| Enrichment engine | lib/matching/enrichConnection.ts | CONNECTION_ENRICHMENT — GPT-4o judgment + publish |
 | Feed engine | lib/feed/*.ts | Feed מותאם אישית |
+| Email | lib/email/sendConnectionEmail.ts | אימייל חיבור עם enrichment data |
 | Types | lib/types.ts | TypeScript interfaces |
+| i18n | lib/i18n/index.ts | תרגומים EN/HE |
 
 ### קומפוננטות (components/)
 
@@ -152,24 +177,27 @@ Server component שטוען עד 60 רשומות מ-`match_attempts_log`, מצי
 
 #### `wishes`
 ```
-id              uuid PK
-user_id         uuid FK→auth.users
-original_text   text (עד 1000 תווים)
-visibility      'open'
-status          text NOT NULL DEFAULT 'pending' — 'pending'|'cancelled'
-contact_name    text
-contact_email   text (מאוכלס אוטומטית מ-user.email)
-contact_country text DEFAULT 'Israel' (מוכנס תמיד כ-'Israel')
-contact_city    text (לא חובה, נבחר מ-SettlementPicker)
-contact_address text
-contact_phone   text
-user_email      text (denormalized)
-created_at      timestamptz
-updated_at      timestamptz
+id                       uuid PK
+user_id                  uuid FK→auth.users
+original_text            text (עד 1000 תווים)
+visibility               'open'
+status                   text NOT NULL DEFAULT 'pending' — 'pending'|'cancelled'
+contact_name             text
+contact_email            text (מאוכלס אוטומטית מ-user.email)
+contact_country          text DEFAULT 'Israel' (מוכנס תמיד כ-'Israel')
+contact_city             text (לא חובה, נבחר מ-SettlementPicker)
+contact_address          text
+contact_phone            text
+user_email               text (denormalized)
+consent_to_match_sharing boolean NOT NULL DEFAULT false  ← migration 037
+created_at               timestamptz
+updated_at               timestamptz
 ```
 
 **Soft delete:** DELETE endpoint מסמן `status='cancelled'` (לא מוחק פיזית).
 RLS מסנן `status != 'cancelled'` לכלל השאילתות (בעלים + ציבורי).
+
+**הסכמה:** הטופס מחייב checkbox הסכמה לפני שליחה (`consent_to_match_sharing=true`). API מאמת ומדחה בחזרה 400 אם חסר.
 
 #### `settlements`
 ```
@@ -222,11 +250,16 @@ wish_b      uuid FK→wishes
 match_score float (0–1)
 match_type  'strong'|'complementary'|'similar'
 status      'suggested'|'accepted_by_a'|'connected'|'rejected'|'deleted'
+published   boolean NOT NULL DEFAULT false  ← migration 040
 created_at  timestamptz
 UNIQUE(wish_a, wish_b), CHECK(wish_a < wish_b)
 ```
 `status='deleted'` נקבע אוטומטית כשמשאלה מסומנת כ-cancelled.
 כל שאילתות wish_connections מסננות `status != 'deleted'`.
+
+**published:** נקבע ל-`true` על-ידי שלב CONNECTION_ENRICHMENT אחרי שה-GPT שופט `overall_connection_score > 70`.
+גם החיבור עם הציון הגבוה ביותר בכל ריצה מקבל `published=true` אפילו מתחת לסף.
+מסכי משתמש (My Matches, My Wishes, API routes) מסננים `published=true` בלבד.
 
 #### `match_attempts_log`
 ```
@@ -247,11 +280,14 @@ match_type               text (null אם לא עבר)
 passed_threshold         boolean NOT NULL
 gate_passed              boolean  ← null=לא הגיע לשער, true=עבר, false=נפסל
 gate_reason              text     ← 'passed' | סיבת כשל
+connection_rank          int      ← migration 038; NULL=נפסל/לא נוצר, 1=הטוב ביותר, N=דירוג N, >3=נחתך
 created_at               timestamptz
 ```
 *עמודות ישנות בטבלה (לא נכתבות יותר):* freshness_factor, object_alignment, anchor_overlap, failed_distance
 
 **מה נרשם:** כל ניסיון שעבר את סינון טווח התאריכים ואת שער הכניסה לניקוד
+
+**connection_rank:** מוקצה פוסט-לופ לפי מיון match_score desc. רק top-3 (`MAX_CONNECTIONS_PER_WISH=3`) מקבלים חיבור בפועל. rank > 3 = נחתך. NULL = לא עבר סף/שער.
 
 #### `match_reviews`
 ```
@@ -267,6 +303,31 @@ UNIQUE(wish_id, candidate_wish_id, reviewer_email)
 ```
 Human-in-the-loop feedback על זוגות התאמה, לצורך כיוונון עתידי של הסף והמשקולות.
 נכתב מ-`/api/admin/review-matches` (POST, upsert on conflict).
+
+#### `connection_enrichment`
+```
+id                        uuid PK
+wish_a_id                 uuid FK→wishes (תמיד wish_a < wish_b)
+wish_b_id                 uuid FK→wishes
+resonance_score           int CHECK(0-100)
+collaboration_depth_score int CHECK(0-100)
+overall_connection_score  int CHECK(0-100)
+confidence                int CHECK(0-100)
+relationship_type         text  ← 'high_resonance_strong_collaboration'|'high_resonance_low_collaboration'|
+                                   'moderate_resonance_practical_match'|'weak_match'|'unclear'
+why                       jsonb ← { he, en }
+opportunity_for_wish_a    jsonb ← { he, en }
+opportunity_for_wish_b    jsonb ← { he, en }
+shared_basis              jsonb ← { he, en }
+risks_or_limits           jsonb ← { he, en }
+model                     text  ← 'gpt-4o'
+prompt_version            text  ← 'v1'
+enriched_at               timestamptz
+UNIQUE(wish_a_id, wish_b_id)
+```
+מייצרת GPT-4o judgment לכל זוג שעבר את ה-top-N capping.
+idempotent: זוג שכבר קיים בטבלה מדולג (אלא אם `force=true`).
+migration 039.
 
 #### `openai_api_log`
 ```
@@ -350,11 +411,22 @@ UNIQUE(wish_id, user_id)
   └── geo soft penalty: finalScore × exp(-distance_km / 50)
 
 שלב 5: Persistence
-  ├── match_attempts_log INSERT (כל המועמדים — כולל שנפסלו בתאריך/שער)
-  └── wish_connections UPSERT (finalScore ≥ 0.55, ignoreDuplicates)
+  ├── connection_rank הקצאה: topConnections ממוינות לפי match_score desc → rank 1…N
+  │     MAX_CONNECTIONS_PER_WISH = 3: slice(0, 3), שאר הרשומות מקבלות rank בלבד (לוג)
+  ├── match_attempts_log INSERT (כל המועמדים — כולל שנפסלו בתאריך/שער; עם connection_rank)
+  └── wish_connections UPSERT (finalScore ≥ 0.55, ignoreDuplicates, רק top-3)
 
-שלב 6: Email notification
-  └── sendConnectionEmail() — שולח אימייל ל-2 הבעלים עם פרטי שתי המשאלות (Resend)
+שלב 6: CONNECTION_ENRICHMENT (fire-and-forget IIFE)
+  ├── enrichConnections(pairs, wishTexts, translations, enrichmentMap)
+  │     ├── לכל זוג: enrichConnection() — GPT-4o judgment
+  │     │     ├── idempotent skip-if-exists (אלא אם force=true)
+  │     │     ├── buildPrompt() עם טקסטי שתי המשאלות + metrics
+  │     │     ├── callEnrichment() → validate() → upsert connection_enrichment
+  │     │     └── מחזיר { score, published, result }
+  │     ├── publishAndEmail() לכל זוג שעלה מעל PUBLISH_THRESHOLD (70):
+  │     │     ├── UPDATE wish_connections SET published=true
+  │     │     └── sendConnectionEmail() עם opportunity/shared_basis/needs/skills + overallScore
+  │     └── force-publish: אם אף זוג לא עבר את הסף — מפרסם את הטוב ביותר בריצה
 ```
 
 ### נוסחת הציון (v13)
@@ -367,6 +439,12 @@ final_score = match_score × exp(-distance_km / 50)
 ```
 
 **ציון סף:** ≥ 0.55 · **שער רלוונטיות:** semantic_en ≥ 0.30
+
+**קבועים:**
+| קבוע | ערך | מיקום |
+|------|-----|--------|
+| `MAX_CONNECTIONS_PER_WISH` | 3 | lib/matching/index.ts |
+| `PUBLISH_THRESHOLD` | 70 | lib/matching/enrichConnection.ts |
 
 ### סיווג סוג ההתאמה
 
@@ -399,6 +477,30 @@ score = max cosine(needVec, skillVec)
 
 נחשב ונרשם ב-`match_attempts_log.structural_similarity` אך **אינו משתתף בנוסחת הציון (v13)**.
 מאפשר ניתוח רטרואקטיבי בלבד.
+
+### Connection Enrichment (`lib/matching/enrichConnection.ts`)
+
+מודול עצמאי שרץ כ-fire-and-forget אחרי שמירת wish_connections.
+
+**GPT-4o judgment לכל זוג:**
+- `resonance_score` — תהודה אנושית/נושאית אמיתית
+- `collaboration_depth_score` — בסיס מעשי לשיתוף פעולה
+- `overall_connection_score` — ציון משולב שמרני
+- `confidence` — ביטחון המודל
+- `relationship_type` — אחד מ-5 ערכים מוגדרים
+- טקסטים דו-לשוניים (he/en): why, opportunity_for_wish_a/b, shared_basis, risks_or_limits
+
+**publish logic:**
+```
+for each pair in batch:
+  if score > PUBLISH_THRESHOLD (70):
+    published=true → email
+
+if no pair crossed threshold:
+  force-publish the best-scoring pair
+```
+
+**email:** `sendConnectionEmail()` עם opportunity + shared_basis + their needs/skills + overallScore
 
 ### חישוב Anchor Keywords (`lib/matching/keywords.ts`)
 
@@ -566,7 +668,8 @@ ORDER BY embedding <=> query_embedding
 | wish_resonances | auth users ← resonance על open wishes |
 | wish_enrichment | בעלים OR public wish |
 | wish_embeddings | בעלים בלבד |
-| wish_connections | משתתפים (wish_a OR wish_b) |
+| wish_connections | משתתפים (wish_a OR wish_b); user-facing queries גם מסננים published=true |
+| connection_enrichment | admin client (service role) |
 | match_attempts_log | admin client (service role) |
 | openai_api_log | admin client (service role) |
 
