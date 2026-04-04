@@ -5,6 +5,7 @@ import ReviewMatchesClient, {
   type AttemptRow,
   type WishStub,
   type WishEnrichmentStub,
+  type ConnectionEnrichmentStub,
   type ExistingReview,
 } from '@/components/admin/ReviewMatchesClient'
 
@@ -90,9 +91,9 @@ export default async function ReviewMatchesPage({
   const wishMap: Record<string, WishStub> = {}
   for (const w of wishRows ?? []) wishMap[w.id] = w as WishStub
 
-  // ── 3. Fetch enrichment stubs (needs + skills_offered) ───────────────────
+  // ── 3. Fetch enrichment stubs (themes + needs + skills_offered) ──────────
   const { data: enrichmentRows } = wishIds.length > 0
-    ? await admin.from('wish_enrichment').select('wish_id, needs, skills_offered').in('wish_id', wishIds)
+    ? await admin.from('wish_enrichment').select('wish_id, themes, needs, skills_offered').in('wish_id', wishIds)
     : { data: [] }
 
   const enrichmentMap: Record<string, WishEnrichmentStub> = {}
@@ -102,7 +103,7 @@ export default async function ReviewMatchesPage({
   const { data: connRows } = wishIds.length > 0
     ? await admin
         .from('wish_connections')
-        .select('id, wish_a, wish_b')
+        .select('id, wish_a, wish_b, published')
         .or(`wish_a.in.(${wishIds.join(',')}),wish_b.in.(${wishIds.join(',')})`)
     : { data: [] }
 
@@ -110,6 +111,32 @@ export default async function ReviewMatchesPage({
   for (const c of connRows ?? []) {
     const key = c.wish_a < c.wish_b ? `${c.wish_a}:${c.wish_b}` : `${c.wish_b}:${c.wish_a}`
     connectionMap[key] = c.id
+  }
+
+  // ── 4b. Fetch connection_enrichment for existing connections ──────────────
+  const connPairs = (connRows ?? []).map(c => ({ a: c.wish_a, b: c.wish_b }))
+  const connEnrichmentMap: Record<string, ConnectionEnrichmentStub> = {}
+  const connPublishedMap: Record<string, boolean> = {}
+
+  for (const c of connRows ?? []) {
+    const key = c.wish_a < c.wish_b ? `${c.wish_a}:${c.wish_b}` : `${c.wish_b}:${c.wish_a}`
+    connPublishedMap[key] = c.published ?? false
+  }
+
+  if (connPairs.length > 0) {
+    const allAs = [...new Set(connPairs.map(p => p.a))]
+    const allBs = [...new Set(connPairs.map(p => p.b))]
+    const { data: ceRows } = await admin
+      .from('connection_enrichment')
+      .select('wish_a_id, wish_b_id, overall_connection_score, resonance_score, collaboration_depth_score, relationship_type')
+      .in('wish_a_id', allAs)
+      .in('wish_b_id', allBs)
+
+    const pairSet = new Set(connPairs.map(p => `${p.a}:${p.b}`))
+    for (const ce of ceRows ?? []) {
+      const key = `${ce.wish_a_id}:${ce.wish_b_id}`
+      if (pairSet.has(key)) connEnrichmentMap[key] = ce as ConnectionEnrichmentStub
+    }
   }
 
   // ── 5. Fetch existing reviews ─────────────────────────────────────────────
@@ -147,6 +174,8 @@ export default async function ReviewMatchesPage({
       wishMap={wishMap}
       enrichmentMap={enrichmentMap}
       connectionMap={connectionMap}
+      connEnrichmentMap={connEnrichmentMap}
+      connPublishedMap={connPublishedMap}
       reviewMap={reviewMap}
       userEmail={user.email!}
       filters={{ type: typeFilter, reviewed: reviewedFilter, gate: gateFilter, near: nearFilter, cancelled: cancelledFilter }}

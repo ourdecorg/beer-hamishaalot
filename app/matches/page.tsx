@@ -22,42 +22,55 @@ interface ConnectionEnrichRow {
   wish_a_id: string
   wish_b_id: string
   overall_connection_score: number
+  relationship_type: string | null
   opportunity_for_wish_a: BilingualText | null
   opportunity_for_wish_b: BilingualText | null
   shared_basis: BilingualText | null
 }
 
 interface MyWishMatch {
-  connectionId:    string
-  myWishId:        string
-  myWishText:      string
-  matchScore:      number
-  matchType:       MatchType
-  matchedAt:       string
-  sharedThemes:    string[]
-  overallScore:    number | null
-  opportunityText: string | null
-  sharedBasisText: string | null
+  connectionId:     string
+  myWishId:         string
+  myWishText:       string
+  matchScore:       number
+  matchType:        MatchType
+  matchedAt:        string
+  sharedThemes:     string[]
+  overallScore:     number | null
+  relationshipType: string | null
+  opportunityText:  string | null
+  sharedBasisText:  string | null
+  myNeeds:          string[]
+  mySkills:         string[]
 }
 
 interface GroupedMatch {
-  theirWishId:     string
-  theirWishText:   string
-  theirName:       string | null
-  theirEmail:      string | null
-  theirPhone:      string | null
-  theirNeeds:      string[]
-  theirSkills:     string[]
-  maxScore:        number
-  maxOverallScore: number | null
-  maxMatchType:    MatchType
-  myMatches:       MyWishMatch[]
-  allSharedThemes: string[]
-  opportunityText: string | null
-  sharedBasisText: string | null
+  theirWishId:      string
+  theirWishText:    string
+  theirName:        string | null
+  theirEmail:       string | null
+  theirPhone:       string | null
+  theirNeeds:       string[]
+  theirSkills:      string[]
+  maxScore:         number
+  maxOverallScore:  number | null
+  maxMatchType:     MatchType
+  relationshipType: string | null
+  myMatches:        MyWishMatch[]
+  allSharedThemes:  string[]
+  opportunityText:  string | null
+  sharedBasisText:  string | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+const relationshipTypeLabel: Record<string, { he: string; en: string }> = {
+  high_resonance_strong_collaboration: { he: 'תהודה עמוקה + שיתוף פעולה', en: 'Deep resonance + collaboration' },
+  high_resonance_low_collaboration:    { he: 'תהודה עמוקה', en: 'Deep resonance' },
+  moderate_resonance_practical_match:  { he: 'התאמה מעשית', en: 'Practical match' },
+  weak_match:                          { he: 'התאמה חלשה', en: 'Weak match' },
+  unclear:                             { he: 'לא ברור', en: 'Unclear' },
+}
 
 const matchTypeCls: Record<string, string> = {
   strong:        'bg-indigo-50 border-indigo-200 text-indigo-700',
@@ -127,31 +140,30 @@ export default async function MyMatchesPage() {
   )]
 
   // Fetch all data in parallel
-  const [theirWishesRes, enrichmentsRes, connEnrichRes, theirEnrichRes] = await Promise.all([
+  // enrichmentsRes covers all wish IDs (mine + theirs) for themes + needs + skills
+  const [theirWishesRes, enrichmentsRes, connEnrichRes] = await Promise.all([
     supabase
       .from('wishes')
       .select('id, original_text, contact_name, contact_email, contact_phone')
       .in('id', uniqueMatchedIds),
     supabase
       .from('wish_enrichment')
-      .select('wish_id, themes')
+      .select('wish_id, themes, needs, skills_offered')
       .in('wish_id', [...myWishIds, ...uniqueMatchedIds]),
     supabase
       .from('connection_enrichment')
-      .select('wish_a_id, wish_b_id, overall_connection_score, opportunity_for_wish_a, opportunity_for_wish_b, shared_basis')
+      .select('wish_a_id, wish_b_id, overall_connection_score, relationship_type, opportunity_for_wish_a, opportunity_for_wish_b, shared_basis')
       .or(`wish_a_id.in.(${myWishIds.join(',')}),wish_b_id.in.(${myWishIds.join(',')})`),
-    supabase
-      .from('wish_enrichment')
-      .select('wish_id, needs, skills_offered')
-      .in('wish_id', uniqueMatchedIds),
   ])
 
-  const theirWishMap   = new Map((theirWishesRes.data ?? []).map(w => [w.id, w]))
-  const themeMap       = new Map<string, string[]>(
-    (enrichmentsRes.data ?? []).map(e => [e.wish_id, e.themes ?? []])
+  const theirWishMap = new Map((theirWishesRes.data ?? []).map(w => [w.id, w]))
+
+  type EnrichRow = { wish_id: string; themes: string[] | null; needs: string[] | null; skills_offered: string[] | null }
+  const allEnrichMap = new Map<string, EnrichRow>(
+    (enrichmentsRes.data ?? []).map((e: EnrichRow) => [e.wish_id, e])
   )
-  const theirEnrichMap = new Map(
-    (theirEnrichRes.data ?? []).map(e => [e.wish_id, e])
+  const themeMap = new Map<string, string[]>(
+    (enrichmentsRes.data ?? []).map((e: EnrichRow) => [e.wish_id, e.themes ?? []])
   )
 
   // Build canonical-key map for connection_enrichment
@@ -172,42 +184,48 @@ export default async function MyMatchesPage() {
     const isWishA   = myWishId === conn.wish_a
     const oppField  = isWishA ? enrich?.opportunity_for_wish_a : enrich?.opportunity_for_wish_b
 
+    const myEnrich = allEnrichMap.get(myWishId)
+
     return {
-      connectionId:    conn.id,
+      connectionId:     conn.id,
       myWishId,
-      myWishText:      myWishTextMap.get(myWishId) ?? '',
-      matchScore:      conn.match_score,
-      matchType:       conn.match_type as MatchType,
-      matchedAt:       conn.created_at,
-      sharedThemes:    theirThemes.filter((th: string) => myThemes.has(th.toLowerCase().trim())),
-      overallScore:    enrich?.overall_connection_score ?? null,
-      opportunityText: bilingualText(oppField, lang),
-      sharedBasisText: bilingualText(enrich?.shared_basis, lang),
+      myWishText:       myWishTextMap.get(myWishId) ?? '',
+      matchScore:       conn.match_score,
+      matchType:        conn.match_type as MatchType,
+      matchedAt:        conn.created_at,
+      sharedThemes:     theirThemes.filter((th: string) => myThemes.has(th.toLowerCase().trim())),
+      overallScore:     enrich?.overall_connection_score ?? null,
+      relationshipType: enrich?.relationship_type ?? null,
+      opportunityText:  bilingualText(oppField, lang),
+      sharedBasisText:  bilingualText(enrich?.shared_basis, lang),
+      myNeeds:          (myEnrich?.needs as string[] | null) ?? [],
+      mySkills:         (myEnrich?.skills_offered as string[] | null) ?? [],
       theirWishId,
     }
   })
 
   const groupMap = new Map<string, GroupedMatch>()
   for (const row of flatList) {
-    const existing = groupMap.get(row.theirWishId)
+    const existing  = groupMap.get(row.theirWishId)
     const them      = theirWishMap.get(row.theirWishId)
-    const theirEnr  = theirEnrichMap.get(row.theirWishId)
+    const theirEnr  = allEnrichMap.get(row.theirWishId)
     if (!existing) {
       groupMap.set(row.theirWishId, {
-        theirWishId:     row.theirWishId,
-        theirWishText:   them?.original_text ?? '',
-        theirName:       them?.contact_name  ?? null,
-        theirEmail:      them?.contact_email ?? null,
-        theirPhone:      them?.contact_phone ?? null,
-        theirNeeds:      (theirEnr?.needs as string[] | null) ?? [],
-        theirSkills:     (theirEnr?.skills_offered as string[] | null) ?? [],
-        maxScore:        row.matchScore,
-        maxOverallScore: row.overallScore,
-        maxMatchType:    row.matchType,
-        myMatches:       [row],
-        allSharedThemes: row.sharedThemes,
-        opportunityText: row.opportunityText,
-        sharedBasisText: row.sharedBasisText,
+        theirWishId:      row.theirWishId,
+        theirWishText:    them?.original_text ?? '',
+        theirName:        them?.contact_name  ?? null,
+        theirEmail:       them?.contact_email ?? null,
+        theirPhone:       them?.contact_phone ?? null,
+        theirNeeds:       (theirEnr?.needs as string[] | null) ?? [],
+        theirSkills:      (theirEnr?.skills_offered as string[] | null) ?? [],
+        maxScore:         row.matchScore,
+        maxOverallScore:  row.overallScore,
+        maxMatchType:     row.matchType,
+        relationshipType: row.relationshipType,
+        myMatches:        [row],
+        allSharedThemes:  row.sharedThemes,
+        opportunityText:  row.opportunityText,
+        sharedBasisText:  row.sharedBasisText,
       })
     } else {
       existing.myMatches.push(row)
@@ -255,11 +273,9 @@ export default async function MyMatchesPage() {
               {/* Score + type */}
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${matchTypeCls[group.maxMatchType] ?? 'bg-slate-100 border-slate-200 text-slate-600'}`}>
-                    {matchTypeLabel[group.maxMatchType] ?? group.maxMatchType}
-                  </span>
+                  {/* Overall connection score — primary indicator */}
                   {group.maxOverallScore != null ? (
-                    <span className="text-sm font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
+                    <span className="text-sm font-black px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-800">
                       {group.maxOverallScore}/100
                     </span>
                   ) : (
@@ -267,8 +283,18 @@ export default async function MyMatchesPage() {
                       {Math.round(group.maxScore * 100)}%
                     </span>
                   )}
+                  {/* Relationship type — replaces generic match_type */}
+                  {group.relationshipType && relationshipTypeLabel[group.relationshipType] ? (
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
+                      {isHe ? relationshipTypeLabel[group.relationshipType].he : relationshipTypeLabel[group.relationshipType].en}
+                    </span>
+                  ) : (
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${matchTypeCls[group.maxMatchType] ?? 'bg-slate-100 border-slate-200 text-slate-600'}`}>
+                      {matchTypeLabel[group.maxMatchType] ?? group.maxMatchType}
+                    </span>
+                  )}
                   {group.myMatches.length > 1 && (
-                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600">
                       {tr.moreWishes(group.myMatches.length)}
                     </span>
                   )}
@@ -353,12 +379,25 @@ export default async function MyMatchesPage() {
                         </span>
                       </div>
                     )}
-                    <Link
-                      href={`/wishes/${m.myWishId}`}
-                      className="text-xs text-slate-600 hover:text-slate-900 leading-relaxed line-clamp-3 transition-colors flex-1"
-                    >
-                      {truncate(m.myWishText, group.myMatches.length > 1 ? 160 : 140)}
-                    </Link>
+                    <div className="flex-1 space-y-1.5">
+                      <Link
+                        href={`/wishes/${m.myWishId}`}
+                        className="text-xs text-slate-600 hover:text-slate-900 leading-relaxed line-clamp-3 transition-colors block"
+                      >
+                        {truncate(m.myWishText, group.myMatches.length > 1 ? 160 : 140)}
+                      </Link>
+                      {/* My wish's needs/skills */}
+                      {(m.myNeeds.length > 0 || m.mySkills.length > 0) && (
+                        <div className="flex flex-wrap gap-1 items-center">
+                          {m.myNeeds.map(n => (
+                            <span key={n} className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700">{n}</span>
+                          ))}
+                          {m.mySkills.map(s => (
+                            <span key={s} className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">{s}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     {group.myMatches.length > 1 && (
                       <span className="text-[10px] text-slate-400 shrink-0 pt-0.5">
                         {String(idx + 1)}

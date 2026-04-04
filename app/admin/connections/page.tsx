@@ -42,6 +42,7 @@ type Connection = {
   match_score: number
   match_type: string
   status: string
+  published: boolean | null
   created_at: string
 }
 
@@ -63,6 +64,26 @@ type Enrichment = {
   analyzed_at: string
 }
 
+type BilingualText = { he: string; en: string }
+
+type ConnectionEnrichment = {
+  wish_a_id: string
+  wish_b_id: string
+  resonance_score: number
+  collaboration_depth_score: number
+  overall_connection_score: number
+  confidence: number
+  relationship_type: string
+  why: BilingualText | null
+  opportunity_for_wish_a: BilingualText | null
+  opportunity_for_wish_b: BilingualText | null
+  shared_basis: BilingualText | null
+  risks_or_limits: BilingualText | null
+  model: string | null
+  prompt_version: string | null
+  enriched_at: string | null
+}
+
 type DebugResult = {
   logs: LogEntry[]
   connection: Connection | null
@@ -70,6 +91,7 @@ type DebugResult = {
   enrichment_b: Enrichment | null
   wish_a: Wish | null
   wish_b: Wish | null
+  connection_enrichment: ConnectionEnrichment | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -176,6 +198,99 @@ function EnrichmentCard({ enrichment, label }: { enrichment: Enrichment | null; 
             {enrichment.date_range_start ?? '(פתוח)'} → {enrichment.date_range_end ?? '(לעד)'}
           </p>
         </div>
+      )}
+    </div>
+  )
+}
+
+function ScoreMeter({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</span>
+        <span className={`text-sm font-black ${color}`}>{value}</span>
+      </div>
+      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${color.replace('text-', 'bg-')}`} style={{ width: `${value}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function BilingualBlock({ label, value }: { label: string; value: BilingualText | null }) {
+  if (!value) return null
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="text-sm text-slate-800 leading-relaxed">{value.he}</p>
+      {value.en && value.en !== value.he && (
+        <p className="text-xs text-slate-400 leading-relaxed italic" dir="ltr">{value.en}</p>
+      )}
+    </div>
+  )
+}
+
+const RELATIONSHIP_TYPE_LABELS: Record<string, string> = {
+  high_resonance_strong_collaboration: 'תהודה גבוהה + שיתוף פעולה חזק',
+  high_resonance_low_collaboration:    'תהודה גבוהה + שיתוף פעולה נמוך',
+  moderate_resonance_practical_match:  'תהודה בינונית + שיתוף פעולה מעשי',
+  weak_match:                          'התאמה חלשה',
+  unclear:                             'לא ברור',
+}
+
+function ConnectionEnrichmentCard({ enrichment }: { enrichment: ConnectionEnrichment | null }) {
+  if (!enrichment) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-3">שיפור חיבור — GPT</p>
+        <p className="text-slate-400 text-sm">לא בוצע ניתוח GPT לזוג זה עדיין</p>
+      </div>
+    )
+  }
+
+  const scoreColor = (v: number) =>
+    v >= 75 ? 'text-emerald-600' : v >= 50 ? 'text-amber-600' : 'text-red-500'
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">שיפור חיבור — GPT</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-2xl font-black text-indigo-700">{enrichment.overall_connection_score}</span>
+          <span className="text-xs text-slate-400">/ 100</span>
+          {enrichment.relationship_type && (
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
+              {RELATIONSHIP_TYPE_LABELS[enrichment.relationship_type] ?? enrichment.relationship_type}
+            </span>
+          )}
+          {enrichment.enriched_at && (
+            <span className="text-xs text-slate-400">{fmt(enrichment.enriched_at)}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Score meters */}
+      <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+        <ScoreMeter label="תהודה"           value={enrichment.resonance_score}           color={scoreColor(enrichment.resonance_score)} />
+        <ScoreMeter label="עומק שיתוף פעולה" value={enrichment.collaboration_depth_score} color={scoreColor(enrichment.collaboration_depth_score)} />
+        <ScoreMeter label="ציון כולל"        value={enrichment.overall_connection_score}  color={scoreColor(enrichment.overall_connection_score)} />
+        <ScoreMeter label="ביטחון המודל"     value={enrichment.confidence}               color="text-slate-600" />
+      </div>
+
+      {/* Bilingual texts */}
+      <div className="space-y-4 border-t border-slate-100 pt-4">
+        <BilingualBlock label="מדוע — why"                   value={enrichment.why} />
+        <BilingualBlock label="הזדמנות למשאלה א׳"            value={enrichment.opportunity_for_wish_a} />
+        <BilingualBlock label="הזדמנות למשאלה ב׳"            value={enrichment.opportunity_for_wish_b} />
+        <BilingualBlock label="בסיס משותף — shared basis"    value={enrichment.shared_basis} />
+        <BilingualBlock label="סיכונים / מגבלות"             value={enrichment.risks_or_limits} />
+      </div>
+
+      {/* Model metadata */}
+      {(enrichment.model || enrichment.prompt_version) && (
+        <p className="text-[10px] text-slate-300 font-mono" dir="ltr">
+          model: {enrichment.model} · prompt: {enrichment.prompt_version}
+        </p>
       )}
     </div>
   )
@@ -352,10 +467,22 @@ export default function ConnectionsDebugPage() {
                   <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600">
                     {result.connection.status}
                   </span>
+                  {result.connection.published != null && (
+                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
+                      result.connection.published
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        : 'bg-slate-50 border-slate-200 text-slate-500'
+                    }`}>
+                      {result.connection.published ? '✓ פורסם' : '○ לא פורסם'}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
           </div>
+
+          {/* Connection enrichment (GPT judgment) */}
+          <ConnectionEnrichmentCard enrichment={result.connection_enrichment} />
 
           {/* Match attempts log */}
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">

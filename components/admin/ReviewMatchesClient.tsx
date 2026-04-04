@@ -33,8 +33,18 @@ export interface WishStub {
 
 export interface WishEnrichmentStub {
   wish_id: string
+  themes: string[] | null
   needs: string[] | null
   skills_offered: string[] | null
+}
+
+export interface ConnectionEnrichmentStub {
+  wish_a_id: string
+  wish_b_id: string
+  overall_connection_score: number
+  resonance_score: number
+  collaboration_depth_score: number
+  relationship_type: string | null
 }
 
 export interface ExistingReview {
@@ -50,6 +60,8 @@ export interface ReviewMatchesProps {
   wishMap: Record<string, WishStub>
   enrichmentMap: Record<string, WishEnrichmentStub>
   connectionMap: Record<string, string | null>
+  connEnrichmentMap: Record<string, ConnectionEnrichmentStub>
+  connPublishedMap: Record<string, boolean>
   reviewMap: Record<string, ExistingReview>
   userEmail: string
   filters: { type: string; reviewed: string; gate: string; near: string; cancelled: string }
@@ -96,6 +108,14 @@ function RankBadge({ rank, created }: { rank: number | null; created: boolean })
       #{rank}{!created ? ' נחתך' : ''}
     </span>
   )
+}
+
+const RELATIONSHIP_TYPE_LABELS: Record<string, string> = {
+  high_resonance_strong_collaboration: 'תהודה גבוהה + שיתוף פעולה',
+  high_resonance_low_collaboration:    'תהודה גבוהה',
+  moderate_resonance_practical_match:  'התאמה מעשית',
+  weak_match:                          'חלש',
+  unclear:                             'לא ברור',
 }
 
 const SORT_OPTIONS: { key: string; label: string }[] = [
@@ -271,6 +291,8 @@ function ReviewCard({
   enrichA,
   enrichB,
   connectionId,
+  connEnrichment,
+  published,
   existingReview,
   userEmail,
   activeSort,
@@ -281,6 +303,8 @@ function ReviewCard({
   enrichA: WishEnrichmentStub | undefined
   enrichB: WishEnrichmentStub | undefined
   connectionId: string | null
+  connEnrichment: ConnectionEnrichmentStub | undefined
+  published: boolean
   existingReview: ExistingReview | undefined
   userEmail: string
   activeSort: string
@@ -363,15 +387,29 @@ function ReviewCard({
 
       {/* Wish texts */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-slate-50 rounded-xl p-3 space-y-1">
+        <div className="bg-slate-50 rounded-xl p-3 space-y-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">משאלה מקורית</p>
           <p className="text-sm text-slate-800 leading-relaxed">{wishA ? truncate(wishA.original_text) : attempt.wish_id}</p>
           {wishA?.contact_city && <p className="text-xs text-slate-400">{wishA.contact_city}</p>}
+          {enrichA?.themes && enrichA.themes.length > 0 && (
+            <div className="flex flex-wrap gap-1 pt-1">
+              {enrichA.themes.slice(0, 4).map(th => (
+                <span key={th} className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600">{th}</span>
+              ))}
+            </div>
+          )}
         </div>
-        <div className="bg-indigo-50/30 rounded-xl p-3 space-y-1">
+        <div className="bg-indigo-50/30 rounded-xl p-3 space-y-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">משאלה מועמדת</p>
           <p className="text-sm text-slate-800 leading-relaxed">{wishB ? truncate(wishB.original_text) : attempt.candidate_wish_id}</p>
           {wishB?.contact_city && <p className="text-xs text-slate-400">{wishB.contact_city}</p>}
+          {enrichB?.themes && enrichB.themes.length > 0 && (
+            <div className="flex flex-wrap gap-1 pt-1">
+              {enrichB.themes.slice(0, 4).map(th => (
+                <span key={th} className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600">{th}</span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -411,6 +449,29 @@ function ReviewCard({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Connection enrichment (GPT scores) */}
+      {connEnrichment && (
+        <div className="flex flex-wrap items-center gap-2 p-3 bg-indigo-50/40 rounded-xl border border-indigo-100">
+          <span className="text-base font-black text-indigo-700">{connEnrichment.overall_connection_score}/100</span>
+          <span className="text-xs text-slate-400">GPT</span>
+          {connEnrichment.relationship_type && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white border border-indigo-200 text-indigo-700">
+              {RELATIONSHIP_TYPE_LABELS[connEnrichment.relationship_type] ?? connEnrichment.relationship_type}
+            </span>
+          )}
+          <span className="text-xs text-slate-400 font-mono">
+            R:{connEnrichment.resonance_score} C:{connEnrichment.collaboration_depth_score}
+          </span>
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ms-auto ${
+            published
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+              : 'bg-slate-50 border-slate-200 text-slate-500'
+          }`}>
+            {published ? '✓ פורסם' : '○ לא פורסם'}
+          </span>
         </div>
       )}
 
@@ -459,7 +520,7 @@ function ReviewCard({
 // ── Main client component ─────────────────────────────────────────────────────
 
 export default function ReviewMatchesClient({
-  attempts, wishMap, enrichmentMap, connectionMap, reviewMap, userEmail, filters, sort, search, page, totalPages, totalCount,
+  attempts, wishMap, enrichmentMap, connectionMap, connEnrichmentMap, connPublishedMap, reviewMap, userEmail, filters, sort, search, page, totalPages, totalCount,
 }: ReviewMatchesProps) {
 
   const pathname = usePathname()
@@ -545,6 +606,8 @@ export default function ReviewMatchesClient({
                 enrichA={enrichmentMap[attempt.wish_id]}
                 enrichB={enrichmentMap[attempt.candidate_wish_id]}
                 connectionId={connectionMap[connKey] ?? null}
+                connEnrichment={connEnrichmentMap[connKey]}
+                published={connPublishedMap[connKey] ?? false}
                 existingReview={reviewMap[`${attempt.wish_id}:${attempt.candidate_wish_id}`]}
                 userEmail={userEmail}
                 activeSort={sort}
