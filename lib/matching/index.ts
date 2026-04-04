@@ -30,6 +30,7 @@ import { computeMatchScore, MATCH_THRESHOLD } from './score'
 import { haversineKm } from './geo'
 import { dateRangesOverlap } from './timeRange'
 import { sendConnectionEmail } from '@/lib/email/sendConnectionEmail'
+import { enrichConnections, type ConnectionPair } from './enrichConnection'
 import type { WishEnrichment } from '@/lib/types'
 
 /** Below this wish count, skip ANN and evaluate all pairs directly (same as admin batch full-scan). */
@@ -356,6 +357,48 @@ export async function processWishForMatching(
     if (upsertError) {
       console.error('[ResonanceEngine] upsert failed:', upsertError.message)
     }
+
+    // Connection enrichment (fire-and-forget — GPT judgment for each surviving pair)
+    ;(async () => {
+      try {
+        // Build pairs from topConnections, joining with logEntries for pre-computed metrics
+        const logByPair = new Map(
+          logEntries
+            .filter(e => e.passed_threshold)
+            .map(e => {
+              const [ka, kb] = canonicalPair(e.wish_id, e.candidate_wish_id)
+              return [`${ka}:${kb}`, e] as const
+            })
+        )
+
+        const pairs: ConnectionPair[] = topConnections.map(c => {
+          const log = logByPair.get(`${c.wish_a}:${c.wish_b}`)
+          return {
+            wish_a_id:             c.wish_a,
+            wish_b_id:             c.wish_b,
+            semantic_similarity:   log?.semantic_similarity   ?? 0,
+            structural_similarity: log?.structural_similarity ?? null,
+            complementarity_score: log?.complementarity_score ?? 0,
+          }
+        })
+
+        // Fetch wish texts for both sides of each pair (needed for prompt)
+        const allIds = [...new Set(pairs.flatMap(p => [p.wish_a_id, p.wish_b_id]))]
+        const { data: wishRows } = await supabase
+          .from('wishes')
+          .select('id, original_text')
+          .in('id', allIds)
+
+        const wishTexts  = new Map((wishRows ?? []).map((w: { id: string; original_text: string }) => [w.id, w.original_text]))
+        const translations = new Map(
+          [...enrichmentMap.entries()].map(([id, e]) => [id, (e as WishEnrichment & { translation_en?: string | null }).translation_en ?? null])
+        )
+
+        await enrichConnections(pairs, wishTexts, translations, enrichmentMap)
+      } catch (err) {
+        console.error('[ResonanceEngine] enrichConnections failed:', err)
+      }
+    })()
 
     // Send connection emails (fire-and-forget — never blocks the pipeline)
     console.log(`[email] ${topConnections.length} new connection(s) — starting email notify`)
