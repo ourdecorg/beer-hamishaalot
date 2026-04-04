@@ -5,6 +5,7 @@ import ReviewMatchesClient, {
   type AttemptRow,
   type WishStub,
   type WishEnrichmentStub,
+  type ConnectionEnrichmentStub,
   type ExistingReview,
 } from '@/components/admin/ReviewMatchesClient'
 
@@ -36,7 +37,8 @@ export default async function ReviewMatchesPage({
   const reviewedFilter  = typeof sp.reviewed  === 'string' ? sp.reviewed  : 'all'
   const gateFilter      = typeof sp.gate      === 'string' ? sp.gate      : 'all'
   const nearFilter      = typeof sp.near      === 'string' ? sp.near      : '0'
-  const cancelledFilter = typeof sp.cancelled === 'string' ? sp.cancelled : 'hide'
+  const cancelledFilter  = typeof sp.cancelled  === 'string' ? sp.cancelled  : 'hide'
+  const publishedFilter  = typeof sp.published  === 'string' ? sp.published  : 'all'
   const sortKey         = typeof sp.sort      === 'string' && SORT_COLUMNS[sp.sort] ? sp.sort : 'match_score'
   const page            = Math.max(1, parseInt(typeof sp.page === 'string' ? sp.page : '1') || 1)
   const searchFilter    = typeof sp.search    === 'string' ? sp.search.trim() : ''
@@ -90,9 +92,9 @@ export default async function ReviewMatchesPage({
   const wishMap: Record<string, WishStub> = {}
   for (const w of wishRows ?? []) wishMap[w.id] = w as WishStub
 
-  // ── 3. Fetch enrichment stubs (needs + skills_offered) ───────────────────
+  // ── 3. Fetch enrichment stubs (themes + needs + skills_offered) ──────────
   const { data: enrichmentRows } = wishIds.length > 0
-    ? await admin.from('wish_enrichment').select('wish_id, needs, skills_offered').in('wish_id', wishIds)
+    ? await admin.from('wish_enrichment').select('wish_id, themes, needs, skills_offered').in('wish_id', wishIds)
     : { data: [] }
 
   const enrichmentMap: Record<string, WishEnrichmentStub> = {}
@@ -102,7 +104,7 @@ export default async function ReviewMatchesPage({
   const { data: connRows } = wishIds.length > 0
     ? await admin
         .from('wish_connections')
-        .select('id, wish_a, wish_b')
+        .select('id, wish_a, wish_b, published')
         .or(`wish_a.in.(${wishIds.join(',')}),wish_b.in.(${wishIds.join(',')})`)
     : { data: [] }
 
@@ -110,6 +112,32 @@ export default async function ReviewMatchesPage({
   for (const c of connRows ?? []) {
     const key = c.wish_a < c.wish_b ? `${c.wish_a}:${c.wish_b}` : `${c.wish_b}:${c.wish_a}`
     connectionMap[key] = c.id
+  }
+
+  // ── 4b. Fetch connection_enrichment for existing connections ──────────────
+  const connPairs = (connRows ?? []).map(c => ({ a: c.wish_a, b: c.wish_b }))
+  const connEnrichmentMap: Record<string, ConnectionEnrichmentStub> = {}
+  const connPublishedMap: Record<string, boolean> = {}
+
+  for (const c of connRows ?? []) {
+    const key = c.wish_a < c.wish_b ? `${c.wish_a}:${c.wish_b}` : `${c.wish_b}:${c.wish_a}`
+    connPublishedMap[key] = c.published ?? false
+  }
+
+  if (connPairs.length > 0) {
+    const allAs = [...new Set(connPairs.map(p => p.a))]
+    const allBs = [...new Set(connPairs.map(p => p.b))]
+    const { data: ceRows } = await admin
+      .from('connection_enrichment')
+      .select('wish_a_id, wish_b_id, overall_connection_score, resonance_score, collaboration_depth_score, relationship_type')
+      .in('wish_a_id', allAs)
+      .in('wish_b_id', allBs)
+
+    const pairSet = new Set(connPairs.map(p => `${p.a}:${p.b}`))
+    for (const ce of ceRows ?? []) {
+      const key = `${ce.wish_a_id}:${ce.wish_b_id}`
+      if (pairSet.has(key)) connEnrichmentMap[key] = ce as ConnectionEnrichmentStub
+    }
   }
 
   // ── 5. Fetch existing reviews ─────────────────────────────────────────────
@@ -141,15 +169,30 @@ export default async function ReviewMatchesPage({
     attempts = attempts.filter(a => !reviewMap[`${a.wish_id}:${a.candidate_wish_id}`])
   }
 
+  // ── 8. Apply published filter ─────────────────────────────────────────────
+  if (publishedFilter === 'yes') {
+    attempts = attempts.filter(a => {
+      const key = a.wish_id < a.candidate_wish_id ? `${a.wish_id}:${a.candidate_wish_id}` : `${a.candidate_wish_id}:${a.wish_id}`
+      return connectionMap[key] != null && connPublishedMap[key] === true
+    })
+  } else if (publishedFilter === 'no') {
+    attempts = attempts.filter(a => {
+      const key = a.wish_id < a.candidate_wish_id ? `${a.wish_id}:${a.candidate_wish_id}` : `${a.candidate_wish_id}:${a.wish_id}`
+      return connectionMap[key] != null && connPublishedMap[key] === false
+    })
+  }
+
   return (
     <ReviewMatchesClient
       attempts={attempts}
       wishMap={wishMap}
       enrichmentMap={enrichmentMap}
       connectionMap={connectionMap}
+      connEnrichmentMap={connEnrichmentMap}
+      connPublishedMap={connPublishedMap}
       reviewMap={reviewMap}
       userEmail={user.email!}
-      filters={{ type: typeFilter, reviewed: reviewedFilter, gate: gateFilter, near: nearFilter, cancelled: cancelledFilter }}
+      filters={{ type: typeFilter, reviewed: reviewedFilter, gate: gateFilter, near: nearFilter, cancelled: cancelledFilter, published: publishedFilter }}
       sort={sortKey}
       search={searchFilter}
       page={page}

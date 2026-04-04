@@ -38,6 +38,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     .select('*')
     .or(`wish_a.eq.${params.id},wish_b.eq.${params.id}`)
     .neq('status', 'deleted')
+    .eq('published', true)
     .order('match_score', { ascending: false })
 
   if (error) {

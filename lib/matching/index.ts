@@ -29,11 +29,14 @@ import { buildAnchorKeywords, computeStructuralSimilarity } from './keywords'
 import { computeMatchScore, MATCH_THRESHOLD } from './score'
 import { haversineKm } from './geo'
 import { dateRangesOverlap } from './timeRange'
-import { sendConnectionEmail } from '@/lib/email/sendConnectionEmail'
+import { enrichConnections, type ConnectionPair } from './enrichConnection'
 import type { WishEnrichment } from '@/lib/types'
 
 /** Below this wish count, skip ANN and evaluate all pairs directly (same as admin batch full-scan). */
 const FULL_SCAN_MAX = 300
+
+/** Maximum connections created per wish run — keep only the top-N by match_score. */
+const MAX_CONNECTIONS_PER_WISH = 3
 
 type RecallSource = 'semantic' | 'structured' | 'both'
 
@@ -98,7 +101,16 @@ export async function processWishForMatching(
         .select('wish_id')
         .neq('wish_id', wishId)
       if (allWishes && allWishes.length <= FULL_SCAN_MAX) {
-        explicitCandidateIds = allWishes.map((w: { wish_id: string }) => w.wish_id)
+        // Filter out cancelled wishes — wish_embeddings has no status column so we
+        // cross-reference with wishes. The admin client bypasses RLS, making this
+        // necessary explicitly (the RPCs already do this via their JOIN + WHERE).
+        const embeddedIds = allWishes.map((w: { wish_id: string }) => w.wish_id)
+        const { data: activeWishes } = await supabase
+          .from('wishes')
+          .select('id')
+          .in('id', embeddedIds)
+          .neq('status', 'cancelled')
+        explicitCandidateIds = (activeWishes ?? []).map((w: { id: string }) => w.id)
       }
     }
 
@@ -199,6 +211,7 @@ export async function processWishForMatching(
       passed_threshold: boolean
       gate_passed: boolean
       gate_reason: string
+      connection_rank: number | null
     }> = []
 
     for (const candidate of merged) {
@@ -225,6 +238,7 @@ export async function processWishForMatching(
           passed_threshold:      false,
           gate_passed:           false,
           gate_reason:           'date_range_mismatch',
+          connection_rank:       null,
         })
         continue
       }
@@ -259,6 +273,7 @@ export async function processWishForMatching(
           passed_threshold:      false,
           gate_passed:           false,
           gate_reason:           'low_semantic',
+          connection_rank:       null,
         })
         continue
       }
@@ -286,6 +301,7 @@ export async function processWishForMatching(
         passed_threshold:      passed,
         gate_passed:           true,
         gate_reason:           'passed',
+        connection_rank:       null,  // assigned after loop once all scores are known
       })
 
       if (!passed) continue
@@ -300,8 +316,22 @@ export async function processWishForMatching(
       })
     }
 
+    // Assign connection_rank to all threshold-passing log entries (sorted by match_score desc)
+    const passingEntries = logEntries
+      .filter(e => e.passed_threshold)
+      .sort((a, b) => b.match_score - a.match_score)
+    passingEntries.forEach((e, i) => { e.connection_rank = i + 1 })
+
+    // Cap to top-N connections by match_score
+    const topConnections = connections
+      .sort((a, b) => b.match_score - a.match_score)
+      .slice(0, MAX_CONNECTIONS_PER_WISH)
+    if (topConnections.length < connections.length) {
+      console.log(`[matching] capped connections ${connections.length} → ${topConnections.length} (MAX_CONNECTIONS_PER_WISH=${MAX_CONNECTIONS_PER_WISH})`)
+    }
+
     // Write log entries (fire-and-forget with retry)
-    console.log(`[matching] logEntries=${logEntries.length} connections=${connections.length}`)
+    console.log(`[matching] logEntries=${logEntries.length} connections=${topConnections.length}`)
     if (logEntries.length > 0) {
       ;(async () => {
         for (let attempt = 0; attempt < 3; attempt++) {
@@ -318,70 +348,56 @@ export async function processWishForMatching(
       })()
     }
 
-    if (connections.length === 0) return
+    if (topConnections.length === 0) return
 
     const { error: upsertError } = await supabase
       .from('wish_connections')
-      .upsert(connections, { onConflict: 'wish_a,wish_b', ignoreDuplicates: true })
+      .upsert(topConnections, { onConflict: 'wish_a,wish_b', ignoreDuplicates: true })
     if (upsertError) {
       console.error('[ResonanceEngine] upsert failed:', upsertError.message)
     }
 
-    // Send connection emails (fire-and-forget — never blocks the pipeline)
-    console.log(`[email] ${connections.length} new connection(s) — starting email notify`)
-    if (connections.length > 0 && !upsertError) {
-      ;(async () => {
-        try {
-          const wishIds = connections.flatMap(c => [c.wish_a, c.wish_b])
-          const { data: wishes, error: wishFetchErr } = await supabase
-            .from('wishes')
-            .select('id, original_text, contact_name, contact_email, contact_phone, contact_city')
-            .in('id', wishIds)
+    // Connection enrichment (fire-and-forget — GPT judgment for each surviving pair)
+    ;(async () => {
+      try {
+        // Build pairs from topConnections, joining with logEntries for pre-computed metrics
+        const logByPair = new Map(
+          logEntries
+            .filter(e => e.passed_threshold)
+            .map(e => {
+              const [ka, kb] = canonicalPair(e.wish_id, e.candidate_wish_id)
+              return [`${ka}:${kb}`, e] as const
+            })
+        )
 
-          if (wishFetchErr) {
-            console.error('[email] fetch wishes failed:', wishFetchErr.message)
-            return
+        const pairs: ConnectionPair[] = topConnections.map(c => {
+          const log = logByPair.get(`${c.wish_a}:${c.wish_b}`)
+          return {
+            wish_a_id:             c.wish_a,
+            wish_b_id:             c.wish_b,
+            semantic_similarity:   log?.semantic_similarity   ?? 0,
+            structural_similarity: log?.structural_similarity ?? null,
+            complementarity_score: log?.complementarity_score ?? 0,
           }
-          if (!wishes || wishes.length === 0) {
-            console.warn('[email] no wish rows returned for ids:', wishIds)
-            return
-          }
-          console.log(`[email] fetched ${wishes.length} wish row(s)`)
+        })
 
-          const wishMap = new Map(wishes.map(w => [w.id, w]))
+        // Fetch wish texts for both sides of each pair (needed for prompt)
+        const allIds = [...new Set(pairs.flatMap(p => [p.wish_a_id, p.wish_b_id]))]
+        const { data: wishRows } = await supabase
+          .from('wishes')
+          .select('id, original_text')
+          .in('id', allIds)
 
-          for (const conn of connections) {
-            const wA = wishMap.get(conn.wish_a)
-            const wB = wishMap.get(conn.wish_b)
-            if (!wA?.contact_email || !wB?.contact_email) {
-              console.warn(`[email] skipping ${conn.wish_a}↔${conn.wish_b}: missing contact_email (A=${wA?.contact_email ?? 'null'} B=${wB?.contact_email ?? 'null'})`)
-              continue
-            }
+        const wishTexts  = new Map((wishRows ?? []).map((w: { id: string; original_text: string }) => [w.id, w.original_text]))
+        const translations = new Map(
+          [...enrichmentMap.entries()].map(([id, e]) => [id, (e as WishEnrichment & { translation_en?: string | null }).translation_en ?? null])
+        )
 
-            console.log(`[email] sending to ${wA.contact_email} + ${wB.contact_email}`)
-            await sendConnectionEmail(
-              {
-                wishText:     wA.original_text,
-                contactName:  wA.contact_name  ?? '',
-                contactEmail: wA.contact_email,
-                contactPhone: wA.contact_phone ?? null,
-                contactCity:  wA.contact_city  ?? null,
-              },
-              {
-                wishText:     wB.original_text,
-                contactName:  wB.contact_name  ?? '',
-                contactEmail: wB.contact_email,
-                contactPhone: wB.contact_phone ?? null,
-                contactCity:  wB.contact_city  ?? null,
-              },
-            )
-            console.log(`[email] sent OK — from: ${process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev'}`)
-          }
-        } catch (err) {
-          console.error('[ResonanceEngine] sendConnectionEmail failed:', err)
-        }
-      })()
-    }
+        await enrichConnections(pairs, wishTexts, translations, enrichmentMap)
+      } catch (err) {
+        console.error('[ResonanceEngine] enrichConnections failed:', err)
+      }
+    })()
 
   } catch (err) {
     console.error('[ResonanceEngine] processWishForMatching failed:', err)

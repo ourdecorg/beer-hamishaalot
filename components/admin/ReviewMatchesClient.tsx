@@ -20,6 +20,7 @@ export interface AttemptRow {
   gate_passed: boolean | null
   gate_reason: string | null
   recall_source: string | null
+  connection_rank: number | null
   created_at: string
 }
 
@@ -32,8 +33,18 @@ export interface WishStub {
 
 export interface WishEnrichmentStub {
   wish_id: string
+  themes: string[] | null
   needs: string[] | null
   skills_offered: string[] | null
+}
+
+export interface ConnectionEnrichmentStub {
+  wish_a_id: string
+  wish_b_id: string
+  overall_connection_score: number
+  resonance_score: number
+  collaboration_depth_score: number
+  relationship_type: string | null
 }
 
 export interface ExistingReview {
@@ -49,9 +60,11 @@ export interface ReviewMatchesProps {
   wishMap: Record<string, WishStub>
   enrichmentMap: Record<string, WishEnrichmentStub>
   connectionMap: Record<string, string | null>
+  connEnrichmentMap: Record<string, ConnectionEnrichmentStub>
+  connPublishedMap: Record<string, boolean>
   reviewMap: Record<string, ExistingReview>
   userEmail: string
-  filters: { type: string; reviewed: string; gate: string; near: string; cancelled: string }
+  filters: { type: string; reviewed: string; gate: string; near: string; cancelled: string; published: string }
   sort: string
   search: string
   page: number
@@ -82,6 +95,29 @@ const labelConfig: Record<Label, { label: string; active: string; idle: string }
   bad:   { label: 'לא טוב', active: 'bg-red-500 text-white border-red-500',         idle: 'border-red-300 text-red-600 hover:bg-red-50' },
 }
 
+function RankBadge({ rank, created }: { rank: number | null; created: boolean }) {
+  if (rank == null) return null
+  return (
+    <span className={`text-xs font-bold px-2.5 py-1 rounded-full border tabular-nums ${
+      !created
+        ? 'bg-amber-50 border-amber-300 text-amber-700'
+        : rank === 1
+          ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+          : 'bg-indigo-50 border-indigo-200 text-indigo-700'
+    }`}>
+      #{rank}{!created ? ' נחתך' : ''}
+    </span>
+  )
+}
+
+const RELATIONSHIP_TYPE_LABELS: Record<string, string> = {
+  high_resonance_strong_collaboration: 'תהודה גבוהה + שיתוף פעולה',
+  high_resonance_low_collaboration:    'תהודה גבוהה',
+  moderate_resonance_practical_match:  'התאמה מעשית',
+  weak_match:                          'חלש',
+  unclear:                             'לא ברור',
+}
+
 const SORT_OPTIONS: { key: string; label: string }[] = [
   { key: 'match_score',     label: 'ציון סופי' },
   { key: 'semantic_en',     label: 'סמנטי' },
@@ -102,7 +138,7 @@ function buildUrl(
 ) {
   const params = new URLSearchParams({
     type: filters.type, reviewed: filters.reviewed, gate: filters.gate,
-    near: filters.near, cancelled: filters.cancelled,
+    near: filters.near, cancelled: filters.cancelled, published: filters.published,
     sort, page: String(page),
     ...overrides,
   })
@@ -162,6 +198,11 @@ function FilterBar({
 
         {filterLink('cancelled', filters.cancelled === 'show' ? 'hide' : 'show',
           filters.cancelled === 'show' ? '× כולל מבוטלות' : 'כולל מבוטלות', filters.cancelled === 'show')}
+
+        <span className="font-semibold text-slate-700 mr-1">פרסום:</span>
+        {filterLink('published', 'all', 'הכל',       filters.published === 'all')}
+        {filterLink('published', 'yes', 'פורסמו',     filters.published === 'yes')}
+        {filterLink('published', 'no',  'לא פורסמו',  filters.published === 'no')}
       </div>
 
       {/* Sort */}
@@ -255,6 +296,8 @@ function ReviewCard({
   enrichA,
   enrichB,
   connectionId,
+  connEnrichment,
+  published,
   existingReview,
   userEmail,
   activeSort,
@@ -265,6 +308,8 @@ function ReviewCard({
   enrichA: WishEnrichmentStub | undefined
   enrichB: WishEnrichmentStub | undefined
   connectionId: string | null
+  connEnrichment: ConnectionEnrichmentStub | undefined
+  published: boolean
   existingReview: ExistingReview | undefined
   userEmail: string
   activeSort: string
@@ -326,6 +371,7 @@ function ReviewCard({
             לא נוצר חיבור
           </span>
         )}
+        <RankBadge rank={attempt.connection_rank} created={hasConnection} />
         {attempt.match_type && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
             {attempt.match_type}
@@ -346,15 +392,29 @@ function ReviewCard({
 
       {/* Wish texts */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-slate-50 rounded-xl p-3 space-y-1">
+        <div className="bg-slate-50 rounded-xl p-3 space-y-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">משאלה מקורית</p>
           <p className="text-sm text-slate-800 leading-relaxed">{wishA ? truncate(wishA.original_text) : attempt.wish_id}</p>
           {wishA?.contact_city && <p className="text-xs text-slate-400">{wishA.contact_city}</p>}
+          {enrichA?.themes && enrichA.themes.length > 0 && (
+            <div className="flex flex-wrap gap-1 pt-1">
+              {enrichA.themes.slice(0, 4).map(th => (
+                <span key={th} className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600">{th}</span>
+              ))}
+            </div>
+          )}
         </div>
-        <div className="bg-indigo-50/30 rounded-xl p-3 space-y-1">
+        <div className="bg-indigo-50/30 rounded-xl p-3 space-y-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">משאלה מועמדת</p>
           <p className="text-sm text-slate-800 leading-relaxed">{wishB ? truncate(wishB.original_text) : attempt.candidate_wish_id}</p>
           {wishB?.contact_city && <p className="text-xs text-slate-400">{wishB.contact_city}</p>}
+          {enrichB?.themes && enrichB.themes.length > 0 && (
+            <div className="flex flex-wrap gap-1 pt-1">
+              {enrichB.themes.slice(0, 4).map(th => (
+                <span key={th} className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600">{th}</span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -394,6 +454,29 @@ function ReviewCard({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Connection enrichment (GPT scores) */}
+      {connEnrichment && (
+        <div className="flex flex-wrap items-center gap-2 p-3 bg-indigo-50/40 rounded-xl border border-indigo-100">
+          <span className="text-base font-black text-indigo-700">{connEnrichment.overall_connection_score}/100</span>
+          <span className="text-xs text-slate-400">GPT</span>
+          {connEnrichment.relationship_type && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white border border-indigo-200 text-indigo-700">
+              {RELATIONSHIP_TYPE_LABELS[connEnrichment.relationship_type] ?? connEnrichment.relationship_type}
+            </span>
+          )}
+          <span className="text-xs text-slate-400 font-mono">
+            R:{connEnrichment.resonance_score} C:{connEnrichment.collaboration_depth_score}
+          </span>
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ms-auto ${
+            published
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+              : 'bg-slate-50 border-slate-200 text-slate-500'
+          }`}>
+            {published ? '✓ פורסם' : '○ לא פורסם'}
+          </span>
         </div>
       )}
 
@@ -442,7 +525,7 @@ function ReviewCard({
 // ── Main client component ─────────────────────────────────────────────────────
 
 export default function ReviewMatchesClient({
-  attempts, wishMap, enrichmentMap, connectionMap, reviewMap, userEmail, filters, sort, search, page, totalPages, totalCount,
+  attempts, wishMap, enrichmentMap, connectionMap, connEnrichmentMap, connPublishedMap, reviewMap, userEmail, filters, sort, search, page, totalPages, totalCount,
 }: ReviewMatchesProps) {
 
   const pathname = usePathname()
@@ -528,6 +611,8 @@ export default function ReviewMatchesClient({
                 enrichA={enrichmentMap[attempt.wish_id]}
                 enrichB={enrichmentMap[attempt.candidate_wish_id]}
                 connectionId={connectionMap[connKey] ?? null}
+                connEnrichment={connEnrichmentMap[connKey]}
+                published={connPublishedMap[connKey] ?? false}
                 existingReview={reviewMap[`${attempt.wish_id}:${attempt.candidate_wish_id}`]}
                 userEmail={userEmail}
                 activeSort={sort}

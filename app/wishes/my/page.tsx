@@ -16,6 +16,7 @@ export async function generateMetadata() {
 export default async function MyWishesPage() {
   const [supabase, lang] = await Promise.all([createClient(), getLang()])
   const tr = t(lang).myWishes
+  const isHe = lang === 'he'
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -35,29 +36,61 @@ export default async function MyWishesPage() {
   const wishList = wishes ?? []
   const ids = wishList.map((w) => w.id)
 
-  const matchCountMap = new Map<string, number>()
-  if (ids.length > 0) {
-    const { data: connections } = await supabase
-      .from('wish_connections')
-      .select('wish_a, wish_b')
-      .or(`wish_a.in.(${ids.join(',')}),wish_b.in.(${ids.join(',')})`)
-      .neq('status', 'deleted')
+  // Parallel fetches for matches, resonances, enrichment, and best connection scores
+  const [connectionsRes, resonancesRes, enrichmentRes, connEnrichRes] = await Promise.all([
+    ids.length > 0
+      ? supabase
+          .from('wish_connections')
+          .select('wish_a, wish_b')
+          .or(`wish_a.in.(${ids.join(',')}),wish_b.in.(${ids.join(',')})`)
+          .neq('status', 'deleted')
+          .eq('published', true)
+      : Promise.resolve({ data: [] }),
 
-    for (const c of connections ?? []) {
-      if (ids.includes(c.wish_a)) matchCountMap.set(c.wish_a, (matchCountMap.get(c.wish_a) ?? 0) + 1)
-      if (ids.includes(c.wish_b)) matchCountMap.set(c.wish_b, (matchCountMap.get(c.wish_b) ?? 0) + 1)
-    }
+    ids.length > 0
+      ? supabase.from('wish_resonances').select('wish_id').in('wish_id', ids)
+      : Promise.resolve({ data: [] }),
+
+    ids.length > 0
+      ? supabase
+          .from('wish_enrichment')
+          .select('wish_id, themes, intent, needs, skills_offered')
+          .in('wish_id', ids)
+      : Promise.resolve({ data: [] }),
+
+    ids.length > 0
+      ? supabase
+          .from('connection_enrichment')
+          .select('wish_a_id, wish_b_id, overall_connection_score')
+          .or(`wish_a_id.in.(${ids.join(',')}),wish_b_id.in.(${ids.join(',')})`)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  const matchCountMap = new Map<string, number>()
+  for (const c of connectionsRes.data ?? []) {
+    if (ids.includes(c.wish_a)) matchCountMap.set(c.wish_a, (matchCountMap.get(c.wish_a) ?? 0) + 1)
+    if (ids.includes(c.wish_b)) matchCountMap.set(c.wish_b, (matchCountMap.get(c.wish_b) ?? 0) + 1)
   }
 
   const resonanceCountMap = new Map<string, number>()
-  if (ids.length > 0) {
-    const { data: resonances } = await supabase
-      .from('wish_resonances')
-      .select('wish_id')
-      .in('wish_id', ids)
+  for (const r of resonancesRes.data ?? []) {
+    resonanceCountMap.set(r.wish_id, (resonanceCountMap.get(r.wish_id) ?? 0) + 1)
+  }
 
-    for (const r of resonances ?? []) {
-      resonanceCountMap.set(r.wish_id, (resonanceCountMap.get(r.wish_id) ?? 0) + 1)
+  type EnrichRow = { wish_id: string; themes: string[] | null; intent: string | null; needs: string[] | null; skills_offered: string[] | null }
+  const enrichMap = new Map<string, EnrichRow>(
+    (enrichmentRes.data ?? []).map((e: EnrichRow) => [e.wish_id, e])
+  )
+
+  // Best overall_connection_score per wish
+  const bestScoreMap = new Map<string, number>()
+  for (const row of connEnrichRes.data ?? []) {
+    const score = row.overall_connection_score
+    for (const wid of [row.wish_a_id, row.wish_b_id]) {
+      if (ids.includes(wid)) {
+        const prev = bestScoreMap.get(wid) ?? 0
+        if (score > prev) bestScoreMap.set(wid, score)
+      }
     }
   }
 
@@ -99,8 +132,11 @@ export default async function MyWishesPage() {
           {wishList.map((wish) => {
             const vis = visibilityLabel[wish.visibility as keyof typeof visibilityLabel]
               ?? visibilityLabel.open
-            const matchCount = matchCountMap.get(wish.id) ?? 0
+            const matchCount   = matchCountMap.get(wish.id) ?? 0
             const resonanceCount = resonanceCountMap.get(wish.id) ?? 0
+            const bestScore    = bestScoreMap.get(wish.id) ?? null
+            const enrich       = enrichMap.get(wish.id)
+
             const date = new Date(wish.created_at).toLocaleDateString(dateLocale(lang), {
               day: 'numeric',
               month: 'long',
@@ -111,12 +147,17 @@ export default async function MyWishesPage() {
                 ? wish.original_text.slice(0, 200) + '…'
                 : wish.original_text
 
+            const topThemes = (enrich?.themes ?? []).slice(0, 4)
+            const needs     = (enrich?.needs ?? []).slice(0, 3)
+            const skills    = (enrich?.skills_offered ?? []).slice(0, 3)
+
             return (
               <Link
                 key={wish.id}
                 href={`/wishes/${wish.id}`}
                 className="card-hover p-6 flex flex-col gap-3 block"
               >
+                {/* Header row */}
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="section-label text-xs">{date}</span>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -127,12 +168,61 @@ export default async function MyWishesPage() {
                   </div>
                 </div>
 
+                {/* Intent label */}
+                {enrich?.intent && (
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-indigo-500">
+                    {enrich.intent}
+                  </p>
+                )}
+
+                {/* Wish text */}
                 <p className="text-slate-800 leading-relaxed">{truncated}</p>
 
+                {/* Theme pills */}
+                {topThemes.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {topThemes.map(th => (
+                      <span key={th} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600">
+                        {th}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Needs / Skills */}
+                {(needs.length > 0 || skills.length > 0) && (
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    {needs.length > 0 && (
+                      <>
+                        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                          {isHe ? 'צריך' : 'Needs'}
+                        </span>
+                        {needs.map(n => (
+                          <span key={n} className="text-xs px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700">{n}</span>
+                        ))}
+                      </>
+                    )}
+                    {skills.length > 0 && (
+                      <>
+                        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 ms-2">
+                          {isHe ? 'מציע' : 'Offers'}
+                        </span>
+                        {skills.map(s => (
+                          <span key={s} className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">{s}</span>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Footer row */}
                 <div className="flex items-center gap-3 pt-1 border-t border-slate-100 flex-wrap">
                   {matchCount > 0 ? (
                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
                       🎯 {tr.matches(matchCount)}
+                      {bestScore != null && (
+                        <span className="font-black text-indigo-900 ms-1">{bestScore}/100</span>
+                      )}
                     </span>
                   ) : (
                     <span className="text-xs text-slate-300">{tr.noMatches}</span>

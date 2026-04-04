@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   }
 
   // ── Pair debug data ────────────────────────────────────────────
-  const [logsAB, logsBA, connResult, enrichA, enrichB, wishAResult, wishBResult] =
+  const [logsAB, logsBA, connResult, enrichA, enrichB, wishAResult, wishBResult, connEnrichResult] =
     await Promise.all([
       // A→B attempts
       supabase
@@ -67,14 +67,14 @@ export async function GET(request: NextRequest) {
         )
         .maybeSingle(),
 
-      // Enrichment A
+      // Wish enrichment A
       supabase
         .from('wish_enrichment')
         .select('*')
         .eq('wish_id', wishA)
         .maybeSingle(),
 
-      // Enrichment B
+      // Wish enrichment B
       supabase
         .from('wish_enrichment')
         .select('*')
@@ -94,6 +94,15 @@ export async function GET(request: NextRequest) {
         .select('id, original_text, created_at, visibility, contact_name, contact_email, contact_city, contact_country')
         .eq('id', wishB)
         .single(),
+
+      // Connection enrichment (GPT judgment for this pair)
+      supabase
+        .from('connection_enrichment')
+        .select('*')
+        .or(
+          `and(wish_a_id.eq.${wishA},wish_b_id.eq.${wishB}),and(wish_a_id.eq.${wishB},wish_b_id.eq.${wishA})`
+        )
+        .maybeSingle(),
     ])
 
   // Merge both directions, sort by date desc
@@ -109,5 +118,6 @@ export async function GET(request: NextRequest) {
     enrichment_b: enrichB.data ?? null,
     wish_a: wishAResult.data ?? null,
     wish_b: wishBResult.data ?? null,
+    connection_enrichment: connEnrichResult.data ?? null,
   })
 }
