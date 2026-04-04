@@ -83,20 +83,17 @@ const labelConfig: Record<Label, { label: string; active: string; idle: string }
   bad:   { label: 'לא טוב', active: 'bg-red-500 text-white border-red-500',         idle: 'border-red-300 text-red-600 hover:bg-red-50' },
 }
 
-const MAX_CONNECTIONS_PER_WISH = 3
-
-function RankBadge({ rank }: { rank: number | null }) {
+function RankBadge({ rank, created }: { rank: number | null; created: boolean }) {
   if (rank == null) return null
-  const capped = rank > MAX_CONNECTIONS_PER_WISH
   return (
     <span className={`text-xs font-bold px-2.5 py-1 rounded-full border tabular-nums ${
-      capped
+      !created
         ? 'bg-amber-50 border-amber-300 text-amber-700'
         : rank === 1
           ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
           : 'bg-indigo-50 border-indigo-200 text-indigo-700'
     }`}>
-      #{rank}{capped ? ' נחתך' : ''}
+      #{rank}{!created ? ' נחתך' : ''}
     </span>
   )
 }
@@ -345,7 +342,7 @@ function ReviewCard({
             לא נוצר חיבור
           </span>
         )}
-        <RankBadge rank={attempt.connection_rank} />
+        <RankBadge rank={attempt.connection_rank} created={hasConnection} />
         {attempt.match_type && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
             {attempt.match_type}
