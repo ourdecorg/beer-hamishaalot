@@ -378,34 +378,53 @@ export async function enrichConnection(
 
   // Send notification emails to both wish owners
   try {
-    const { data: wishRows } = await supabase
-      .from('wishes')
-      .select('id, original_text, contact_name, contact_email, contact_phone, contact_city')
-      .in('id', [wish_a_id, wish_b_id])
+    const [wishRowsRes, enrichRowsRes] = await Promise.all([
+      supabase
+        .from('wishes')
+        .select('id, original_text, contact_name, contact_email, contact_phone, contact_city')
+        .in('id', [wish_a_id, wish_b_id]),
+      supabase
+        .from('wish_enrichment')
+        .select('wish_id, needs, skills_offered')
+        .in('wish_id', [wish_a_id, wish_b_id]),
+    ])
 
-    const wA = (wishRows ?? []).find((w: { id: string }) => w.id === wish_a_id)
-    const wB = (wishRows ?? []).find((w: { id: string }) => w.id === wish_b_id)
+    const wA = (wishRowsRes.data ?? []).find((w: { id: string }) => w.id === wish_a_id)
+    const wB = (wishRowsRes.data ?? []).find((w: { id: string }) => w.id === wish_b_id)
+    const eA = (enrichRowsRes.data ?? []).find((e: { wish_id: string }) => e.wish_id === wish_a_id)
+    const eB = (enrichRowsRes.data ?? []).find((e: { wish_id: string }) => e.wish_id === wish_b_id)
 
     if (!wA?.contact_email || !wB?.contact_email) {
       console.warn(`[ConnectionEnrichment] skipping email ${wish_a_id}↔${wish_b_id}: missing contact_email (A=${wA?.contact_email ?? 'null'} B=${wB?.contact_email ?? 'null'})`)
       return
     }
 
+    const sharedBasisEn = (result.shared_basis as { en?: string })?.en ?? null
+
     await sendConnectionEmail(
       {
-        wishText:     wA.original_text,
-        contactName:  wA.contact_name  ?? '',
-        contactEmail: wA.contact_email,
-        contactPhone: wA.contact_phone ?? null,
-        contactCity:  wA.contact_city  ?? null,
+        wishText:        wA.original_text,
+        contactName:     wA.contact_name  ?? '',
+        contactEmail:    wA.contact_email,
+        contactPhone:    wA.contact_phone ?? null,
+        contactCity:     wA.contact_city  ?? null,
+        opportunityText: (result.opportunity_for_wish_a as { en?: string })?.en ?? null,
+        sharedBasisText: sharedBasisEn,
+        theirNeeds:      (eB?.needs as string[] | null)   ?? [],
+        theirSkills:     (eB?.skills_offered as string[] | null) ?? [],
       },
       {
-        wishText:     wB.original_text,
-        contactName:  wB.contact_name  ?? '',
-        contactEmail: wB.contact_email,
-        contactPhone: wB.contact_phone ?? null,
-        contactCity:  wB.contact_city  ?? null,
+        wishText:        wB.original_text,
+        contactName:     wB.contact_name  ?? '',
+        contactEmail:    wB.contact_email,
+        contactPhone:    wB.contact_phone ?? null,
+        contactCity:     wB.contact_city  ?? null,
+        opportunityText: (result.opportunity_for_wish_b as { en?: string })?.en ?? null,
+        sharedBasisText: sharedBasisEn,
+        theirNeeds:      (eA?.needs as string[] | null)   ?? [],
+        theirSkills:     (eA?.skills_offered as string[] | null) ?? [],
       },
+      { overallScore: result.overall_connection_score },
     )
     console.log(`[ConnectionEnrichment] email sent ${wish_a_id}↔${wish_b_id}`)
   } catch (emailErr) {

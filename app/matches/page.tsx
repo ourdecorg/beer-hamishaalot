@@ -4,6 +4,7 @@ import Header from '@/components/layout/Header'
 import { createClient } from '@/lib/supabase/server'
 import { t, dateLocale } from '@/lib/i18n'
 import { getLang } from '@/lib/i18n/server'
+import type { Lang } from '@/lib/i18n'
 import type { MatchType } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -15,26 +16,45 @@ export async function generateMetadata() {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+interface BilingualText { he: string; en: string }
+
+interface ConnectionEnrichRow {
+  wish_a_id: string
+  wish_b_id: string
+  overall_connection_score: number
+  opportunity_for_wish_a: BilingualText | null
+  opportunity_for_wish_b: BilingualText | null
+  shared_basis: BilingualText | null
+}
+
 interface MyWishMatch {
-  connectionId: string
-  myWishId: string
-  myWishText: string
-  matchScore: number
-  matchType: MatchType
-  matchedAt: string
-  sharedThemes: string[]
+  connectionId:    string
+  myWishId:        string
+  myWishText:      string
+  matchScore:      number
+  matchType:       MatchType
+  matchedAt:       string
+  sharedThemes:    string[]
+  overallScore:    number | null
+  opportunityText: string | null
+  sharedBasisText: string | null
 }
 
 interface GroupedMatch {
-  theirWishId: string
-  theirWishText: string
-  theirName: string | null
-  theirEmail: string | null
-  theirPhone: string | null
-  maxScore: number
-  maxMatchType: MatchType
-  myMatches: MyWishMatch[]
+  theirWishId:     string
+  theirWishText:   string
+  theirName:       string | null
+  theirEmail:      string | null
+  theirPhone:      string | null
+  theirNeeds:      string[]
+  theirSkills:     string[]
+  maxScore:        number
+  maxOverallScore: number | null
+  maxMatchType:    MatchType
+  myMatches:       MyWishMatch[]
   allSharedThemes: string[]
+  opportunityText: string | null
+  sharedBasisText: string | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -47,6 +67,12 @@ const matchTypeCls: Record<string, string> = {
 
 function truncate(s: string, n = 220) {
   return s.length > n ? s.slice(0, n) + '…' : s
+}
+
+function bilingualText(v: unknown, lang: Lang): string | null {
+  if (!v || typeof v !== 'object') return null
+  const t = v as BilingualText
+  return (lang === 'he' ? t.he : t.en) || null
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -76,7 +102,7 @@ export default async function MyMatchesPage() {
     .eq('user_id', user.id)
 
   const myWishList = myWishes ?? []
-  const myWishIds = myWishList.map(w => w.id)
+  const myWishIds  = myWishList.map(w => w.id)
   const myWishTextMap = new Map(myWishList.map(w => [w.id, w.original_text]))
 
   if (myWishIds.length === 0) {
@@ -100,35 +126,63 @@ export default async function MyMatchesPage() {
     connList.map(c => myWishIds.includes(c.wish_a) ? c.wish_b : c.wish_a)
   )]
 
-  const { data: theirWishes } = await supabase
-    .from('wishes')
-    .select('id, original_text, contact_name, contact_email, contact_phone')
-    .in('id', uniqueMatchedIds)
+  // Fetch all data in parallel
+  const [theirWishesRes, enrichmentsRes, connEnrichRes, theirEnrichRes] = await Promise.all([
+    supabase
+      .from('wishes')
+      .select('id, original_text, contact_name, contact_email, contact_phone')
+      .in('id', uniqueMatchedIds),
+    supabase
+      .from('wish_enrichment')
+      .select('wish_id, themes')
+      .in('wish_id', [...myWishIds, ...uniqueMatchedIds]),
+    supabase
+      .from('connection_enrichment')
+      .select('wish_a_id, wish_b_id, overall_connection_score, opportunity_for_wish_a, opportunity_for_wish_b, shared_basis')
+      .or(`wish_a_id.in.(${myWishIds.join(',')}),wish_b_id.in.(${myWishIds.join(',')})`),
+    supabase
+      .from('wish_enrichment')
+      .select('wish_id, needs, skills_offered')
+      .in('wish_id', uniqueMatchedIds),
+  ])
 
-  const theirWishMap = new Map((theirWishes ?? []).map(w => [w.id, w]))
-
-  const { data: enrichments } = await supabase
-    .from('wish_enrichment')
-    .select('wish_id, themes')
-    .in('wish_id', [...myWishIds, ...uniqueMatchedIds])
-
-  const themeMap = new Map<string, string[]>(
-    (enrichments ?? []).map(e => [e.wish_id, e.themes ?? []])
+  const theirWishMap   = new Map((theirWishesRes.data ?? []).map(w => [w.id, w]))
+  const themeMap       = new Map<string, string[]>(
+    (enrichmentsRes.data ?? []).map(e => [e.wish_id, e.themes ?? []])
   )
+  const theirEnrichMap = new Map(
+    (theirEnrichRes.data ?? []).map(e => [e.wish_id, e])
+  )
+
+  // Build canonical-key map for connection_enrichment
+  const connEnrichMap = new Map<string, ConnectionEnrichRow>()
+  for (const e of connEnrichRes.data ?? []) {
+    connEnrichMap.set(`${e.wish_a_id}:${e.wish_b_id}`, e as ConnectionEnrichRow)
+  }
 
   const flatList: Array<MyWishMatch & { theirWishId: string }> = connList.map(conn => {
     const myWishId    = myWishIds.includes(conn.wish_a) ? conn.wish_a : conn.wish_b
     const theirWishId = myWishId === conn.wish_a ? conn.wish_b : conn.wish_a
     const myThemes    = new Set((themeMap.get(myWishId) ?? []).map((th: string) => th.toLowerCase().trim()))
     const theirThemes = themeMap.get(theirWishId) ?? []
+
+    // Connection enrichment — canonical key is always wish_a < wish_b
+    const [ka, kb]  = conn.wish_a < conn.wish_b ? [conn.wish_a, conn.wish_b] : [conn.wish_b, conn.wish_a]
+    const enrich    = connEnrichMap.get(`${ka}:${kb}`)
+    const isWishA   = myWishId === conn.wish_a
+    const oppField  = isWishA ? enrich?.opportunity_for_wish_a : enrich?.opportunity_for_wish_b
+
     return {
-      connectionId: conn.id,
+      connectionId:    conn.id,
       myWishId,
-      myWishText:   myWishTextMap.get(myWishId) ?? '',
-      matchScore:   conn.match_score,
-      matchType:    conn.match_type as MatchType,
-      matchedAt:    conn.created_at,
-      sharedThemes: theirThemes.filter((th: string) => myThemes.has(th.toLowerCase().trim())),
+      myWishText:      myWishTextMap.get(myWishId) ?? '',
+      matchScore:      conn.match_score,
+      matchType:       conn.match_type as MatchType,
+      matchedAt:       conn.created_at,
+      sharedThemes:    theirThemes.filter((th: string) => myThemes.has(th.toLowerCase().trim())),
+      overallScore:    enrich?.overall_connection_score ?? null,
+      opportunityText: bilingualText(oppField, lang),
+      sharedBasisText: bilingualText(enrich?.shared_basis, lang),
       theirWishId,
     }
   })
@@ -136,7 +190,8 @@ export default async function MyMatchesPage() {
   const groupMap = new Map<string, GroupedMatch>()
   for (const row of flatList) {
     const existing = groupMap.get(row.theirWishId)
-    const them = theirWishMap.get(row.theirWishId)
+    const them      = theirWishMap.get(row.theirWishId)
+    const theirEnr  = theirEnrichMap.get(row.theirWishId)
     if (!existing) {
       groupMap.set(row.theirWishId, {
         theirWishId:     row.theirWishId,
@@ -144,22 +199,32 @@ export default async function MyMatchesPage() {
         theirName:       them?.contact_name  ?? null,
         theirEmail:      them?.contact_email ?? null,
         theirPhone:      them?.contact_phone ?? null,
+        theirNeeds:      (theirEnr?.needs as string[] | null) ?? [],
+        theirSkills:     (theirEnr?.skills_offered as string[] | null) ?? [],
         maxScore:        row.matchScore,
+        maxOverallScore: row.overallScore,
         maxMatchType:    row.matchType,
         myMatches:       [row],
         allSharedThemes: row.sharedThemes,
+        opportunityText: row.opportunityText,
+        sharedBasisText: row.sharedBasisText,
       })
     } else {
       existing.myMatches.push(row)
       const allThemes = new Set([...existing.allSharedThemes, ...row.sharedThemes])
       existing.allSharedThemes = [...allThemes]
+      // Keep the best opportunity/basis text (from highest-ranked match)
+      if (!existing.opportunityText && row.opportunityText) existing.opportunityText = row.opportunityText
+      if (!existing.sharedBasisText && row.sharedBasisText) existing.sharedBasisText = row.sharedBasisText
     }
   }
 
   const groups: GroupedMatch[] = [...groupMap.values()]
-    .sort((a, b) => b.maxScore - a.maxScore)
+    .sort((a, b) => (b.maxOverallScore ?? b.maxScore * 100) - (a.maxOverallScore ?? a.maxScore * 100))
 
   const totalConnections = flatList.length
+
+  const isHe = lang === 'he'
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
@@ -187,14 +252,21 @@ export default async function MyMatchesPage() {
           {groups.map((group) => (
             <div key={group.theirWishId} className="card p-6 space-y-5">
 
+              {/* Score + type */}
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${matchTypeCls[group.maxMatchType] ?? 'bg-slate-100 border-slate-200 text-slate-600'}`}>
                     {matchTypeLabel[group.maxMatchType] ?? group.maxMatchType}
                   </span>
-                  <span className="text-sm font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                    {Math.round(group.maxScore * 100)}%
-                  </span>
+                  {group.maxOverallScore != null ? (
+                    <span className="text-sm font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
+                      {group.maxOverallScore}/100
+                    </span>
+                  ) : (
+                    <span className="text-sm font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                      {Math.round(group.maxScore * 100)}%
+                    </span>
+                  )}
                   {group.myMatches.length > 1 && (
                     <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
                       {tr.moreWishes(group.myMatches.length)}
@@ -206,13 +278,60 @@ export default async function MyMatchesPage() {
                 </span>
               </div>
 
+              {/* Opportunity text */}
+              {group.opportunityText && (
+                <div className="bg-amber-50 border-l-4 border-amber-400 rounded-lg px-4 py-3 space-y-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-700">
+                    {isHe ? 'מה יכול להיות כאן בשבילך' : 'Why this could matter for you'}
+                  </p>
+                  <p className="text-sm text-slate-700 leading-relaxed">{group.opportunityText}</p>
+                </div>
+              )}
+
+              {/* Shared basis */}
+              {group.sharedBasisText && (
+                <div className="bg-sky-50 border-l-4 border-sky-400 rounded-lg px-4 py-3 space-y-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-sky-700">
+                    {isHe ? 'מה משותף לכם' : 'What you share'}
+                  </p>
+                  <p className="text-sm text-slate-700 leading-relaxed">{group.sharedBasisText}</p>
+                </div>
+              )}
+
+              {/* Their wish */}
               <div className="bg-slate-50 border border-slate-100 rounded-xl px-5 py-4 space-y-2">
                 <p className="section-label text-xs">{tr.theirWish}</p>
                 <p className="text-sm text-slate-700 leading-relaxed">
                   {truncate(group.theirWishText)}
                 </p>
+                {/* Their needs/skills from enrichment */}
+                {(group.theirNeeds.length > 0 || group.theirSkills.length > 0) && (
+                  <div className="pt-2 space-y-1.5">
+                    {group.theirNeeds.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                          {isHe ? 'צריך' : 'Needs'}
+                        </span>
+                        {group.theirNeeds.map(n => (
+                          <span key={n} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600">{n}</span>
+                        ))}
+                      </div>
+                    )}
+                    {group.theirSkills.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                          {isHe ? 'מציע' : 'Offers'}
+                        </span>
+                        {group.theirSkills.map(s => (
+                          <span key={s} className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">{s}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
+              {/* My matching wishes */}
               <div className="space-y-2">
                 <p className="section-label text-xs">
                   {group.myMatches.length === 1 ? tr.matchesYourWish : tr.yourMatchingWishes}
@@ -227,7 +346,7 @@ export default async function MyMatchesPage() {
                     {group.myMatches.length > 1 && (
                       <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
                         <span className="text-xs font-bold text-slate-700">
-                          {Math.round(m.matchScore * 100)}%
+                          {m.overallScore != null ? `${m.overallScore}` : `${Math.round(m.matchScore * 100)}%`}
                         </span>
                         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${matchTypeCls[m.matchType] ?? 'bg-slate-100 border-slate-200 text-slate-600'}`}>
                           {matchTypeLabel[m.matchType]?.split(' ')[1] ?? m.matchType}
@@ -249,6 +368,7 @@ export default async function MyMatchesPage() {
                 ))}
               </div>
 
+              {/* Shared themes */}
               {group.allSharedThemes.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {group.allSharedThemes.map(th => (
@@ -257,6 +377,7 @@ export default async function MyMatchesPage() {
                 </div>
               )}
 
+              {/* Contact details */}
               {(group.theirName || group.theirEmail) && (
                 <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-4 space-y-1.5">
                   <p className="section-label mb-2">{tr.contactDetails}</p>
