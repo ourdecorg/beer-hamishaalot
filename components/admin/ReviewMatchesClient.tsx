@@ -20,6 +20,7 @@ export interface AttemptRow {
   gate_passed: boolean | null
   gate_reason: string | null
   recall_source: string | null
+  connection_rank: number | null
   created_at: string
 }
 
@@ -80,6 +81,24 @@ const labelConfig: Record<Label, { label: string; active: string; idle: string }
   good:  { label: 'טוב',    active: 'bg-emerald-600 text-white border-emerald-600', idle: 'border-emerald-300 text-emerald-700 hover:bg-emerald-50' },
   maybe: { label: 'אולי',   active: 'bg-amber-500 text-white border-amber-500',     idle: 'border-amber-300 text-amber-700 hover:bg-amber-50' },
   bad:   { label: 'לא טוב', active: 'bg-red-500 text-white border-red-500',         idle: 'border-red-300 text-red-600 hover:bg-red-50' },
+}
+
+const MAX_CONNECTIONS_PER_WISH = 3
+
+function RankBadge({ rank }: { rank: number | null }) {
+  if (rank == null) return null
+  const capped = rank > MAX_CONNECTIONS_PER_WISH
+  return (
+    <span className={`text-xs font-bold px-2.5 py-1 rounded-full border tabular-nums ${
+      capped
+        ? 'bg-amber-50 border-amber-300 text-amber-700'
+        : rank === 1
+          ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+          : 'bg-indigo-50 border-indigo-200 text-indigo-700'
+    }`}>
+      #{rank}{capped ? ' נחתך' : ''}
+    </span>
+  )
 }
 
 const SORT_OPTIONS: { key: string; label: string }[] = [
@@ -326,6 +345,7 @@ function ReviewCard({
             לא נוצר חיבור
           </span>
         )}
+        <RankBadge rank={attempt.connection_rank} />
         {attempt.match_type && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
             {attempt.match_type}

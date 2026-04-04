@@ -31,6 +31,7 @@ type LogEntry = {
   passed_threshold: boolean
   gate_passed: boolean | null
   gate_reason: string | null
+  connection_rank: number | null
   created_at: string
 }
 
@@ -378,6 +379,20 @@ export default function ConnectionsDebugPage() {
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge ok={log.passed_threshold} label={log.passed_threshold ? 'עבר סף' : 'לא עבר סף'} />
+                        {log.connection_rank != null && (() => {
+                          const capped = log.connection_rank > 3
+                          return (
+                            <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border tabular-nums ${
+                              capped
+                                ? 'bg-amber-50 border-amber-300 text-amber-700'
+                                : log.connection_rank === 1
+                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                                  : 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                            }`}>
+                              #{log.connection_rank}{capped ? ' נחתך' : ''}
+                            </span>
+                          )
+                        })()}
                         <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded" dir="ltr">
                           {log._direction}
                         </span>
