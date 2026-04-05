@@ -117,6 +117,18 @@ export default function MatchesSection({ wishId, isAdmin = false }: Props) {
             </div>
           </div>
 
+          {/* Matching wish */}
+          {match.matched_wish_text && (
+            <div className="bg-slate-50 border border-slate-100 rounded-xl px-5 py-4">
+              <p className="section-label text-xs mb-2">{tr.matchingWish}</p>
+              <p className="text-sm text-slate-700 leading-relaxed">
+                {match.matched_wish_text.length > 280
+                  ? match.matched_wish_text.slice(0, 280) + '…'
+                  : match.matched_wish_text}
+              </p>
+            </div>
+          )}
+
           {/* Opportunity */}
           {opportunityText && (
             <div className="bg-amber-50 border-l-4 border-amber-400 rounded-lg px-4 py-3 space-y-1">
@@ -134,17 +146,6 @@ export default function MatchesSection({ wishId, isAdmin = false }: Props) {
                 {isHe ? 'מה משותף לכם' : 'What you share'}
               </p>
               <p className="text-sm text-slate-700 leading-relaxed">{sharedBasisText}</p>
-            </div>
-          )}
-
-          {match.matched_wish_text && (
-            <div className="bg-slate-50 border border-slate-100 rounded-xl px-5 py-4">
-              <p className="section-label text-xs mb-2">{tr.matchingWish}</p>
-              <p className="text-sm text-slate-700 leading-relaxed">
-                {match.matched_wish_text.length > 280
-                  ? match.matched_wish_text.slice(0, 280) + '…'
-                  : match.matched_wish_text}
-              </p>
             </div>
           )}
 
