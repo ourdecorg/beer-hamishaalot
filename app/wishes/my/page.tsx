@@ -16,8 +16,6 @@ export async function generateMetadata() {
 export default async function MyWishesPage() {
   const [supabase, lang] = await Promise.all([createClient(), getLang()])
   const tr = t(lang).myWishes
-  const isHe = lang === 'he'
-
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
@@ -37,7 +35,7 @@ export default async function MyWishesPage() {
   const ids = wishList.map((w) => w.id)
 
   // Parallel fetches for matches, resonances, enrichment, and best connection scores
-  const [connectionsRes, resonancesRes, enrichmentRes, connEnrichRes] = await Promise.all([
+  const [connectionsRes, resonancesRes, connEnrichRes] = await Promise.all([
     ids.length > 0
       ? supabase
           .from('wish_connections')
@@ -49,13 +47,6 @@ export default async function MyWishesPage() {
 
     ids.length > 0
       ? supabase.from('wish_resonances').select('wish_id').in('wish_id', ids)
-      : Promise.resolve({ data: [] }),
-
-    ids.length > 0
-      ? supabase
-          .from('wish_enrichment')
-          .select('wish_id, themes, intent, needs, skills_offered')
-          .in('wish_id', ids)
       : Promise.resolve({ data: [] }),
 
     ids.length > 0
@@ -76,11 +67,6 @@ export default async function MyWishesPage() {
   for (const r of resonancesRes.data ?? []) {
     resonanceCountMap.set(r.wish_id, (resonanceCountMap.get(r.wish_id) ?? 0) + 1)
   }
-
-  type EnrichRow = { wish_id: string; themes: string[] | null; intent: string | null; needs: string[] | null; skills_offered: string[] | null }
-  const enrichMap = new Map<string, EnrichRow>(
-    (enrichmentRes.data ?? []).map((e: EnrichRow) => [e.wish_id, e])
-  )
 
   // Best overall_connection_score per wish
   const bestScoreMap = new Map<string, number>()
@@ -135,7 +121,6 @@ export default async function MyWishesPage() {
             const matchCount   = matchCountMap.get(wish.id) ?? 0
             const resonanceCount = resonanceCountMap.get(wish.id) ?? 0
             const bestScore    = bestScoreMap.get(wish.id) ?? null
-            const enrich       = enrichMap.get(wish.id)
 
             const date = new Date(wish.created_at).toLocaleDateString(dateLocale(lang), {
               day: 'numeric',
@@ -146,10 +131,6 @@ export default async function MyWishesPage() {
               wish.original_text.length > 200
                 ? wish.original_text.slice(0, 200) + '…'
                 : wish.original_text
-
-            const topThemes = (enrich?.themes ?? []).slice(0, 4)
-            const needs     = (enrich?.needs ?? []).slice(0, 3)
-            const skills    = (enrich?.skills_offered ?? []).slice(0, 3)
 
             return (
               <Link
@@ -168,52 +149,8 @@ export default async function MyWishesPage() {
                   </div>
                 </div>
 
-                {/* Intent label */}
-                {enrich?.intent && (
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-indigo-500">
-                    {enrich.intent}
-                  </p>
-                )}
-
                 {/* Wish text */}
                 <p className="text-slate-800 leading-relaxed">{truncated}</p>
-
-                {/* Theme pills */}
-                {topThemes.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {topThemes.map(th => (
-                      <span key={th} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600">
-                        {th}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Needs / Skills */}
-                {(needs.length > 0 || skills.length > 0) && (
-                  <div className="flex flex-wrap gap-1.5 items-center">
-                    {needs.length > 0 && (
-                      <>
-                        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                          {isHe ? 'צריך' : 'Needs'}
-                        </span>
-                        {needs.map(n => (
-                          <span key={n} className="text-xs px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700">{n}</span>
-                        ))}
-                      </>
-                    )}
-                    {skills.length > 0 && (
-                      <>
-                        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 ms-2">
-                          {isHe ? 'מציע' : 'Offers'}
-                        </span>
-                        {skills.map(s => (
-                          <span key={s} className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">{s}</span>
-                        ))}
-                      </>
-                    )}
-                  </div>
-                )}
 
                 {/* Footer row */}
                 <div className="flex items-center gap-3 pt-1 border-t border-slate-100 flex-wrap">
