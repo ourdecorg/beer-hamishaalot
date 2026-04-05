@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
     const { data: wishes, error } = await supabase
       .from('wishes')
       .select('id, original_text, created_at, visibility, contact_name')
+      .neq('status', 'cancelled')
       .order('created_at', { ascending: false })
       .limit(500)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
