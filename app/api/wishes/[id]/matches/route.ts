@@ -7,6 +7,7 @@
  */
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { MatchResult, WishEnrichment } from '@/lib/types'
 
 interface Params {
@@ -62,7 +63,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       .from('wishes')
       .select('id, original_text, contact_name, contact_email, contact_phone')
       .in('id', matchedWishIds),
-    supabase
+    createAdminClient()
       .from('connection_enrichment')
       .select('wish_a_id, wish_b_id, overall_connection_score, opportunity_for_wish_a, opportunity_for_wish_b, shared_basis')
       .or(`wish_a_id.eq.${params.id},wish_b_id.eq.${params.id}`),
