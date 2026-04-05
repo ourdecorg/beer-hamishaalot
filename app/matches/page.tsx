@@ -325,36 +325,11 @@ export default async function MyMatchesPage() {
               )}
 
               {/* Their wish */}
-              <div className="bg-slate-50 border border-slate-100 rounded-xl px-5 py-4 space-y-2">
-                <p className="section-label text-xs">{tr.theirWish}</p>
+              <div className="bg-slate-50 border border-slate-100 rounded-xl px-5 py-4">
+                <p className="section-label text-xs mb-2">{tr.theirWish}</p>
                 <p className="text-sm text-slate-700 leading-relaxed">
                   {truncate(group.theirWishText)}
                 </p>
-                {/* Their needs/skills from enrichment */}
-                {(group.theirNeeds.length > 0 || group.theirSkills.length > 0) && (
-                  <div className="pt-2 space-y-1.5">
-                    {group.theirNeeds.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                          {isHe ? 'צריך' : 'Needs'}
-                        </span>
-                        {group.theirNeeds.map(n => (
-                          <span key={n} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600">{n}</span>
-                        ))}
-                      </div>
-                    )}
-                    {group.theirSkills.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                          {isHe ? 'מציע' : 'Offers'}
-                        </span>
-                        {group.theirSkills.map(s => (
-                          <span key={s} className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">{s}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* My matching wishes */}
@@ -379,25 +354,12 @@ export default async function MyMatchesPage() {
                         </span>
                       </div>
                     )}
-                    <div className="flex-1 space-y-1.5">
-                      <Link
-                        href={`/wishes/${m.myWishId}`}
-                        className="text-xs text-slate-600 hover:text-slate-900 leading-relaxed line-clamp-3 transition-colors block"
-                      >
-                        {truncate(m.myWishText, group.myMatches.length > 1 ? 160 : 140)}
-                      </Link>
-                      {/* My wish's needs/skills */}
-                      {(m.myNeeds.length > 0 || m.mySkills.length > 0) && (
-                        <div className="flex flex-wrap gap-1 items-center">
-                          {m.myNeeds.map(n => (
-                            <span key={n} className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700">{n}</span>
-                          ))}
-                          {m.mySkills.map(s => (
-                            <span key={s} className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">{s}</span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <Link
+                      href={`/wishes/${m.myWishId}`}
+                      className="flex-1 text-xs text-slate-600 hover:text-slate-900 leading-relaxed line-clamp-3 transition-colors"
+                    >
+                      {truncate(m.myWishText, group.myMatches.length > 1 ? 160 : 140)}
+                    </Link>
                     {group.myMatches.length > 1 && (
                       <span className="text-[10px] text-slate-400 shrink-0 pt-0.5">
                         {String(idx + 1)}
@@ -406,15 +368,6 @@ export default async function MyMatchesPage() {
                   </div>
                 ))}
               </div>
-
-              {/* Shared themes */}
-              {group.allSharedThemes.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {group.allSharedThemes.map(th => (
-                    <span key={th} className="tag-badge text-xs">{th}</span>
-                  ))}
-                </div>
-              )}
 
               {/* Contact details */}
               {(group.theirName || group.theirEmail) && (
