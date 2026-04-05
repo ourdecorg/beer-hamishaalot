@@ -73,19 +73,38 @@ export default function MatchesSection({ wishId, isAdmin = false }: Props) {
         <div className="h-px flex-1 bg-slate-200" />
       </div>
 
-      {matches.map((match) => (
+      {matches.map((match) => {
+        const opportunityText = match.opportunity
+          ? (lang === 'he' ? match.opportunity.he : match.opportunity.en) || null
+          : null
+        const sharedBasisText = match.shared_basis
+          ? (lang === 'he' ? match.shared_basis.he : match.shared_basis.en) || null
+          : null
+        const isHe = lang === 'he'
+
+        return (
         <div key={match.connection_id} className="card p-6 space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${matchTypeCls[match.match_type]}`}>
-              {matchTypeLabel[match.match_type]}
-            </span>
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-slate-400">{tr.scoreLabel}</span>
-                <span className="text-sm font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                  {Math.round(match.match_score * 100)}%
+              {match.overall_connection_score != null ? (
+                <span className="text-sm font-black px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-800">
+                  {match.overall_connection_score}/100
                 </span>
-              </div>
+              ) : (
+                <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${matchTypeCls[match.match_type]}`}>
+                  {matchTypeLabel[match.match_type]}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {match.overall_connection_score == null && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-slate-400">{tr.scoreLabel}</span>
+                  <span className="text-sm font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                    {Math.round(match.match_score * 100)}%
+                  </span>
+                </div>
+              )}
               {isAdmin && (
                 <a
                   href={`/admin/connections?a=${wishId}&b=${match.matched_wish_id}`}
@@ -98,10 +117,24 @@ export default function MatchesSection({ wishId, isAdmin = false }: Props) {
             </div>
           </div>
 
-          {(match.explanation_text || match.match_summary) && (
-            <p className="text-sm text-slate-600 italic leading-relaxed">
-              {match.explanation_text ?? match.match_summary}
-            </p>
+          {/* Opportunity */}
+          {opportunityText && (
+            <div className="bg-amber-50 border-l-4 border-amber-400 rounded-lg px-4 py-3 space-y-1">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-700">
+                {isHe ? 'מה יכול להיות כאן בשבילך' : 'Why this could matter for you'}
+              </p>
+              <p className="text-sm text-slate-700 leading-relaxed">{opportunityText}</p>
+            </div>
+          )}
+
+          {/* Shared basis */}
+          {sharedBasisText && (
+            <div className="bg-sky-50 border-l-4 border-sky-400 rounded-lg px-4 py-3 space-y-1">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-sky-700">
+                {isHe ? 'מה משותף לכם' : 'What you share'}
+              </p>
+              <p className="text-sm text-slate-700 leading-relaxed">{sharedBasisText}</p>
+            </div>
           )}
 
           {match.matched_wish_text && (
@@ -145,7 +178,8 @@ export default function MatchesSection({ wishId, isAdmin = false }: Props) {
             </div>
           )}
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

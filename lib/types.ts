@@ -132,6 +132,9 @@ export interface MatchResult {
   match_summary: string        // human-readable e.g. "Complementary: they offer skills you need"
   matched_wish_text?: string   // original text of the matched wish
   explanation_text?: string    // short_reason from explanation JSONB
+  overall_connection_score?: number | null
+  opportunity?: { he: string; en: string } | null  // opportunity for the current wish's owner
+  shared_basis?: { he: string; en: string } | null
   contact?: {
     name: string | null
     email: string | null
