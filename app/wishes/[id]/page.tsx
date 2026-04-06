@@ -1,11 +1,9 @@
 import { notFound } from 'next/navigation'
 import Header from '@/components/layout/Header'
-import ResonanceButton from '@/components/wishes/ResonanceButton'
 import MatchesSection from '@/components/wishes/MatchesSection'
 import { createClient } from '@/lib/supabase/server'
 import { t, dateLocale } from '@/lib/i18n'
 import { getLang } from '@/lib/i18n/server'
-import type { WishWithResonance } from '@/lib/types'
 
 interface Props {
   params: { id: string }
@@ -30,31 +28,8 @@ export default async function WishPage({ params }: Props) {
 
   if (error || !wish) notFound()
 
-  const { count: resonanceCount } = await supabase
-    .from('wish_resonances')
-    .select('*', { count: 'exact', head: true })
-    .eq('wish_id', wish.id)
-
-  let userHasResonated = false
-  if (user) {
-    const { data: ownResonance } = await supabase
-      .from('wish_resonances')
-      .select('id')
-      .eq('wish_id', wish.id)
-      .eq('user_id', user.id)
-      .maybeSingle()
-    userHasResonated = !!ownResonance
-  }
-
-  const wishWithResonance: WishWithResonance = {
-    ...wish,
-    resonance_count: resonanceCount ?? 0,
-    user_has_resonated: userHasResonated,
-  }
-
   const isOwner = user?.id === wish.user_id
   const isAdmin = !!(user?.email && user.email === process.env.ADMIN_EMAIL)
-  const canResonate = !isOwner
 
   const formattedDate = new Date(wish.created_at).toLocaleDateString(dateLocale(lang), {
     day: 'numeric',
@@ -114,37 +89,12 @@ export default async function WishPage({ params }: Props) {
           </div>
         )}
 
-        {/* Resonance */}
-        {canResonate && (
-          <div className="mt-8 card p-8 text-center bg-slate-50">
-            <p className="text-slate-600 mb-4 text-sm font-medium">
-              {tr.resonateQuestion}
-            </p>
-            <ResonanceButton
-              wishId={wish.id}
-              initialCount={wishWithResonance.resonance_count}
-              initialResonated={wishWithResonance.user_has_resonated}
-              isAuthenticated={!!user}
-            />
-            {wishWithResonance.resonance_count > 0 && (
-              <p className="text-xs text-slate-400 mt-3">
-                {tr.resonateCount(wishWithResonance.resonance_count)}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Owner actions */}
+        {/* Owner badge */}
         {isOwner && (
           <div className="mt-6 flex gap-3 flex-wrap">
             <div className="tag-badge">
               <span>{tr.yourWish}</span>
             </div>
-            {wishWithResonance.resonance_count > 0 && (
-              <div className="tag-badge tag-badge-well">
-                <span>{tr.yourResonances(wishWithResonance.resonance_count)}</span>
-              </div>
-            )}
           </div>
         )}
 
