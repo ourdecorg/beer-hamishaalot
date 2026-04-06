@@ -35,8 +35,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
+  // Admin bypasses RLS — use service-role client for all data queries
+  const db = isAdmin ? createAdminClient() : supabase
+
   // Fetch connections where this wish is either side
-  const { data: connections, error } = await supabase
+  const { data: connections, error } = await db
     .from('wish_connections')
     .select('*')
     .or(`wish_a.eq.${params.id},wish_b.eq.${params.id}`)
@@ -59,9 +62,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   // Fetch enrichments for matched wishes + own themes + contact info + connection enrichment in parallel
   const [enrichmentsRes, ownEnrichmentRes, contactWishesRes, connEnrichRes] = await Promise.all([
-    supabase.from('wish_enrichment').select('*').in('wish_id', matchedWishIds),
-    supabase.from('wish_enrichment').select('themes').eq('wish_id', params.id).maybeSingle(),
-    supabase
+    db.from('wish_enrichment').select('*').in('wish_id', matchedWishIds),
+    db.from('wish_enrichment').select('themes').eq('wish_id', params.id).maybeSingle(),
+    db
       .from('wishes')
       .select('id, original_text, contact_name, contact_email, contact_phone')
       .in('id', matchedWishIds),
