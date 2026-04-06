@@ -22,14 +22,16 @@ export async function GET(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Verify ownership
+  const isAdmin = user.email === process.env.ADMIN_EMAIL
+
+  // Verify ownership (admin can access any wish)
   const { data: wish } = await supabase
     .from('wishes')
     .select('id, user_id')
     .eq('id', params.id)
     .single()
 
-  if (!wish || wish.user_id !== user.id) {
+  if (!wish || (!isAdmin && wish.user_id !== user.id)) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 

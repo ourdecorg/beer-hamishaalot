@@ -148,7 +148,7 @@ export default async function WishPage({ params }: Props) {
           </div>
         )}
 
-        {isOwner && (
+        {(isOwner || isAdmin) && (
           <MatchesSection wishId={wish.id} isAdmin={isAdmin} />
         )}
       </main>
