@@ -95,14 +95,17 @@ function buildHtml(recipient: WishOwner, other: WishOwner, meta: ConnectionMeta)
       <p style="color: #1e293b; font-size: 15px; margin: 0; line-height: 1.6;">${esc(recipient.wishText)}</p>
     </div>
 
+    <div style="background: #f0fdf4; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <div style="font-size: 11px; text-transform: uppercase; color: #16a34a; letter-spacing: 0.05em; margin-bottom: 8px; font-weight: 600;">Matching wish</div>
+      <p style="color: #1e293b; font-size: 15px; margin: 0; line-height: 1.6;">${esc(other.wishText)}</p>
+    </div>
+
     ${opportunityBlock}
     ${sharedBasisBlock}
 
-    <div style="background: #f0fdf4; border-radius: 8px; padding: 20px; margin: 20px 0;">
-      <div style="font-size: 11px; text-transform: uppercase; color: #16a34a; letter-spacing: 0.05em; margin-bottom: 8px; font-weight: 600;">Matching wish</div>
-      <p style="color: #1e293b; font-size: 15px; margin: 0 0 16px; line-height: 1.6;">${esc(other.wishText)}</p>
-      ${theirNeedsSkills}
-      <div style="border-top: 1px solid #bbf7d0; padding-top: 14px; font-size: 14px; color: #374151; line-height: 1.8;">
+    <div style="background: #f8fafc; border-radius: 8px; padding: 18px 20px; margin: 20px 0; border: 1px solid #e2e8f0;">
+      <div style="font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; margin-bottom: 10px; font-weight: 600;">Contact details</div>
+      <div style="font-size: 14px; color: #374151; line-height: 1.9;">
         <strong>Name:</strong> ${esc(other.contactName)}<br>
         <strong>Email:</strong> <a href="mailto:${esc(other.contactEmail)}" style="color: #4f46e5;">${esc(other.contactEmail)}</a><br>
         ${other.contactPhone ? `<strong>Phone:</strong> ${esc(other.contactPhone)}<br>` : ''}

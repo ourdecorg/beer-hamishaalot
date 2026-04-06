@@ -430,7 +430,13 @@ export default function ConnectionsDebugPage() {
                       {wish.contact_name && <p>👤 {wish.contact_name}</p>}
                       {wish.contact_city && <p>📍 {wish.contact_city}{wish.contact_country ? `, ${wish.contact_country}` : ''}</p>}
                       <p>🕐 {fmt(wish.created_at)}</p>
-                      <p className="font-mono break-all" dir="ltr">{wish.id}</p>
+                      <a
+                        href={`/wishes/${wish.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono break-all text-indigo-500 hover:text-indigo-700 underline underline-offset-2"
+                        dir="ltr"
+                      >{wish.id}</a>
                     </div>
                   </>
                 ) : <p className="text-slate-400 text-sm">לא נמצאה</p>}
