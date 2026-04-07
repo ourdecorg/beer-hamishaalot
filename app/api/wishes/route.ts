@@ -73,8 +73,23 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 2. Fire-and-forget: deep analysis + embedding + matching (non-blocking)
-  waitUntil(processWishForMatching(wish.id, original_text.trim()))
+  // 2. Upsert user profile with contact details from this wish, then run matching.
+  //    Both are fire-and-forget — we don't block the wish creation response.
+  waitUntil(
+    (async () => {
+      await supabase.from('user_profiles').upsert(
+        {
+          id: user.id,
+          display_name: contact?.contact_name?.trim() || null,
+          city: contact?.contact_city?.trim() || null,
+          phone: contact?.contact_phone?.trim() || null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' }
+      )
+      await processWishForMatching(wish.id, original_text.trim())
+    })()
+  )
 
   return NextResponse.json(wish, { status: 201 })
 }

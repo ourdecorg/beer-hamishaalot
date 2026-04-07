@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { WishContactInfo } from '@/lib/types'
@@ -27,6 +27,22 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
   const [text, setText] = useState(initialText)
   const [contact, setContact] = useState<WishContactInfo>(emptyContact)
   const [consent, setConsent] = useState(false)
+
+  // Pre-fill contact fields from the user's saved profile
+  useEffect(() => {
+    fetch('/api/profile')
+      .then((r) => r.json())
+      .then((profile) => {
+        if (!profile || profile.error) return
+        setContact((prev) => ({
+          ...prev,
+          contact_name: profile.display_name ?? prev.contact_name,
+          contact_city: profile.city ?? prev.contact_city,
+          contact_phone: profile.phone ?? prev.contact_phone,
+        }))
+      })
+      .catch(() => null)
+  }, [])
   const [consentError, setConsentError] = useState(false)
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
