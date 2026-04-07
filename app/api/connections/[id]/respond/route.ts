@@ -34,6 +34,7 @@ const SHAREABLE_FIELDS: ProfileField[] = [
   'linkedin_url',
   'short_bio',
   'city',
+  'address',
   'organization',
   'role',
 ]

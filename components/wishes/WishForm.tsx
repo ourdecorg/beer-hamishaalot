@@ -36,9 +36,10 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
         if (!profile || profile.error) return
         setContact((prev) => ({
           ...prev,
-          contact_name: profile.display_name ?? prev.contact_name,
-          contact_city: profile.city ?? prev.contact_city,
-          contact_phone: profile.phone ?? prev.contact_phone,
+          contact_name:    profile.display_name ?? prev.contact_name,
+          contact_city:    profile.city         ?? prev.contact_city,
+          contact_address: profile.address      ?? prev.contact_address,
+          contact_phone:   profile.phone        ?? prev.contact_phone,
         }))
       })
       .catch(() => null)

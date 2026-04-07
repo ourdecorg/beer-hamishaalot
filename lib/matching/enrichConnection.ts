@@ -402,10 +402,12 @@ async function publishAndEmail(
   console.log(`[ConnectionEnrichment] published=true ${wish_a_id}↔${wish_b_id} — overall=${result.overall_connection_score}`)
 
   try {
+    // Fetch wish texts, owner user_ids, enrichment data, and profiles in parallel.
+    // Identity/contact fields come from user_profiles, not from the wish record.
     const [wishRowsRes, enrichRowsRes] = await Promise.all([
       supabase
         .from('wishes')
-        .select('id, original_text, contact_name, contact_email, contact_phone, contact_city')
+        .select('id, original_text, user_id')
         .in('id', [wish_a_id, wish_b_id]),
       supabase
         .from('wish_enrichment')
@@ -418,8 +420,22 @@ async function publishAndEmail(
     const eA = (enrichRowsRes.data ?? []).find((e: { wish_id: string }) => e.wish_id === wish_a_id)
     const eB = (enrichRowsRes.data ?? []).find((e: { wish_id: string }) => e.wish_id === wish_b_id)
 
-    if (!wA?.contact_email || !wB?.contact_email) {
-      console.warn(`[ConnectionEnrichment] skipping email ${wish_a_id}↔${wish_b_id}: missing contact_email (A=${wA?.contact_email ?? 'null'} B=${wB?.contact_email ?? 'null'})`)
+    if (!wA?.user_id || !wB?.user_id) {
+      console.warn(`[ConnectionEnrichment] skipping email ${wish_a_id}↔${wish_b_id}: missing user_id`)
+      return
+    }
+
+    // Fetch contact details from user_profiles (service-role, bypasses RLS)
+    const profilesRes = await supabase
+      .from('user_profiles')
+      .select('id, display_name, email, phone, city')
+      .in('id', [wA.user_id, wB.user_id])
+
+    const pA = (profilesRes.data ?? []).find((p: { id: string }) => p.id === wA.user_id)
+    const pB = (profilesRes.data ?? []).find((p: { id: string }) => p.id === wB.user_id)
+
+    if (!pA?.email || !pB?.email) {
+      console.warn(`[ConnectionEnrichment] skipping email ${wish_a_id}↔${wish_b_id}: missing email in user_profiles (A=${pA?.email ?? 'null'} B=${pB?.email ?? 'null'})`)
       return
     }
 
@@ -428,10 +444,10 @@ async function publishAndEmail(
     await sendConnectionEmail(
       {
         wishText:        wA.original_text,
-        contactName:     wA.contact_name  ?? '',
-        contactEmail:    wA.contact_email,
-        contactPhone:    wA.contact_phone ?? null,
-        contactCity:     wA.contact_city  ?? null,
+        contactName:     pA.display_name  ?? '',
+        contactEmail:    pA.email,
+        contactPhone:    pA.phone ?? null,
+        contactCity:     pA.city  ?? null,
         opportunityText: (result.opportunity_for_wish_a as { en?: string })?.en ?? null,
         sharedBasisText: sharedBasisEn,
         theirNeeds:      (eB?.needs as string[] | null)   ?? [],
@@ -439,10 +455,10 @@ async function publishAndEmail(
       },
       {
         wishText:        wB.original_text,
-        contactName:     wB.contact_name  ?? '',
-        contactEmail:    wB.contact_email,
-        contactPhone:    wB.contact_phone ?? null,
-        contactCity:     wB.contact_city  ?? null,
+        contactName:     pB.display_name  ?? '',
+        contactEmail:    pB.email,
+        contactPhone:    pB.phone ?? null,
+        contactCity:     pB.city  ?? null,
         opportunityText: (result.opportunity_for_wish_b as { en?: string })?.en ?? null,
         sharedBasisText: sharedBasisEn,
         theirNeeds:      (eA?.needs as string[] | null)   ?? [],

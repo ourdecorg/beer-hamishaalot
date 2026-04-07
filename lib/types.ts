@@ -121,6 +121,7 @@ export type ProfileField =
   | 'linkedin_url'
   | 'short_bio'
   | 'city'
+  | 'address'
   | 'organization'
   | 'role'
 
@@ -137,6 +138,7 @@ export interface UserProfile {
   linkedin_url: string | null
   short_bio: string | null
   city: string | null
+  address: string | null
   organization: string | null
   role: string | null
   updated_at: string | null
