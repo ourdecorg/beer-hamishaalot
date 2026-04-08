@@ -33,7 +33,7 @@ Next.js 14 App Router (Railway)
 
 **אסטרטגיית עיבוד:**
 - POST /api/wishes מחזיר תגובה מיד
-- `waitUntil(processWishForMatching(...))` — pipeline רץ ברקע (fire-and-forget)
+- `waitUntil(...)` — fire-and-forget: upsert user_profiles → processWishForMatching()
 - Railway שומר את ה-process חי עד שה-pipeline מסתיים
 
 ---
@@ -70,7 +70,10 @@ Next.js 14 App Router (Railway)
 | `/api/wishes/[id]` | DELETE | soft delete — מסמן `status='cancelled'` + connections→`deleted` |
 | `/api/wishes/[id]/matches` | GET | חיבורים של המשאלה (בעלים בלבד, מסנן deleted) |
 | `/api/wishes/[id]/resonate` | GET/POST/DELETE | ניהול resonances |
-| `/api/connections/[id]/approve` | POST | State machine לאישור חיבורים |
+| `/api/connections/[id]/approve` | POST | State machine לאישור חיבורים (legacy) |
+| `/api/connections/[id]/respond` | POST | תגובה לחיבור: accepted/declined/later + בחירת שדות לשיתוף + snapshot פרופיל |
+| `/api/profile` | GET | שליפת פרופיל המשתמש המחובר |
+| `/api/profile` | PATCH | עדכון שדות פרופיל (whitelist) |
 | `/api/auth/magic-link` | POST | שליחת magic link |
 | `/auth/callback` | GET | OAuth callback מ-Supabase |
 | `/api/admin/run-matching` | POST | הפעלת batch matching (admin בלבד) |
@@ -151,11 +154,11 @@ Server component שטוען עד 60 רשומות מ-`match_attempts_log`, מצי
 
 | קובץ | מטרה |
 |------|------|
-| components/wishes/WishForm.tsx | טופס יצירת משאלה (ללא שדה ארץ, contact_country מוכנס ל-'Israel') |
+| components/wishes/WishForm.tsx | טופס יצירת משאלה — טוען פרטי קשר מ-user_profiles בטעינה (pre-fill); שמירה מעדכנת את user_profiles |
 | components/wishes/WishCard.tsx | כרטיס משאלה |
 | components/wishes/SettlementPicker.tsx | חיפוש ישוב server-side עם ilike, debounce 150ms |
 | components/wishes/DeleteWishButton.tsx | כפתור מחיקה עם אישור דו-שלבי (soft delete) |
-| components/wishes/MatchesSection.tsx | רשימת חיבורים לצד משאלה בודדת |
+| components/wishes/MatchesSection.tsx | רשימת חיבורים לצד משאלה בודדת; כולל UI לתגובה (Accept/Decline/Later), בחירת שדות לשיתוף, ותצוגת snapshot לאחר אישור הדדי |
 | components/wishes/ResonanceButton.tsx | כפתור לב |
 | components/admin/AdminNav.tsx | Sidebar ניווט לאדמין (5 מסכים) |
 | components/admin/ReviewMatchesClient.tsx | Client Component — כרטיסי review עם חיפוש טקסט וסינונים |
@@ -182,22 +185,41 @@ user_id                  uuid FK→auth.users
 original_text            text (עד 1000 תווים)
 visibility               'open'
 status                   text NOT NULL DEFAULT 'pending' — 'pending'|'cancelled'
-contact_name             text
-contact_email            text (מאוכלס אוטומטית מ-user.email)
-contact_country          text DEFAULT 'Israel' (מוכנס תמיד כ-'Israel')
-contact_city             text (לא חובה, נבחר מ-SettlementPicker)
-contact_address          text
-contact_phone            text
-user_email               text (denormalized)
 consent_to_match_sharing boolean NOT NULL DEFAULT false  ← migration 037
 created_at               timestamptz
 updated_at               timestamptz
+
+--- עמודות legacy (קיימות ב-DB, אך אינן נכתבות או נקראות יותר) ---
+contact_name, contact_email, contact_country, contact_city, contact_address, contact_phone, user_email
 ```
+
+**עיקרון תוכן-בלבד:** המשאלה היא תוכן בלבד — פרטי זיהוי/קשר של המשתמש נשמרים ב-`user_profiles` בלבד. POST /api/wishes אינו כותב שדות contact_* לטבלת wishes.
 
 **Soft delete:** DELETE endpoint מסמן `status='cancelled'` (לא מוחק פיזית).
 RLS מסנן `status != 'cancelled'` לכלל השאילתות (בעלים + ציבורי).
 
 **הסכמה:** הטופס מחייב checkbox הסכמה לפני שליחה (`consent_to_match_sharing=true`). API מאמת ומדחה בחזרה 400 אם חסר.
+
+#### `user_profiles`
+```
+id               uuid PK FK→auth.users (on delete cascade)
+display_name     text
+email            text
+phone            text
+linkedin_url     text
+short_bio        text
+city             text
+address          text        ← migration 043
+organization     text
+role             text
+updated_at       timestamptz
+```
+מקור האמת לפרטי זיהוי/קשר של המשתמש. RLS: בעלים בלבד (select + insert + update).
+
+**אכלוס:** POST /api/wishes → upsert עם הערכים שהוזנו בטופס המשאלה (display_name, city, address, phone, email).
+WishForm טוען את הפרופיל בטעינה ומאכלס את שדות הקשר כברירת מחדל.
+
+**שיתוף:** שדות אינם חשופים אוטומטית — גילוי הוא per-connection בלבד, דרך snapshot בעת אישור חיבור (ראה disclosure בטבלת wish_connections).
 
 #### `settlements`
 ```
@@ -253,6 +275,19 @@ status      'suggested'|'accepted_by_a'|'connected'|'rejected'|'deleted'
 published   boolean NOT NULL DEFAULT false  ← migration 040
 created_at  timestamptz
 UNIQUE(wish_a, wish_b), CHECK(wish_a < wish_b)
+
+--- disclosure columns (migration 042) ---
+user_a_response                     text DEFAULT 'pending'  CHECK IN ('pending','accepted','declined','later')
+user_a_shared_fields_json           jsonb   ← שמות השדות שנבחרו לשיתוף
+user_a_shared_profile_snapshot_json jsonb   ← snapshot ערכים בעת האישור (בלתי-ניתן לשינוי)
+user_a_intro_message                text
+user_a_responded_at                 timestamptz
+user_b_response                     text DEFAULT 'pending'  (same CHECK)
+user_b_shared_fields_json           jsonb
+user_b_shared_profile_snapshot_json jsonb
+user_b_intro_message                text
+user_b_responded_at                 timestamptz
+mutual_accepted_at                  timestamptz  ← שער לחשיפת פרטי זיהוי
 ```
 `status='deleted'` נקבע אוטומטית כשמשאלה מסומנת כ-cancelled.
 כל שאילתות wish_connections מסננות `status != 'deleted'`.
@@ -260,6 +295,20 @@ UNIQUE(wish_a, wish_b), CHECK(wish_a < wish_b)
 **published:** נקבע ל-`true` על-ידי שלב CONNECTION_ENRICHMENT אחרי שה-GPT שופט `overall_connection_score > 70`.
 גם החיבור עם הציון הגבוה ביותר בכל ריצה מקבל `published=true` אפילו מתחת לסף.
 מסכי משתמש (My Matches, My Wishes, API routes) מסננים `published=true` בלבד.
+
+**disclosure — double opt-in per-connection:**
+- `user_a` = בעל wish_a, `user_b` = בעל wish_b
+- כל צד בוחר: `accepted` / `declined` / `later`
+- בעת `accepted`: בוחרים אילו שדות מ-`user_profiles` לשתף → snapshot נשמר ב-`*_shared_profile_snapshot_json`
+- `mutual_accepted_at` נקבע כשגם A וגם B ב-`accepted` — רק אז הצדדים רואים זה את זה
+
+**מצב disclosure נגזר (application layer):**
+| מצב | תנאי |
+|-----|------|
+| `pending` | שני הצדדים pending/later |
+| `one_side_accepted` | אחד accepted, השני pending/later |
+| `mutual_accept` | `mutual_accepted_at IS NOT NULL` |
+| `declined` | אחד מהצדדים declined |
 
 #### `match_attempts_log`
 ```
@@ -500,7 +549,8 @@ if no pair crossed threshold:
   force-publish the best-scoring pair
 ```
 
-**email:** `sendConnectionEmail()` עם opportunity + shared_basis + their needs/skills + overallScore
+**email:** `sendConnectionEmail()` עם opportunity + shared_basis + their needs/skills + overallScore.
+פרטי קשר לאימייל (שם, אימייל, טלפון, עיר) נשלפים מ-`user_profiles` דרך `user_id` של המשאלה — לא מעמודות `contact_*` בטבלת wishes.
 
 ### חישוב Anchor Keywords (`lib/matching/keywords.ts`)
 
@@ -664,6 +714,7 @@ ORDER BY embedding <=> query_embedding
 | טבלה | מדיניות |
 |------|---------|
 | wishes | בעלים ← CRUD (status != 'cancelled') · כולם ← open wishes (status != 'cancelled') |
+| user_profiles | בעלים בלבד ← select + insert + update (RLS על auth.uid() = id) |
 | settlements | כולם ← read only |
 | wish_resonances | auth users ← resonance על open wishes |
 | wish_enrichment | בעלים OR public wish |
