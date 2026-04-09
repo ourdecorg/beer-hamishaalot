@@ -200,8 +200,6 @@ export async function processWishForMatching(
       candidate_wish_id: string
       semantic_similarity: number
       complementarity_score: number
-      theme_overlap: number          // NOT NULL in DB — always 0 (legacy)
-      intent_compatibility: number   // always 0 (legacy)
       domain_match: number
       structural_similarity: number
       recall_source: string
@@ -227,8 +225,6 @@ export async function processWishForMatching(
           candidate_wish_id:     candidate.wish_id,
           semantic_similarity:   Math.round(candidate.similarityEn * 1000) / 1000,
           complementarity_score: 0,
-          theme_overlap:         0,
-          intent_compatibility:  0,
           domain_match:          0,
           structural_similarity: 0,
           recall_source:         candidate.recallSource,
@@ -262,8 +258,6 @@ export async function processWishForMatching(
           candidate_wish_id:     candidate.wish_id,
           semantic_similarity:   Math.round(candidate.similarityEn  * 1000) / 1000,
           complementarity_score: Math.round(complementarityScore    * 1000) / 1000,
-          theme_overlap:         0,
-          intent_compatibility:  0,
           domain_match:          domainMatch,
           structural_similarity: Math.round(structuralSimilarity    * 1000) / 1000,
           recall_source:         candidate.recallSource,
@@ -290,8 +284,6 @@ export async function processWishForMatching(
         candidate_wish_id:     candidate.wish_id,
         semantic_similarity:   Math.round(candidate.similarityEn  * 1000) / 1000,
         complementarity_score: Math.round(complementarityScore    * 1000) / 1000,
-        theme_overlap:         0,
-        intent_compatibility:  0,
         domain_match:          domainMatch,
         structural_similarity: Math.round(structuralSimilarity    * 1000) / 1000,
         recall_source:         candidate.recallSource,
