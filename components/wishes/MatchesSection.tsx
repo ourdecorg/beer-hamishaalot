@@ -524,16 +524,6 @@ export default function MatchesSection({ wishId, isAdmin = false }: Props) {
                             >
                               {value}
                             </a>
-                          ) : field === 'linkedin_url' ? (
-                            <a
-                              href={value!}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-indigo-600 underline underline-offset-2 hover:text-indigo-800"
-                              dir="ltr"
-                            >
-                              {value}
-                            </a>
                           ) : (
                             <span className="text-sm text-slate-800">{value}</span>
                           )}

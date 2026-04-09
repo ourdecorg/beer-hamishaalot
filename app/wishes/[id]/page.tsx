@@ -54,41 +54,6 @@ export default async function WishPage({ params }: Props) {
           </p>
         </div>
 
-        {/* Contact info */}
-        {wish.contact_name && (
-          <div className="card p-6 mt-6 bg-slate-50">
-            <p className="section-label mb-4">
-              {tr.contactDetails}
-            </p>
-            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
-              <div>
-                <dt className="text-xs text-slate-400 mb-0.5">{tr.nameLabel}</dt>
-                <dd className="text-slate-800 font-medium">{wish.contact_name}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-slate-400 mb-0.5">{tr.emailLabel}</dt>
-                <dd className="text-slate-800 font-medium" dir="ltr">{wish.contact_email}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-slate-400 mb-0.5">{tr.cityLabel}</dt>
-                <dd className="text-slate-800">{wish.contact_city}</dd>
-              </div>
-              {wish.contact_address && (
-                <div>
-                  <dt className="text-xs text-slate-400 mb-0.5">{tr.addressLabel}</dt>
-                  <dd className="text-slate-800">{wish.contact_address}</dd>
-                </div>
-              )}
-              {wish.contact_phone && (
-                <div>
-                  <dt className="text-xs text-slate-400 mb-0.5">{tr.phoneLabel}</dt>
-                  <dd className="text-slate-800" dir="ltr">{wish.contact_phone}</dd>
-                </div>
-              )}
-            </dl>
-          </div>
-        )}
-
         {/* Owner badge */}
         {isOwner && (
           <div className="mt-6 flex gap-3 flex-wrap">

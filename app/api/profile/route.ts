@@ -14,24 +14,16 @@ const SHAREABLE_FIELDS = [
   'display_name',
   'email',
   'phone',
-  'linkedin_url',
-  'short_bio',
   'country',
   'city',
-  'organization',
-  'role',
 ] as const
 
 const EMPTY_PROFILE: Omit<UserProfile, 'id' | 'updated_at'> = {
   display_name: null,
   email: null,
   phone: null,
-  linkedin_url: null,
-  short_bio: null,
   country: null,
   city: null,
-  organization: null,
-  role: null,
 }
 
 export async function GET() {

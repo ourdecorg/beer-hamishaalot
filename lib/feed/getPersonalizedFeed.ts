@@ -82,9 +82,6 @@ async function fetchWishDetails(
 
   const wishes: WishWithResonance[] = (wishesResult.data ?? []).map(w => ({
     ...w,
-    // Null-fill contact fields — not needed in the public feed view
-    contact_name: null, contact_email: null, contact_country: null,
-    contact_city: null, contact_address: null, contact_phone: null,
     resonance_count: resonanceCountMap.get(w.id) ?? 0,
     user_has_resonated: resonatedIds.has(w.id),
   }))
@@ -195,8 +192,6 @@ async function getTrendingFeed(userId: string, supabase: SupabaseClient): Promis
 
     return {
       ...w,
-      contact_name: null, contact_email: null, contact_country: null,
-      contact_city: null, contact_address: null, contact_phone: null,
       resonance_count,
       user_has_resonated: false,
       enrichment: null,

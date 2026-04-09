@@ -9,10 +9,6 @@ type Wish = {
   id: string
   original_text: string
   created_at: string
-  contact_name: string | null
-  contact_email: string | null
-  contact_city: string | null
-  contact_country: string | null
 }
 
 type LogEntry = {
@@ -346,8 +342,7 @@ export default function ConnectionsDebugPage() {
     wishes.filter(w =>
       filter.length < 2 ||
       w.original_text.includes(filter) ||
-      w.id.startsWith(filter) ||
-      (w.contact_name ?? '').includes(filter)
+      w.id.startsWith(filter)
     ).slice(0, 120)
 
   return (
@@ -389,7 +384,7 @@ export default function ConnectionsDebugPage() {
                 <option value="">— בחר משאלה —</option>
                 {filteredWishes(filter).map(w => (
                   <option key={w.id} value={w.id}>
-                    {truncate(w.original_text)} {w.contact_name ? `(${w.contact_name})` : ''}
+                    {truncate(w.original_text)}
                   </option>
                 ))}
               </select>
@@ -427,8 +422,6 @@ export default function ConnectionsDebugPage() {
                   <>
                     <p className="text-slate-800 leading-relaxed text-sm mb-3">{wish.original_text}</p>
                     <div className="text-xs text-slate-400 space-y-1">
-                      {wish.contact_name && <p>👤 {wish.contact_name}</p>}
-                      {wish.contact_city && <p>📍 {wish.contact_city}{wish.contact_country ? `, ${wish.contact_country}` : ''}</p>}
                       <p>🕐 {fmt(wish.created_at)}</p>
                       <a
                         href={`/wishes/${wish.id}`}

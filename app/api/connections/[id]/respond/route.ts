@@ -31,12 +31,8 @@ const SHAREABLE_FIELDS: ProfileField[] = [
   'display_name',
   'email',
   'phone',
-  'linkedin_url',
-  'short_bio',
   'country',
   'city',
-  'organization',
-  'role',
 ]
 
 interface Params {

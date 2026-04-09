@@ -11,13 +11,6 @@ export interface Wish {
   visibility: WishVisibility
   created_at: string
   updated_at: string
-  // Contact info — only for open wishes
-  contact_name: string | null
-  contact_email: string | null
-  contact_country: string | null
-  contact_city: string | null
-  contact_address: string | null
-  contact_phone: string | null
   user_email: string | null
   consent_to_match_sharing?: boolean
 }
@@ -117,12 +110,8 @@ export type ProfileField =
   | 'display_name'
   | 'email'
   | 'phone'
-  | 'linkedin_url'
-  | 'short_bio'
   | 'country'
   | 'city'
-  | 'organization'
-  | 'role'
 
 /**
  * User profile — identity/contact details stored separately from wishes.
@@ -134,12 +123,8 @@ export interface UserProfile {
   display_name: string | null
   email: string | null
   phone: string | null
-  linkedin_url: string | null
-  short_bio: string | null
   country: string | null
   city: string | null
-  organization: string | null
-  role: string | null
   updated_at: string | null
 }
 

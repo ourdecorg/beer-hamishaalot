@@ -27,7 +27,6 @@ export interface AttemptRow {
 export interface WishStub {
   id: string
   original_text: string
-  contact_city: string | null
   status?: string | null
 }
 
@@ -395,7 +394,6 @@ function ReviewCard({
         <div className="bg-slate-50 rounded-xl p-3 space-y-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">משאלה מקורית</p>
           <p className="text-sm text-slate-800 leading-relaxed">{wishA ? truncate(wishA.original_text) : attempt.wish_id}</p>
-          {wishA?.contact_city && <p className="text-xs text-slate-400">{wishA.contact_city}</p>}
           {enrichA?.themes && enrichA.themes.length > 0 && (
             <div className="flex flex-wrap gap-1 pt-1">
               {enrichA.themes.slice(0, 4).map(th => (
@@ -407,7 +405,6 @@ function ReviewCard({
         <div className="bg-indigo-50/30 rounded-xl p-3 space-y-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">משאלה מועמדת</p>
           <p className="text-sm text-slate-800 leading-relaxed">{wishB ? truncate(wishB.original_text) : attempt.candidate_wish_id}</p>
-          {wishB?.contact_city && <p className="text-xs text-slate-400">{wishB.contact_city}</p>}
           {enrichB?.themes && enrichB.themes.length > 0 && (
             <div className="flex flex-wrap gap-1 pt-1">
               {enrichB.themes.slice(0, 4).map(th => (
