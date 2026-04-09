@@ -11,15 +11,12 @@ const matchTypeCls: Record<MatchType, string> = {
   similar: 'bg-slate-100 border-slate-200 text-slate-600',
 }
 
-const SHAREABLE_FIELDS: ProfileField[] = [
+const DISCLOSURE_FIELDS: ProfileField[] = [
   'display_name',
   'email',
-  'phone',
-  'linkedin_url',
-  'short_bio',
+  'country',
   'city',
-  'organization',
-  'role',
+  'phone',
 ]
 
 interface Props {
@@ -38,14 +35,22 @@ interface RespondPanelProps {
 
 function RespondPanel({ connectionId, profile, onResponded, tr }: RespondPanelProps) {
   const [step, setStep] = useState<'cta' | 'accept-form'>('cta')
-  const [selectedFields, setSelectedFields] = useState<Set<ProfileField>>(new Set())
+  const [selectedFields, setSelectedFields] = useState<Set<ProfileField>>(
+    new Set<ProfileField>(['display_name', 'email'])
+  )
   const [introMessage, setIntroMessage] = useState('')
   const [saving, setSaving] = useState(false)
 
   function toggleField(f: ProfileField) {
     setSelectedFields((prev) => {
       const next = new Set(prev)
-      next.has(f) ? next.delete(f) : next.add(f)
+      if (next.has(f)) {
+        next.delete(f)
+        if (f === 'country') next.delete('city')
+      } else {
+        next.add(f)
+        if (f === 'city') next.add('country')
+      }
       return next
     })
   }
@@ -69,7 +74,7 @@ function RespondPanel({ connectionId, profile, onResponded, tr }: RespondPanelPr
   }
 
   const profileHasData = profile
-    ? SHAREABLE_FIELDS.some((f) => profile[f as keyof UserProfile])
+    ? DISCLOSURE_FIELDS.some((f) => profile[f as keyof UserProfile])
     : false
 
   if (step === 'accept-form') {
@@ -84,7 +89,7 @@ function RespondPanel({ connectionId, profile, onResponded, tr }: RespondPanelPr
         )}
 
         <div className="grid grid-cols-2 gap-2">
-          {SHAREABLE_FIELDS.map((f) => {
+          {DISCLOSURE_FIELDS.map((f) => {
             const value = profile?.[f as keyof UserProfile] as string | null
             const label = tr.fieldLabels[f as keyof typeof tr.fieldLabels]
             const isChecked = selectedFields.has(f)
