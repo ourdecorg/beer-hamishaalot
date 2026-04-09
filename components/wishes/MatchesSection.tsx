@@ -34,9 +34,10 @@ interface RespondPanelProps {
   initialStep?: 'cta' | 'accept-form'
   initialSharedFields?: string[] | null
   initialIntroMessage?: string | null
+  onCancel?: () => void
 }
 
-function RespondPanel({ connectionId, profile, onResponded, tr, initialStep = 'cta', initialSharedFields, initialIntroMessage }: RespondPanelProps) {
+function RespondPanel({ connectionId, profile, onResponded, tr, initialStep = 'cta', initialSharedFields, initialIntroMessage, onCancel }: RespondPanelProps) {
   const [step, setStep] = useState<'cta' | 'accept-form'>(initialStep)
   const [selectedFields, setSelectedFields] = useState<Set<ProfileField>>(
     initialSharedFields && initialSharedFields.length > 0
@@ -161,13 +162,15 @@ function RespondPanel({ connectionId, profile, onResponded, tr, initialStep = 'c
           >
             {saving ? tr.submitting : tr.submitAccept}
           </button>
-          <button
-            onClick={() => setStep('cta')}
-            disabled={saving}
-            className="px-4 py-2 text-sm text-slate-500 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
-          >
-            ←
-          </button>
+          {(onCancel || initialStep !== 'accept-form') && (
+            <button
+              onClick={() => onCancel ? onCancel() : setStep('cta')}
+              disabled={saving}
+              className="px-4 py-2 text-sm text-slate-500 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+            >
+              ←
+            </button>
+          )}
         </div>
       </div>
     )
@@ -225,6 +228,7 @@ function WaitingPanel({ connectionId, profile, onResponded, tr, mySharedFields, 
         connectionId={connectionId}
         profile={profile}
         onResponded={(r) => { setEditing(false); onResponded(r) }}
+        onCancel={() => setEditing(false)}
         tr={tr}
         initialStep="accept-form"
         initialSharedFields={mySharedFields}
@@ -261,6 +265,7 @@ export default function MatchesSection({ wishId, isAdmin = false }: Props) {
   const [matches, setMatches] = useState<MatchResult[]>([])
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     function fetchData() {
@@ -280,7 +285,7 @@ export default function MatchesSection({ wishId, isAdmin = false }: Props) {
     const onVisible = () => { if (document.visibilityState === 'visible') fetchData() }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [wishId])
+  }, [wishId, refreshKey])
 
   // Optimistically update a single match's disclosure state after the user responds
   function handleResponded(connectionId: string, response: 'accepted' | 'declined' | 'later') {
@@ -303,6 +308,8 @@ export default function MatchesSection({ wishId, isAdmin = false }: Props) {
         }
       })
     )
+    // Refetch from server after acceptance to get fresh my_shared_fields / my_intro_message
+    if (response === 'accepted') setRefreshKey((k) => k + 1)
   }
 
   if (loading) {
