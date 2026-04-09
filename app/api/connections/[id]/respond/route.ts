@@ -100,9 +100,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  // Prevent overwriting a final response (accepted or declined)
+  // Prevent overwriting a final response, except: re-accepting is allowed (to update shared fields)
   const myCurrentResponse = isOwnerA ? conn.user_a_response : conn.user_b_response
-  if (myCurrentResponse === 'accepted' || myCurrentResponse === 'declined') {
+  const isReAccept = myCurrentResponse === 'accepted' && response === 'accepted'
+  if (!isReAccept && (myCurrentResponse === 'accepted' || myCurrentResponse === 'declined')) {
     return NextResponse.json(
       { error: 'You have already responded', current_response: myCurrentResponse },
       { status: 409 }

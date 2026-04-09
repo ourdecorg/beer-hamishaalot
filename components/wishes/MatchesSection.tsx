@@ -31,15 +31,17 @@ interface RespondPanelProps {
   profile: UserProfile | null
   onResponded: (response: 'accepted' | 'declined' | 'later') => void
   tr: ReturnType<typeof t>['matchesSection']
+  initialStep?: 'cta' | 'accept-form'
 }
 
-function RespondPanel({ connectionId, profile, onResponded, tr }: RespondPanelProps) {
-  const [step, setStep] = useState<'cta' | 'accept-form'>('cta')
+function RespondPanel({ connectionId, profile, onResponded, tr, initialStep = 'cta' }: RespondPanelProps) {
+  const [step, setStep] = useState<'cta' | 'accept-form'>(initialStep)
   const [selectedFields, setSelectedFields] = useState<Set<ProfileField>>(
     new Set<ProfileField>(['display_name', 'email'])
   )
   const [introMessage, setIntroMessage] = useState('')
   const [saving, setSaving] = useState(false)
+  const [contactError, setContactError] = useState(false)
 
   function toggleField(f: ProfileField) {
     setSelectedFields((prev) => {
@@ -134,11 +136,22 @@ function RespondPanel({ connectionId, profile, onResponded, tr }: RespondPanelPr
           />
         </div>
 
+        {contactError && (
+          <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            {tr.contactMethodRequired}
+          </p>
+        )}
+
         <div className="flex gap-2">
           <button
-            onClick={() =>
+            onClick={() => {
+              const hasContact =
+                (selectedFields.has('email') && !!profile?.email) ||
+                (selectedFields.has('phone') && !!profile?.phone)
+              if (!hasContact) { setContactError(true); return }
+              setContactError(false)
               submitResponse('accepted', Array.from(selectedFields), introMessage.trim() || null)
-            }
+            }}
             disabled={saving}
             className="flex-1 bg-emerald-600 text-white text-sm font-semibold rounded-lg px-4 py-2 hover:bg-emerald-700 disabled:opacity-60 transition-colors"
           >
@@ -184,6 +197,43 @@ function RespondPanel({ connectionId, profile, onResponded, tr }: RespondPanelPr
           {tr.declineBtn}
         </button>
       </div>
+    </div>
+  )
+}
+
+// ── Waiting panel (accepted, pending other side) ──────────────────────────────
+
+interface WaitingPanelProps {
+  connectionId: string
+  profile: UserProfile | null
+  onResponded: (response: 'accepted' | 'declined' | 'later') => void
+  tr: ReturnType<typeof t>['matchesSection']
+}
+
+function WaitingPanel({ connectionId, profile, onResponded, tr }: WaitingPanelProps) {
+  const [editing, setEditing] = useState(false)
+
+  if (editing) {
+    return (
+      <RespondPanel
+        connectionId={connectionId}
+        profile={profile}
+        onResponded={(r) => { setEditing(false); onResponded(r) }}
+        tr={tr}
+        initialStep="accept-form"
+      />
+    )
+  }
+
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 flex items-center justify-between gap-3">
+      <p className="text-sm text-emerald-700 font-medium">{tr.waitingOther}</p>
+      <button
+        onClick={() => setEditing(true)}
+        className="text-xs text-emerald-700 border border-emerald-300 rounded-lg px-3 py-1.5 hover:bg-emerald-100 transition-colors shrink-0"
+      >
+        {tr.editSharedFields}
+      </button>
     </div>
   )
 }
@@ -400,9 +450,12 @@ export default function MatchesSection({ wishId, isAdmin = false }: Props) {
 
             {/* Accepted, waiting for other side */}
             {!isDeclined && isWaiting && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
-                <p className="text-sm text-emerald-700 font-medium">{tr.waitingOther}</p>
-              </div>
+              <WaitingPanel
+                connectionId={match.connection_id}
+                profile={profile}
+                onResponded={(r) => handleResponded(match.connection_id, r)}
+                tr={tr}
+              />
             )}
 
             {/* Mutual — show the other side's shared snapshot */}
