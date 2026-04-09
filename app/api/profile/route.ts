@@ -39,10 +39,22 @@ export async function GET() {
     .eq('id', user.id)
     .maybeSingle()
 
-  // Return empty profile shape if the row doesn't exist yet
-  return NextResponse.json(
-    profile ?? { id: user.id, updated_at: null, ...EMPTY_PROFILE }
-  )
+  // Return empty profile shape if the row doesn't exist yet.
+  // Seed display_name from auth metadata (Google full_name / name) as a default.
+  if (!profile) {
+    const meta = user.user_metadata ?? {}
+    const authName: string | null =
+      (typeof meta.full_name === 'string' && meta.full_name) ||
+      (typeof meta.name === 'string' && meta.name) ||
+      null
+    return NextResponse.json({
+      id: user.id,
+      updated_at: null,
+      ...EMPTY_PROFILE,
+      display_name: authName,
+    })
+  }
+  return NextResponse.json(profile)
 }
 
 export async function PATCH(request: NextRequest) {
