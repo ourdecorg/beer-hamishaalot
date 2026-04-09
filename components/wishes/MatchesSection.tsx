@@ -263,17 +263,22 @@ export default function MatchesSection({ wishId, isAdmin = false }: Props) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
 
   useEffect(() => {
-    fetch(`/api/wishes/${wishId}/matches`)
-      .then((r) => r.json())
-      .then((data) => setMatches(Array.isArray(data) ? data : []))
-      .catch(() => setMatches([]))
-      .finally(() => setLoading(false))
+    function fetchData() {
+      setLoading(true)
+      Promise.all([
+        fetch(`/api/wishes/${wishId}/matches`).then((r) => r.json()).catch(() => []),
+        fetch('/api/profile').then((r) => r.json()).catch(() => null),
+      ]).then(([matchData, profileData]) => {
+        setMatches(Array.isArray(matchData) ? matchData : [])
+        if (profileData && !profileData.error) setProfile(profileData)
+      }).finally(() => setLoading(false))
+    }
 
-    // Fetch the user's profile so we know what fields are available to share
-    fetch('/api/profile')
-      .then((r) => r.json())
-      .then((data) => setProfile(data))
-      .catch(() => null)
+    fetchData()
+
+    // Refetch when the tab regains focus (handles browser back-navigation from router cache)
+    window.addEventListener('focus', fetchData)
+    return () => window.removeEventListener('focus', fetchData)
   }, [wishId])
 
   // Optimistically update a single match's disclosure state after the user responds
