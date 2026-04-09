@@ -44,12 +44,11 @@ export interface Collaboration {
   created_at: string
 }
 
-// Contact info for open wishes
+// Contact info collected in the wish form (stored to user_profiles, not to the wish)
 export interface WishContactInfo {
   contact_name: string
   contact_country: string
   contact_city: string
-  contact_address?: string
   contact_phone?: string
 }
 
@@ -120,8 +119,8 @@ export type ProfileField =
   | 'phone'
   | 'linkedin_url'
   | 'short_bio'
+  | 'country'
   | 'city'
-  | 'address'
   | 'organization'
   | 'role'
 
@@ -137,8 +136,8 @@ export interface UserProfile {
   phone: string | null
   linkedin_url: string | null
   short_bio: string | null
+  country: string | null
   city: string | null
-  address: string | null
   organization: string | null
   role: string | null
   updated_at: string | null

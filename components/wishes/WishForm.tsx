@@ -8,11 +8,20 @@ import SettlementPicker from './SettlementPicker'
 import { useLang } from '@/components/LangProvider'
 import { t } from '@/lib/i18n'
 
+interface Country {
+  id: number
+  alpha2: string
+  name: string
+}
+
+const FALLBACK_COUNTRIES: Country[] = [
+  { id: 376, alpha2: 'il', name: 'Israel' },
+]
+
 const emptyContact: WishContactInfo = {
   contact_name: '',
   contact_country: 'Israel',
   contact_city: '',
-  contact_address: '',
   contact_phone: '',
 }
 
@@ -27,31 +36,49 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
   const [text, setText] = useState(initialText)
   const [contact, setContact] = useState<WishContactInfo>(emptyContact)
   const [consent, setConsent] = useState(false)
-
-  // Pre-fill contact fields from the user's saved profile
-  useEffect(() => {
-    fetch('/api/profile')
-      .then((r) => r.json())
-      .then((profile) => {
-        if (!profile || profile.error) return
-        setContact((prev) => ({
-          ...prev,
-          contact_name:    profile.display_name ?? prev.contact_name,
-          contact_city:    profile.city         ?? prev.contact_city,
-          contact_address: profile.address      ?? prev.contact_address,
-          contact_phone:   profile.phone        ?? prev.contact_phone,
-        }))
-      })
-      .catch(() => null)
-  }, [])
   const [consentError, setConsentError] = useState(false)
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
+  const [countries, setCountries] = useState<Country[]>(FALLBACK_COUNTRIES)
   const router = useRouter()
+
+  // Pre-fill from profile + load countries list in parallel
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/profile').then((r) => r.json()).catch(() => null),
+      fetch('/api/countries').then((r) => r.json()).catch(() => null),
+    ]).then(([profile, countryList]) => {
+      if (Array.isArray(countryList) && countryList.length > 0) {
+        setCountries(countryList)
+      }
+      if (profile && !profile.error) {
+        setContact((prev) => ({
+          ...prev,
+          contact_name:    profile.display_name ?? prev.contact_name,
+          contact_country: profile.country      ?? prev.contact_country,
+          contact_city:    profile.city         ?? prev.contact_city,
+          contact_phone:   profile.phone        ?? prev.contact_phone,
+        }))
+      }
+    })
+  }, [])
 
   const setContactField = (field: keyof WishContactInfo, value: string) => {
     setContact((prev) => ({ ...prev, [field]: value }))
   }
+
+  const handleCountryChange = (value: string) => {
+    // Clear city when switching away from Israel (settlement names don't apply)
+    const wasIsrael = contact.contact_country === 'Israel'
+    const isNowIsrael = value === 'Israel'
+    setContact((prev) => ({
+      ...prev,
+      contact_country: value,
+      contact_city: wasIsrael !== isNowIsrael ? '' : prev.contact_city,
+    }))
+  }
+
+  const isIsrael = contact.contact_country === 'Israel'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,17 +92,15 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
     setStatus('loading')
     setErrorMsg('')
 
-    const body: Record<string, unknown> = {
-      original_text: text.trim(),
-      visibility: 'open',
-      contact,
-      consent_to_match_sharing: true,
-    }
-
     const res = await fetch('/api/wishes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        original_text: text.trim(),
+        visibility: 'open',
+        contact,
+        consent_to_match_sharing: true,
+      }),
     })
 
     if (!res.ok) {
@@ -96,6 +121,7 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Wish text */}
       <div>
         <label htmlFor="wish-text" className="block text-sm font-medium text-slate-700 mb-2">
           {tr.label}
@@ -126,10 +152,12 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
         <p className="text-xs text-slate-400 mt-2">{tr.consentHelper}</p>
       </div>
 
+      {/* Contact details — order: name, country, city, phone */}
       <div className="card p-6 space-y-4 bg-slate-50">
         <p className="text-sm font-medium text-slate-700">{tr.contactTitle}</p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Name */}
           <div>
             <label className="block text-xs text-slate-600 mb-1">
               {tr.nameLabel} <span className="text-red-400">{tr.nameRequired}</span>
@@ -145,38 +173,56 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
             />
           </div>
 
+          {/* Country */}
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">
+              {tr.countryLabel} <span className="text-slate-400">{tr.optional}</span>
+            </label>
+            <select
+              value={contact.contact_country}
+              onChange={(e) => handleCountryChange(e.target.value)}
+              disabled={status === 'loading'}
+              className="input-base bg-white"
+            >
+              {countries.map((c) => (
+                <option key={c.id} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* City — SettlementPicker for Israel, free text otherwise */}
           <div>
             <label className="block text-xs text-slate-600 mb-1">
               {tr.cityLabel} <span className="text-slate-400">{tr.optional}</span>
             </label>
-            <SettlementPicker
-              value={contact.contact_city}
-              onChange={(v) => setContactField('contact_city', v)}
-              disabled={status === 'loading'}
-            />
+            {isIsrael ? (
+              <SettlementPicker
+                value={contact.contact_city}
+                onChange={(v) => setContactField('contact_city', v)}
+                disabled={status === 'loading'}
+              />
+            ) : (
+              <input
+                type="text"
+                value={contact.contact_city}
+                onChange={(e) => setContactField('contact_city', e.target.value)}
+                placeholder={tr.cityPlaceholder}
+                disabled={status === 'loading'}
+                className="input-base"
+              />
+            )}
           </div>
 
-          <div>
-            <label className="block text-xs text-slate-600 mb-1">
-              {tr.addressLabel} <span className="text-slate-400">{tr.optional}</span>
-            </label>
-            <input
-              type="text"
-              value={contact.contact_address}
-              onChange={(e) => setContactField('contact_address', e.target.value)}
-              placeholder={tr.addressPlaceholder}
-              disabled={status === 'loading'}
-              className="input-base"
-            />
-          </div>
-
+          {/* Phone */}
           <div>
             <label className="block text-xs text-slate-600 mb-1">
               {tr.phoneLabel} <span className="text-slate-400">{tr.optional}</span>
             </label>
             <input
               type="tel"
-              value={contact.contact_phone}
+              value={contact.contact_phone ?? ''}
               onChange={(e) => setContactField('contact_phone', e.target.value)}
               placeholder={tr.phonePlaceholder}
               disabled={status === 'loading'}
@@ -187,7 +233,7 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
         </div>
       </div>
 
-      {/* Consent checkbox */}
+      {/* Consent */}
       <div
         className={`rounded-xl border p-4 ${
           consentError ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50'
@@ -238,9 +284,7 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
             <span>{tr.submitting}</span>
           </>
         ) : (
-          <>
-            <span>{tr.submitBtn}</span>
-          </>
+          <span>{tr.submitBtn}</span>
         )}
       </button>
 

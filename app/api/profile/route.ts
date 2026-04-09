@@ -16,8 +16,8 @@ const SHAREABLE_FIELDS = [
   'phone',
   'linkedin_url',
   'short_bio',
+  'country',
   'city',
-  'address',
   'organization',
   'role',
 ] as const
@@ -28,8 +28,8 @@ const EMPTY_PROFILE: Omit<UserProfile, 'id' | 'updated_at'> = {
   phone: null,
   linkedin_url: null,
   short_bio: null,
+  country: null,
   city: null,
-  address: null,
   organization: null,
   role: null,
 }

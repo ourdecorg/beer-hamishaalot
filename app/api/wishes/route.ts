@@ -73,8 +73,8 @@ export async function POST(request: NextRequest) {
         {
           id: user.id,
           display_name: contact?.contact_name?.trim() || null,
+          country: contact?.contact_country?.trim() || null,
           city: contact?.contact_city?.trim() || null,
-          address: contact?.contact_address?.trim() || null,
           phone: contact?.contact_phone?.trim() || null,
           email: user.email ?? null,
           updated_at: new Date().toISOString(),
