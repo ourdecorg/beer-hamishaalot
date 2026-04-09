@@ -276,9 +276,10 @@ export default function MatchesSection({ wishId, isAdmin = false }: Props) {
 
     fetchData()
 
-    // Refetch when the tab regains focus (handles browser back-navigation from router cache)
-    window.addEventListener('focus', fetchData)
-    return () => window.removeEventListener('focus', fetchData)
+    // Refetch when page becomes visible again (handles browser back-navigation from bfcache/router cache)
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchData() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [wishId])
 
   // Optimistically update a single match's disclosure state after the user responds
