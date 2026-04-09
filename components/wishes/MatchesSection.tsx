@@ -32,14 +32,18 @@ interface RespondPanelProps {
   onResponded: (response: 'accepted' | 'declined' | 'later') => void
   tr: ReturnType<typeof t>['matchesSection']
   initialStep?: 'cta' | 'accept-form'
+  initialSharedFields?: string[] | null
+  initialIntroMessage?: string | null
 }
 
-function RespondPanel({ connectionId, profile, onResponded, tr, initialStep = 'cta' }: RespondPanelProps) {
+function RespondPanel({ connectionId, profile, onResponded, tr, initialStep = 'cta', initialSharedFields, initialIntroMessage }: RespondPanelProps) {
   const [step, setStep] = useState<'cta' | 'accept-form'>(initialStep)
   const [selectedFields, setSelectedFields] = useState<Set<ProfileField>>(
-    new Set<ProfileField>(['display_name', 'email'])
+    initialSharedFields && initialSharedFields.length > 0
+      ? new Set<ProfileField>(initialSharedFields as ProfileField[])
+      : new Set<ProfileField>(['display_name', 'email'])
   )
-  const [introMessage, setIntroMessage] = useState('')
+  const [introMessage, setIntroMessage] = useState(initialIntroMessage ?? '')
   const [saving, setSaving] = useState(false)
   const [contactError, setContactError] = useState(false)
 
@@ -208,9 +212,11 @@ interface WaitingPanelProps {
   profile: UserProfile | null
   onResponded: (response: 'accepted' | 'declined' | 'later') => void
   tr: ReturnType<typeof t>['matchesSection']
+  mySharedFields: string[] | null
+  myIntroMessage: string | null
 }
 
-function WaitingPanel({ connectionId, profile, onResponded, tr }: WaitingPanelProps) {
+function WaitingPanel({ connectionId, profile, onResponded, tr, mySharedFields, myIntroMessage }: WaitingPanelProps) {
   const [editing, setEditing] = useState(false)
 
   if (editing) {
@@ -221,6 +227,8 @@ function WaitingPanel({ connectionId, profile, onResponded, tr }: WaitingPanelPr
         onResponded={(r) => { setEditing(false); onResponded(r) }}
         tr={tr}
         initialStep="accept-form"
+        initialSharedFields={mySharedFields}
+        initialIntroMessage={myIntroMessage}
       />
     )
   }
@@ -455,6 +463,8 @@ export default function MatchesSection({ wishId, isAdmin = false }: Props) {
                 profile={profile}
                 onResponded={(r) => handleResponded(match.connection_id, r)}
                 tr={tr}
+                mySharedFields={match.my_shared_fields}
+                myIntroMessage={match.my_intro_message}
               />
             )}
 

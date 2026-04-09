@@ -86,9 +86,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
     explanation: unknown
     published: boolean
     user_a_response: string | null
+    user_a_shared_fields_json: string[] | null
     user_a_shared_profile_snapshot_json: unknown
     user_a_intro_message: string | null
     user_b_response: string | null
+    user_b_shared_fields_json: string[] | null
     user_b_shared_profile_snapshot_json: unknown
     user_b_intro_message: string | null
     mutual_accepted_at: string | null
@@ -228,6 +230,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
       disclosure_state: disclosureState,
       other_shared_snapshot: otherSnapshot,
       other_intro_message: otherIntroMessage,
+      my_shared_fields: (isWishA ? conn.user_a_shared_fields_json : conn.user_b_shared_fields_json) ?? null,
+      my_intro_message: (isWishA ? conn.user_a_intro_message : conn.user_b_intro_message) ?? null,
     }
 
     // Admin view: also include wish-level contact data (not gated by disclosure)

@@ -200,6 +200,10 @@ export interface MatchResult {
   other_shared_snapshot: Record<string, string | null> | null
   /** The other side's intro message — ONLY populated when mutual. Null otherwise. */
   other_intro_message: string | null
+  /** The fields the current user chose to share (always available after accepting). */
+  my_shared_fields: string[] | null
+  /** The current user's own intro message (always available after accepting). */
+  my_intro_message: string | null
 
   /** @deprecated Contact from wish record — replaced by other_shared_snapshot. Kept for admin view. */
   contact?: {
