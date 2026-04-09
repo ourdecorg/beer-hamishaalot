@@ -7,6 +7,9 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+// Must be dynamic — table is populated after deploy, cannot be statically cached
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const admin = createAdminClient()
 
