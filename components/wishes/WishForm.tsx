@@ -176,7 +176,7 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
           {/* Country */}
           <div>
             <label className="block text-xs text-slate-600 mb-1">
-              {tr.countryLabel} <span className="text-slate-400">{tr.optional}</span>
+              {tr.countryLabel}
             </label>
             <select
               value={contact.contact_country}
@@ -195,7 +195,7 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
           {/* City — SettlementPicker for Israel, free text otherwise */}
           <div>
             <label className="block text-xs text-slate-600 mb-1">
-              {tr.cityLabel} <span className="text-slate-400">{tr.optional}</span>
+              {tr.cityLabel}
             </label>
             {isIsrael ? (
               <SettlementPicker
@@ -218,7 +218,7 @@ export default function WishForm({ initialText = '' }: WishFormProps) {
           {/* Phone */}
           <div>
             <label className="block text-xs text-slate-600 mb-1">
-              {tr.phoneLabel} <span className="text-slate-400">{tr.optional}</span>
+              {tr.phoneLabel}
             </label>
             <input
               type="tel"
