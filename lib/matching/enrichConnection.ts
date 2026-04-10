@@ -68,6 +68,27 @@ const VALID_RELATIONSHIP_TYPES = new Set([
   'unclear',
 ])
 
+const RELATIONSHIP_TYPE_ALIASES: Record<string, string> = {
+  partial:                      'moderate_resonance_practical_match',
+  partial_match:                'moderate_resonance_practical_match',
+  moderate_resonance:           'moderate_resonance_practical_match',
+  low_resonance:                'weak_match',
+  low_resonance_weak_match:     'weak_match',
+  strong_collaboration:         'high_resonance_strong_collaboration',
+  high_resonance:               'high_resonance_low_collaboration',
+}
+
+function normalizeRelationshipType(raw: unknown): string {
+  const s = typeof raw === 'string' ? raw.trim().toLowerCase() : ''
+  if (VALID_RELATIONSHIP_TYPES.has(s)) return s
+  if (RELATIONSHIP_TYPE_ALIASES[s]) {
+    console.warn(`[ConnectionEnrichment] normalised relationship_type "${s}" → "${RELATIONSHIP_TYPE_ALIASES[s]}"`)
+    return RELATIONSHIP_TYPE_ALIASES[s]
+  }
+  console.warn(`[ConnectionEnrichment] unknown relationship_type "${s}", falling back to "unclear"`)
+  return 'unclear'
+}
+
 // ── Validation ───────────────────────────────────────────────────────────────
 
 function scoreBetween(v: unknown): v is number {
@@ -89,8 +110,7 @@ function validate(parsed: unknown): ConnectionEnrichmentResult {
   if (!scoreBetween(p.collaboration_depth_score))  throw new Error('invalid collaboration_depth_score')
   if (!scoreBetween(p.overall_connection_score))   throw new Error('invalid overall_connection_score')
   if (!scoreBetween(p.confidence))                 throw new Error('invalid confidence')
-  if (!VALID_RELATIONSHIP_TYPES.has(p.relationship_type as string))
-    throw new Error(`invalid relationship_type: ${p.relationship_type}`)
+  const relationship_type = normalizeRelationshipType(p.relationship_type)
   if (!bilingualText(p.why))                       throw new Error('invalid why')
   if (!bilingualText(p.opportunity_for_wish_a))    throw new Error('invalid opportunity_for_wish_a')
   if (!bilingualText(p.opportunity_for_wish_b))    throw new Error('invalid opportunity_for_wish_b')
@@ -102,7 +122,7 @@ function validate(parsed: unknown): ConnectionEnrichmentResult {
     collaboration_depth_score: Math.round(p.collaboration_depth_score as number),
     overall_connection_score:  Math.round(p.overall_connection_score as number),
     confidence:                Math.round(p.confidence as number),
-    relationship_type:         p.relationship_type as string,
+    relationship_type:         relationship_type,
     why:                       p.why as BilingualText,
     opportunity_for_wish_a:    p.opportunity_for_wish_a as BilingualText,
     opportunity_for_wish_b:    p.opportunity_for_wish_b as BilingualText,
@@ -332,7 +352,9 @@ export async function enrichConnection(
     console.warn(`[ConnectionEnrichment] first attempt failed for ${wish_a_id}↔${wish_b_id}, retrying once:`, (err as Error).message)
     try {
       result = await callEnrichment(wish_a_id,
-        prompt + '\n\nIMPORTANT: Your previous response was invalid. Return ONLY valid JSON. No extra text.')
+        prompt + '\n\nIMPORTANT: Your previous response contained an invalid "relationship_type" value. ' +
+        'Use ONLY one of: high_resonance_strong_collaboration | high_resonance_low_collaboration | ' +
+        'moderate_resonance_practical_match | weak_match | unclear. Return ONLY valid JSON.')
     } catch (err2) {
       console.error(`[ConnectionEnrichment] failed ${wish_a_id}↔${wish_b_id}:`, (err2 as Error).message)
       return null
