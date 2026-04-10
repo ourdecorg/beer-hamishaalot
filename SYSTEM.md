@@ -188,12 +188,10 @@ status                   text NOT NULL DEFAULT 'pending' — 'pending'|'cancelle
 consent_to_match_sharing boolean NOT NULL DEFAULT false  ← migration 037
 created_at               timestamptz
 updated_at               timestamptz
-
---- עמודות legacy (קיימות ב-DB, אך אינן נכתבות או נקראות יותר) ---
-contact_name, contact_email, contact_country, contact_city, contact_address, contact_phone, user_email
 ```
 
 **עיקרון תוכן-בלבד:** המשאלה היא תוכן בלבד — פרטי זיהוי/קשר של המשתמש נשמרים ב-`user_profiles` בלבד. POST /api/wishes אינו כותב שדות contact_* לטבלת wishes.
+עמודות `contact_*` ו-`user_email` הוסרו לחלוטין במיגרציה 045.
 
 **Soft delete:** DELETE endpoint מסמן `status='cancelled'` (לא מוחק פיזית).
 RLS מסנן `status != 'cancelled'` לכלל השאילתות (בעלים + ציבורי).
@@ -206,20 +204,29 @@ id               uuid PK FK→auth.users (on delete cascade)
 display_name     text
 email            text
 phone            text
-linkedin_url     text
-short_bio        text
 city             text
-address          text        ← migration 043
-organization     text
-role             text
+country          text        ← migration 044
 updated_at       timestamptz
 ```
 מקור האמת לפרטי זיהוי/קשר של המשתמש. RLS: בעלים בלבד (select + insert + update).
+עמודות `address`, `linkedin_url`, `short_bio`, `organization`, `role` הוסרו במיגרציה 045.
 
-**אכלוס:** POST /api/wishes → upsert עם הערכים שהוזנו בטופס המשאלה (display_name, city, address, phone, email).
+**אכלוס:** POST /api/wishes → upsert עם הערכים שהוזנו בטופס המשאלה (display_name, city, country, phone, email).
 WishForm טוען את הפרופיל בטעינה ומאכלס את שדות הקשר כברירת מחדל.
 
+**ברירת מחדל לשם:** GET /api/profile — כשאין שורת פרופיל, `display_name` מוחזר מ-`user.user_metadata.full_name` / `user.user_metadata.name` (Google OAuth).
+
 **שיתוף:** שדות אינם חשופים אוטומטית — גילוי הוא per-connection בלבד, דרך snapshot בעת אישור חיבור (ראה disclosure בטבלת wish_connections).
+**שדות ניתנים לשיתוף:** `display_name`, `email`, `phone`, `country`, `city`.
+
+#### `countries`
+```
+id     integer PK (ISO 3166-1 numeric)
+alpha2 text NOT NULL
+alpha3 text NOT NULL
+name   text NOT NULL (שם באנגלית)
+```
+RLS: public read. נטען דרך `/api/admin/seed-countries` (CSV, UTF-8). ← migration 044
 
 #### `settlements`
 ```
@@ -312,27 +319,24 @@ mutual_accepted_at                  timestamptz  ← שער לחשיפת פרט�
 
 #### `match_attempts_log`
 ```
-id                       uuid PK
-wish_id                  uuid
-candidate_wish_id        uuid
-semantic_similarity      float NOT NULL  ← English embedding similarity (v13: sole ranking signal)
-semantic_similarity_orig float           ← original-language similarity (migration 035); נכתב NULL ב-v10
-complementarity_score    float NOT NULL
-theme_overlap            float NOT NULL  ← תמיד 0 (legacy NOT NULL)
-intent_compatibility     float           ← תמיד 0 (הוסר מהנוסחה ב-v9, לא נכתב ב-v10)
-domain_match             float           ← 0/1 לפי primary_domain (אובסרווביליות בלבד)
-structural_similarity    float
-recall_source            text            ← 'semantic'|'structured'|'both'
-geo_penalty              float           ← exp(-km/50), 1 אם אין מיקום
-match_score              float NOT NULL
-match_type               text (null אם לא עבר)
-passed_threshold         boolean NOT NULL
-gate_passed              boolean  ← null=לא הגיע לשער, true=עבר, false=נפסל
-gate_reason              text     ← 'passed' | סיבת כשל
-connection_rank          int      ← migration 038; NULL=נפסל/לא נוצר, 1=הטוב ביותר, N=דירוג N, >3=נחתך
-created_at               timestamptz
+id                    uuid PK
+wish_id               uuid
+candidate_wish_id     uuid
+semantic_similarity   float NOT NULL  ← English embedding similarity (v13: sole ranking signal)
+complementarity_score float NOT NULL
+domain_match          float           ← 0/1 לפי primary_domain (אובסרווביליות בלבד)
+structural_similarity float
+recall_source         text            ← 'semantic'|'structured'|'both'
+geo_penalty           float           ← exp(-km/50), 1 אם אין מיקום
+match_score           float NOT NULL
+match_type            text (null אם לא עבר)
+passed_threshold      boolean NOT NULL
+gate_passed           boolean  ← null=לא הגיע לשער, true=עבר, false=נפסל
+gate_reason           text     ← 'passed' | סיבת כשל
+connection_rank       int      ← migration 038; NULL=נפסל/לא נוצר, 1=הטוב ביותר, N=דירוג N, >3=נחתך
+created_at            timestamptz
 ```
-*עמודות ישנות בטבלה (לא נכתבות יותר):* freshness_factor, object_alignment, anchor_overlap, failed_distance
+עמודות שהוסרו במיגרציה 046: `theme_overlap`, `intent_compatibility`, `freshness_factor`, `object_alignment`, `keywords_jaccard`, `anchor_overlap`, `semantic_similarity_orig`, `distance_km`, `failed_distance`, `failed_date_range`
 
 **מה נרשם:** כל ניסיון שעבר את סינון טווח התאריכים ואת שער הכניסה לניקוד
 
@@ -405,6 +409,8 @@ UNIQUE(wish_id, user_id)
 ## 4. מנגנון ההפגשה (Resonance Engine v13 — semantic-only)
 
 ### pipeline ראשי — `processWishForMatching(wishId, wishText, {onlyLowerId?, explicitCandidateIds?})`
+
+**סינון same-user:** משאלות של אותו user_id מודרות בשני נתיבי ה-recall — full-scan (`.neq('user_id', sourceUserId)`) ו-ANN (סינון post-recall מרשימת IDs).
 
 ```
 שלב 1: analyzeAndStoreWish()
@@ -536,8 +542,10 @@ score = max cosine(needVec, skillVec)
 - `collaboration_depth_score` — בסיס מעשי לשיתוף פעולה
 - `overall_connection_score` — ציון משולב שמרני
 - `confidence` — ביטחון המודל
-- `relationship_type` — אחד מ-5 ערכים מוגדרים
+- `relationship_type` — אחד מ-5 ערכים: `high_resonance_strong_collaboration` | `high_resonance_low_collaboration` | `moderate_resonance_practical_match` | `weak_match` | `unclear`
 - טקסטים דו-לשוניים (he/en): why, opportunity_for_wish_a/b, shared_basis, risks_or_limits
+
+**normalizeRelationshipType():** ערכים לא-מוכרים ממופים לקרוב ביותר (למשל `partial` → `moderate_resonance_practical_match`). ערכים לא-ידועים נופלים ל-`unclear` עם `console.warn` — לעולם לא נזרקת שגיאה על שדה זה.
 
 **publish logic:**
 ```
@@ -549,8 +557,11 @@ if no pair crossed threshold:
   force-publish the best-scoring pair
 ```
 
-**email:** `sendConnectionEmail()` עם opportunity + shared_basis + their needs/skills + overallScore.
-פרטי קשר לאימייל (שם, אימייל, טלפון, עיר) נשלפים מ-`user_profiles` דרך `user_id` של המשאלה — לא מעמודות `contact_*` בטבלת wishes.
+**email:** `sendConnectionEmail()` שולח לכל אחד מבעלי המשאלה אימייל עם:
+- המשאלה שלו + המשאלה המהדהדת (ללא פרטי זיהוי של הצד השני)
+- `opportunity` + `shared_basis` + `overallScore`
+- כפתור CTA: "לאישור החיבור" → `/wishes/{wishId}`
+פרטי קשר של הצד השני **אינם נחשפים** — גילוי הוא double opt-in בלבד, לאחר שני הצדדים יאשרו.
 
 ### חישוב Anchor Keywords (`lib/matching/keywords.ts`)
 
@@ -610,6 +621,8 @@ WHERE e.wish_id != source_wish_id
 
 **כללים קריטיים:** כל שדות הטקסט החופשי באנגלית · לא להמציא מידע שלא נזכר · העדף מערכים ריקים על ניחושים
 
+**sanitizeForApi():** טקסט המשאלה מנוקה לפני הכנסתו ל-prompt: מוסרים null bytes ותווי בקרה C0/C1 (למעט `\t \n \r`) שגורמים ל-OpenAI לדחות את גוף ה-JSON בשגיאה 400.
+
 ### withRetry — backoff על 429
 
 ```
@@ -631,6 +644,8 @@ fallback → 1000 × 2^attempt (עד 4 ניסיונות)
 | `embedding` | `translation_en` + `themes` | ANN cross-lingual (ראשי) + ניקוד semantic v13 |
 | `embedding_original` | `wishText` + `themes` | נשמר בלבד — לא בשימוש בניקוד |
 
+**sanitizeForApi():** גם `wishText` וגם `translation_en` מנוקים לפני בניית טקסט ה-embedding — אותה פונקציית סינון C0/C1 כמו ב-analyze.ts.
+
 **skip-if-exists:** שני ה-embeddings קיימים → מחזיר `{ en, orig }` ללא קריאת OpenAI
 
 **return type:** `DualEmbedding { en: number[], orig: number[] }`
@@ -647,6 +662,8 @@ fallback → 1000 × 2^attempt (עד 4 ניסיונות)
 | `embedding` | vector(1536) |
 
 **skip-if-exists:** בדיקת `(wish_id, term_type, term_text)` לפני כל insert
+
+**RLS:** מופעל (migration 047) — גישה דרך service role (admin client) בלבד.
 
 ---
 
@@ -716,9 +733,11 @@ ORDER BY embedding <=> query_embedding
 | wishes | בעלים ← CRUD (status != 'cancelled') · כולם ← open wishes (status != 'cancelled') |
 | user_profiles | בעלים בלבד ← select + insert + update (RLS על auth.uid() = id) |
 | settlements | כולם ← read only |
+| countries | כולם ← read only |
 | wish_resonances | auth users ← resonance על open wishes |
 | wish_enrichment | בעלים OR public wish |
 | wish_embeddings | בעלים בלבד |
+| wish_term_embeddings | RLS מופעל (047) — גישה דרך service role בלבד |
 | wish_connections | משתתפים (wish_a OR wish_b); user-facing queries גם מסננים published=true |
 | connection_enrichment | admin client (service role) |
 | match_attempts_log | admin client (service role) |
@@ -789,6 +808,17 @@ ORDER BY embedding <=> query_embedding
 | 034 | translation_en ב-wish_enrichment; embedding_original (vector 1536) ב-wish_embeddings |
 | 035 | semantic_similarity_orig ב-match_attempts_log |
 | 036 | wish_term_embeddings — per-term embeddings לחישוב complementarity |
+| 037 | consent_to_match_sharing ב-wishes |
+| 038 | connection_rank ב-match_attempts_log |
+| 039 | connection_enrichment table (GPT-4o judgment לכל זוג) |
+| 040 | published flag ב-wish_connections |
+| 041 | user_profiles table (פרטי זיהוי/קשר, RLS בעלים בלבד) |
+| 042 | disclosure columns ב-wish_connections (double opt-in: response, shared_fields_json, snapshot, intro_message, mutual_accepted_at) |
+| 043 | address ב-user_profiles (הוסר ב-045) |
+| 044 | countries table + country ב-user_profiles |
+| 045 | DROP: wishes.contact_* · user_profiles.(address, linkedin_url, short_bio, organization, role) |
+| 046 | DROP מ-match_attempts_log: theme_overlap, intent_compatibility, freshness_factor, object_alignment, keywords_jaccard, anchor_overlap, semantic_similarity_orig, distance_km, failed_distance, failed_date_range |
+| 047 | RLS על wish_term_embeddings |
 
 ---
 
@@ -832,7 +862,7 @@ ORDER BY embedding <=> query_embedding
 
 | קובץ | תיאור |
 |------|-------|
-| sendConnectionEmail.ts | `sendConnectionEmail(ownerA, ownerB)` — שולח 2 אימיילים (Resend) עם פרטי שתי המשאלות |
+| sendConnectionEmail.ts | `sendConnectionEmail(ownerA, ownerB, meta)` — שולח 2 אימיילים (Resend); כל אחד רואה את שתי המשאלות + opportunity + shared_basis + כפתור CTA לאישור; פרטי זיהוי **אינם** נחשפים |
 | objectAlignment.ts | `computeObjectAlignment()` — לא בשימוש ב-pipeline (נשמר) |
 | domain.ts | `computeDomainMatch()` — לא בשימוש ב-pipeline (נשמר) |
 | __tests__/ | keywords.test.ts, score.test.ts |

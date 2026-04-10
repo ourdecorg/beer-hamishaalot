@@ -27,8 +27,9 @@ People submit wishes — what they want to achieve and what they offer — and t
 - **AI enrichment** — GPT extracts themes, needs, skills, intent, location, and date range
 - **Semantic matching** — Vector embeddings (English cross-lingual) find relevant matches across all wishes
 - **Complementarity scoring** — Per-term embeddings compare needs ↔ skills between wish pairs (observability)
-- **Connection emails** — When a match is created, both owners receive an email with each other's contact details (Resend)
+- **Connection emails** — When a match is created, both owners receive an email with both wishes, a shared-basis summary, and a CTA button to confirm the connection (Resend). Contact details are NOT revealed — only after mutual acceptance (double opt-in)
 - **Admin tools** — Run batch matching, review match quality, debug connection scoring
+- **Double opt-in disclosure** — Each connection requires both parties to accept and choose which profile fields to share (display_name, email, phone, country, city). Contact details are revealed only after mutual acceptance
 - **Magic link auth** — Passwordless email authentication via Supabase
 - **RTL-first design** — Full Hebrew direction support
 
@@ -95,7 +96,7 @@ beer-hamishaalot/
 │   └── types.ts
 ├── public/
 │   └── logo.png
-├── supabase/migrations/           # 036 migrations
+├── supabase/migrations/           # 047 migrations
 └── SYSTEM.md                      # Full technical documentation
 ```
 
