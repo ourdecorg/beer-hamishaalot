@@ -46,20 +46,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 1. Insert the wish
+  // 1. Insert the wish — content only, no identity fields
   const { data: wish, error: insertError } = await supabase
     .from('wishes')
     .insert({
       user_id: user.id,
-      user_email: user.email ?? null,
       original_text: original_text.trim(),
       visibility,
-      contact_name: contact?.contact_name?.trim() || null,
-      contact_email: user.email ?? null,
-      contact_country: 'Israel',
-      contact_city: contact?.contact_city?.trim() || null,
-      contact_address: contact?.contact_address?.trim() || null,
-      contact_phone: contact?.contact_phone?.trim() || null,
       consent_to_match_sharing: true,
     })
     .select()
@@ -73,8 +66,24 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 2. Fire-and-forget: deep analysis + embedding + matching (non-blocking)
-  waitUntil(processWishForMatching(wish.id, original_text.trim()))
+  // 2. Upsert user profile with the contact details, then run matching (both fire-and-forget)
+  waitUntil(
+    (async () => {
+      await supabase.from('user_profiles').upsert(
+        {
+          id: user.id,
+          display_name: contact?.contact_name?.trim() || null,
+          country: contact?.contact_country?.trim() || null,
+          city: contact?.contact_city?.trim() || null,
+          phone: contact?.contact_phone?.trim() || null,
+          email: user.email ?? null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' }
+      )
+      await processWishForMatching(wish.id, original_text.trim())
+    })()
+  )
 
   return NextResponse.json(wish, { status: 201 })
 }

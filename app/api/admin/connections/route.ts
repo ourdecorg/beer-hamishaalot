@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   if (!wishA || !wishB) {
     const { data: wishes, error } = await supabase
       .from('wishes')
-      .select('id, original_text, created_at, visibility, contact_name')
+      .select('id, original_text, created_at, visibility')
       .neq('status', 'cancelled')
       .order('created_at', { ascending: false })
       .limit(500)
@@ -85,14 +85,14 @@ export async function GET(request: NextRequest) {
       // Wish A text + contact
       supabase
         .from('wishes')
-        .select('id, original_text, created_at, visibility, contact_name, contact_email, contact_city, contact_country')
+        .select('id, original_text, created_at, visibility')
         .eq('id', wishA)
         .single(),
 
-      // Wish B text + contact
+      // Wish B text
       supabase
         .from('wishes')
-        .select('id, original_text, created_at, visibility, contact_name, contact_email, contact_city, contact_country')
+        .select('id, original_text, created_at, visibility')
         .eq('id', wishB)
         .single(),
 

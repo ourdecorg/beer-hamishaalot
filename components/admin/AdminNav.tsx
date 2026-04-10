@@ -8,6 +8,7 @@ const navItems = [
   { href: '/admin/run-matching',  icon: '⚡', label: 'הרצת MATCHES' },
   { href: '/admin/connections',   icon: '🔍', label: 'MATCHES DEBUG' },
   { href: '/admin/settlements',   icon: '🏘', label: 'טעינת ישובים' },
+  { href: '/admin/countries',     icon: '🌍', label: 'טעינת ארצות' },
   { href: '/admin/review-matches',icon: '⭐', label: 'פידבק התאמות' },
 ]
 

@@ -18,6 +18,10 @@ function getOpenAI() {
   return _openai
 }
 
+function sanitizeForApi(text: string): string {
+  return text.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/g, '')
+}
+
 /**
  * Builds the text that will be embedded for the original-language embedding.
  * Appends structured domain fields to focus the vector on topical "what".
@@ -162,14 +166,15 @@ export async function generateAndStoreEmbedding(
     }
   }
 
-  const translationEn = enrichment?.translation_en || wishText
+  const safeWishText   = sanitizeForApi(wishText)
+  const translationEn  = sanitizeForApi(enrichment?.translation_en || wishText)
 
   // English embedding (primary) — language-agnostic, used for ANN search
   const enText = buildEnglishEmbeddingText(translationEn, enrichment)
   const en = await generateEmbedding(enText, wishId)
 
   // Original-language embedding — secondary scoring signal
-  const origText = buildEmbeddingText(wishText, enrichment)
+  const origText = buildEmbeddingText(safeWishText, enrichment)
   const orig = await generateEmbedding(origText, wishId)
 
   await withDbRetry(

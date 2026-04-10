@@ -47,9 +47,6 @@ interface MyWishMatch {
 interface GroupedMatch {
   theirWishId:      string
   theirWishText:    string
-  theirName:        string | null
-  theirEmail:       string | null
-  theirPhone:       string | null
   theirNeeds:       string[]
   theirSkills:      string[]
   maxScore:         number
@@ -144,7 +141,7 @@ export default async function MyMatchesPage() {
   const [theirWishesRes, enrichmentsRes, connEnrichRes] = await Promise.all([
     supabase
       .from('wishes')
-      .select('id, original_text, contact_name, contact_email, contact_phone')
+      .select('id, original_text')
       .in('id', uniqueMatchedIds),
     supabase
       .from('wish_enrichment')
@@ -213,9 +210,6 @@ export default async function MyMatchesPage() {
       groupMap.set(row.theirWishId, {
         theirWishId:      row.theirWishId,
         theirWishText:    them?.original_text ?? '',
-        theirName:        them?.contact_name  ?? null,
-        theirEmail:       them?.contact_email ?? null,
-        theirPhone:       them?.contact_phone ?? null,
         theirNeeds:       (theirEnr?.needs as string[] | null) ?? [],
         theirSkills:      (theirEnr?.skills_offered as string[] | null) ?? [],
         maxScore:         row.matchScore,
@@ -369,28 +363,6 @@ export default async function MyMatchesPage() {
                 ))}
               </div>
 
-              {/* Contact details */}
-              {(group.theirName || group.theirEmail) && (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-4 space-y-1.5">
-                  <p className="section-label mb-2">{tr.contactDetails}</p>
-                  {group.theirName && (
-                    <p className="text-slate-800 font-semibold text-sm">{group.theirName}</p>
-                  )}
-                  {group.theirEmail && (
-                    <p className="text-sm" dir="ltr">
-                      <a
-                        href={`mailto:${group.theirEmail}?subject=${encodeURIComponent(tr.emailSubject)}`}
-                        className="text-indigo-600 underline underline-offset-2 hover:text-indigo-800 font-medium"
-                      >
-                        {group.theirEmail}
-                      </a>
-                    </p>
-                  )}
-                  {group.theirPhone && (
-                    <p className="text-slate-700 text-sm font-medium" dir="ltr">{group.theirPhone}</p>
-                  )}
-                </div>
-              )}
 
             </div>
           ))}

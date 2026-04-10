@@ -127,10 +127,6 @@ export async function POST(request: NextRequest) {
           original_text: row.wishText,
           visibility:    'open',
           is_ai_enriched: false,
-          contact_name:  row.name,
-          contact_city:  row.city,
-          contact_phone: row.phone,
-          contact_email: row.email,
         })
         .select('id')
         .single()

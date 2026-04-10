@@ -24,9 +24,6 @@ interface MyWishMatch {
 interface GroupedMatch {
   theirWishId: string
   theirWishText: string
-  theirName: string | null
-  theirEmail: string | null
-  theirPhone: string | null
   maxScore: number
   maxMatchType: MatchType
   allSharedThemes: string[]
@@ -97,7 +94,7 @@ export async function POST(request: NextRequest) {
   // ── 4. Fetch matched wishes (text + contact) ──────────────────────────────
   const { data: theirWishes } = await admin
     .from('wishes')
-    .select('id, original_text, contact_name, contact_email, contact_phone')
+    .select('id, original_text')
     .in('id', uniqueMatchedIds)
 
   const theirWishMap = new Map((theirWishes ?? []).map(w => [w.id, w]))
@@ -139,9 +136,6 @@ export async function POST(request: NextRequest) {
       groupMap.set(row.theirWishId, {
         theirWishId:    row.theirWishId,
         theirWishText:  them?.original_text ?? '',
-        theirName:      them?.contact_name  ?? null,
-        theirEmail:     them?.contact_email ?? null,
-        theirPhone:     them?.contact_phone ?? null,
         maxScore:       row.matchScore,
         maxMatchType:   row.matchType,
         allSharedThemes: row.sharedThemes,

@@ -11,13 +11,6 @@ export interface Wish {
   visibility: WishVisibility
   created_at: string
   updated_at: string
-  // Contact info — only for open wishes
-  contact_name: string | null
-  contact_email: string | null
-  contact_country: string | null
-  contact_city: string | null
-  contact_address: string | null
-  contact_phone: string | null
   user_email: string | null
   consent_to_match_sharing?: boolean
 }
@@ -44,12 +37,11 @@ export interface Collaboration {
   created_at: string
 }
 
-// Contact info for open wishes
+// Contact info collected in the wish form (stored to user_profiles, not to the wish)
 export interface WishContactInfo {
   contact_name: string
   contact_country: string
   contact_city: string
-  contact_address?: string
   contact_phone?: string
 }
 
@@ -111,6 +103,49 @@ export interface WishEnrichment {
 export type ConnectionStatus = 'suggested' | 'accepted_by_a' | 'connected' | 'rejected'
 export type MatchType = 'strong' | 'complementary' | 'similar'
 
+// ── User Profile ─────────────────────────────────────────────────────────────
+
+/** Shareable profile field names — the whitelist for per-connection disclosure. */
+export type ProfileField =
+  | 'display_name'
+  | 'email'
+  | 'phone'
+  | 'country'
+  | 'city'
+
+/**
+ * User profile — identity/contact details stored separately from wishes.
+ * Fields are NEVER auto-shared; each field is disclosed per-connection only
+ * when a user explicitly accepts and selects it.
+ */
+export interface UserProfile {
+  id: string
+  display_name: string | null
+  email: string | null
+  phone: string | null
+  country: string | null
+  city: string | null
+  updated_at: string | null
+}
+
+// ── Connection Disclosure ─────────────────────────────────────────────────────
+
+/** Per-side response to a published connection invitation. */
+export type ConnectionResponse = 'pending' | 'accepted' | 'declined' | 'later'
+
+/**
+ * Derived disclosure state for a connection (computed in app layer).
+ *   pending          — both sides still 'pending' or 'later'
+ *   one_side_accepted— one accepted, other still pending/later
+ *   mutual_accept    — mutual_accepted_at is set; both consented
+ *   declined         — either side declined
+ */
+export type DisclosureState =
+  | 'pending'
+  | 'one_side_accepted'
+  | 'mutual_accept'
+  | 'declined'
+
 export interface WishConnection {
   id: string
   wish_a: string
@@ -121,7 +156,7 @@ export interface WishConnection {
   created_at: string
 }
 
-// Safe match preview — no identity revealed until both sides approve
+// Safe match preview — no identity revealed until both sides accept
 export interface MatchResult {
   connection_id: string
   matched_wish_id: string
@@ -135,6 +170,27 @@ export interface MatchResult {
   overall_connection_score?: number | null
   opportunity?: { he: string; en: string } | null  // opportunity for the current wish's owner
   shared_basis?: { he: string; en: string } | null
+
+  // ── Disclosure (per-connection double opt-in) ─────────────────────────────
+  /** The current user's own response for this connection. */
+  my_response: ConnectionResponse
+  /** The other side's response (without revealing their snapshot until mutual). */
+  other_response: ConnectionResponse
+  /** Derived state from both responses. */
+  disclosure_state: DisclosureState
+  /**
+   * The other side's shared profile snapshot — ONLY populated when
+   * disclosure_state === 'mutual_accept'. Null otherwise.
+   */
+  other_shared_snapshot: Record<string, string | null> | null
+  /** The other side's intro message — ONLY populated when mutual. Null otherwise. */
+  other_intro_message: string | null
+  /** The fields the current user chose to share (always available after accepting). */
+  my_shared_fields: string[] | null
+  /** The current user's own intro message (always available after accepting). */
+  my_intro_message: string | null
+
+  /** @deprecated Contact from wish record — replaced by other_shared_snapshot. Kept for admin view. */
   contact?: {
     name: string | null
     email: string | null

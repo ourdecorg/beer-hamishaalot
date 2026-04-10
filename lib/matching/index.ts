@@ -91,6 +91,14 @@ export async function processWishForMatching(
   try {
     const supabase = createAdminClient()
 
+    // Fetch the source wish's owner so we can exclude their other wishes from matching.
+    const { data: sourceWish } = await supabase
+      .from('wishes')
+      .select('user_id')
+      .eq('id', wishId)
+      .single()
+    const sourceUserId: string | null = sourceWish?.user_id ?? null
+
     // Auto full-scan: when DB is small (≤ FULL_SCAN_MAX), skip ANN threshold and evaluate
     // all existing wishes directly — same code path as the admin batch runner.
     // Only include wishes that already have an embedding (wish_embeddings row exists),
@@ -101,15 +109,15 @@ export async function processWishForMatching(
         .select('wish_id')
         .neq('wish_id', wishId)
       if (allWishes && allWishes.length <= FULL_SCAN_MAX) {
-        // Filter out cancelled wishes — wish_embeddings has no status column so we
-        // cross-reference with wishes. The admin client bypasses RLS, making this
-        // necessary explicitly (the RPCs already do this via their JOIN + WHERE).
+        // Filter out cancelled wishes and same-user wishes.
         const embeddedIds = allWishes.map((w: { wish_id: string }) => w.wish_id)
-        const { data: activeWishes } = await supabase
+        let q = supabase
           .from('wishes')
           .select('id')
           .in('id', embeddedIds)
           .neq('status', 'cancelled')
+        if (sourceUserId) q = q.neq('user_id', sourceUserId)
+        const { data: activeWishes } = await q
         explicitCandidateIds = (activeWishes ?? []).map((w: { id: string }) => w.id)
       }
     }
@@ -157,6 +165,16 @@ export async function processWishForMatching(
     // Step 3c — Merge both recall channels
     const allIds = new Set([...annEnMap.keys(), ...structuredSet])
 
+    // Remove same-user wishes (ANN / structured recall have no user_id awareness).
+    if (sourceUserId && allIds.size > 0) {
+      const { data: sameUserWishes } = await supabase
+        .from('wishes')
+        .select('id')
+        .in('id', [...allIds])
+        .eq('user_id', sourceUserId)
+      for (const w of sameUserWishes ?? []) allIds.delete(w.id)
+    }
+
     console.log(`[matching] allIds.size=${allIds.size}`)
     if (allIds.size === 0) return
 
@@ -200,8 +218,6 @@ export async function processWishForMatching(
       candidate_wish_id: string
       semantic_similarity: number
       complementarity_score: number
-      theme_overlap: number          // NOT NULL in DB — always 0 (legacy)
-      intent_compatibility: number   // always 0 (legacy)
       domain_match: number
       structural_similarity: number
       recall_source: string
@@ -227,8 +243,6 @@ export async function processWishForMatching(
           candidate_wish_id:     candidate.wish_id,
           semantic_similarity:   Math.round(candidate.similarityEn * 1000) / 1000,
           complementarity_score: 0,
-          theme_overlap:         0,
-          intent_compatibility:  0,
           domain_match:          0,
           structural_similarity: 0,
           recall_source:         candidate.recallSource,
@@ -262,8 +276,6 @@ export async function processWishForMatching(
           candidate_wish_id:     candidate.wish_id,
           semantic_similarity:   Math.round(candidate.similarityEn  * 1000) / 1000,
           complementarity_score: Math.round(complementarityScore    * 1000) / 1000,
-          theme_overlap:         0,
-          intent_compatibility:  0,
           domain_match:          domainMatch,
           structural_similarity: Math.round(structuralSimilarity    * 1000) / 1000,
           recall_source:         candidate.recallSource,
@@ -290,8 +302,6 @@ export async function processWishForMatching(
         candidate_wish_id:     candidate.wish_id,
         semantic_similarity:   Math.round(candidate.similarityEn  * 1000) / 1000,
         complementarity_score: Math.round(complementarityScore    * 1000) / 1000,
-        theme_overlap:         0,
-        intent_compatibility:  0,
         domain_match:          domainMatch,
         structural_similarity: Math.round(structuralSimilarity    * 1000) / 1000,
         recall_source:         candidate.recallSource,

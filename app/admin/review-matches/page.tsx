@@ -86,7 +86,7 @@ export default async function ReviewMatchesPage({
   ])]
 
   const { data: wishRows } = wishIds.length > 0
-    ? await admin.from('wishes').select('id, original_text, contact_city, status').in('id', wishIds)
+    ? await admin.from('wishes').select('id, original_text, status').in('id', wishIds)
     : { data: [] }
 
   const wishMap: Record<string, WishStub> = {}
