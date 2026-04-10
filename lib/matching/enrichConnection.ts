@@ -439,30 +439,24 @@ async function publishAndEmail(
       return
     }
 
-    const sharedBasisEn = (result.shared_basis as { en?: string })?.en ?? null
+    const sharedBasisHe = (result.shared_basis as { he?: string })?.he ?? null
 
     await sendConnectionEmail(
       {
+        wishId:          wish_a_id,
         wishText:        wA.original_text,
         contactName:     pA.display_name  ?? '',
         contactEmail:    pA.email,
-        contactPhone:    pA.phone ?? null,
-        contactCity:     pA.city  ?? null,
-        opportunityText: (result.opportunity_for_wish_a as { en?: string })?.en ?? null,
-        sharedBasisText: sharedBasisEn,
-        theirNeeds:      (eB?.needs as string[] | null)   ?? [],
-        theirSkills:     (eB?.skills_offered as string[] | null) ?? [],
+        opportunityText: (result.opportunity_for_wish_a as { he?: string })?.he ?? null,
+        sharedBasisText: sharedBasisHe,
       },
       {
+        wishId:          wish_b_id,
         wishText:        wB.original_text,
         contactName:     pB.display_name  ?? '',
         contactEmail:    pB.email,
-        contactPhone:    pB.phone ?? null,
-        contactCity:     pB.city  ?? null,
-        opportunityText: (result.opportunity_for_wish_b as { en?: string })?.en ?? null,
-        sharedBasisText: sharedBasisEn,
-        theirNeeds:      (eA?.needs as string[] | null)   ?? [],
-        theirSkills:     (eA?.skills_offered as string[] | null) ?? [],
+        opportunityText: (result.opportunity_for_wish_b as { he?: string })?.he ?? null,
+        sharedBasisText: sharedBasisHe,
       },
       { overallScore: result.overall_connection_score },
     )
