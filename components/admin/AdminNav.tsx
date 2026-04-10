@@ -9,7 +9,8 @@ const navItems = [
   { href: '/admin/connections',   icon: '🔍', label: 'MATCHES DEBUG' },
   { href: '/admin/settlements',   icon: '🏘', label: 'טעינת ישובים' },
   { href: '/admin/countries',     icon: '🌍', label: 'טעינת ארצות' },
-  { href: '/admin/review-matches',icon: '⭐', label: 'פידבק התאמות' },
+  { href: '/admin/review-matches',  icon: '⭐', label: 'פידבק התאמות' },
+  { href: '/admin/backfill-profiles', icon: '👤', label: 'פרופילים חסרים' },
 ]
 
 export default function AdminNav() {
