@@ -18,6 +18,14 @@ function getOpenAI() {
 }
 
 /**
+ * Strip characters that cause OpenAI to reject the JSON request body:
+ * null bytes, C0/C1 control characters (except \t \n \r).
+ */
+function sanitizeForApi(text: string): string {
+  return text.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/g, '')
+}
+
+/**
  * Retries an async function on 429 (rate limit) errors with backoff.
  * Parses OpenAI's "try again in Xs" message when present; falls back to
  * exponential backoff (1s, 2s, 4s, …).
@@ -78,6 +86,7 @@ export interface WishAnalysisResult {
 export async function analyzeWishText(wishText: string, wishId?: string): Promise<WishAnalysisResult> {
   const model = 'gpt-5.2'
   const today = new Date().toISOString().slice(0, 10)
+  const safeText = sanitizeForApi(wishText)
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     {
       role: 'system',
@@ -89,7 +98,7 @@ export async function analyzeWishText(wishText: string, wishId?: string): Promis
     {
       role: 'user',
       content: `Analyze this wish for collaboration matching:
-"${wishText}"
+"${safeText}"
 
 Today's date: ${today}
 
