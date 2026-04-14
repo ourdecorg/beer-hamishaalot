@@ -13,7 +13,6 @@
  */
 import { NextResponse, type NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
 import { generateEmbedding } from '@/lib/matching/embed'
 
 const MIN_LENGTH     = 10
@@ -43,16 +42,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'too_long' }, { status: 400 })
   }
 
-  // Identify the logged-in user (if any) so we can exclude their own wishes.
-  // Non-fatal: if session lookup fails we simply show all wishes.
-  let excludeUserId: string | null = null
-  try {
-    const authClient = await createClient()
-    const { data: { user } } = await authClient.auth.getUser()
-    excludeUserId = user?.id ?? null
-  } catch {
-    // anonymous or cookie error — proceed without exclusion
-  }
+  // No user exclusion — return top 3 by similarity across all wishes.
 
   // --- Step 1: embed the input (text-embedding-3-small, no GPT) ---
   let embedding: number[]
@@ -92,18 +82,12 @@ export async function POST(request: NextRequest) {
   const allIds = allMatches.map(m => m.wish_id)
 
   // --- Step 3: fetch wish text, filter by user ---
-  let wishQuery = supabase
+  const { data: wishes, error: wishError } = await supabase
     .from('wishes')
-    .select('id, original_text, user_id')
+    .select('id, original_text')
     .in('id', allIds)
     .eq('visibility', 'open')
     .neq('status', 'cancelled')
-
-  if (excludeUserId) {
-    wishQuery = wishQuery.neq('user_id', excludeUserId)
-  }
-
-  const { data: wishes, error: wishError } = await wishQuery
   if (wishError) {
     console.error('[peek] wishes fetch error:', wishError.message)
     return NextResponse.json({ error: 'query_failed' }, { status: 500 })

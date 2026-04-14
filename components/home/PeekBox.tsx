@@ -17,7 +17,7 @@ interface PeekResult {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const LOADING_MESSAGES = ['מקשיב…', 'הבאר מגיב…', 'משהו מתגבש…']
+const LOADING_MESSAGES = ['מקשיב…', 'הבאר מגיב…', 'מחפש הדהודים…']
 
 const COLLAB_LABELS: Record<string, string> = {
   build: 'בנייה', learn: 'למידה', connect: 'חיבור', support: 'תמיכה', share: 'שיתוף',
