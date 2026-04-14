@@ -2,32 +2,57 @@
  * POST /api/peek
  *
  * Public endpoint (no auth required) for the "Peek into the Well" feature.
- * Uses the existing match_wishes() RPC (pgvector HNSW index) so no new
- * migrations are needed. Fetches wish text + enrichment in two follow-up
- * queries, then returns the top 3 semantically resonant wishes.
- *
- * Constraints:
- *   - ONLY uses OpenAI for embeddings (text-embedding-3-small).
- *   - NO LLM / chat-completions calls.
- *   - Ranking is deterministic: score = cosine similarity only.
+ * Translates the input to English before embedding so the query vector lives
+ * in the same space as the stored English embeddings (translation_en).
+ * Uses the existing match_wishes() RPC (pgvector HNSW index).
  */
 import { NextResponse, type NextRequest } from 'next/server'
+import OpenAI from 'openai'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { generateEmbedding } from '@/lib/matching/embed'
 
 const MIN_LENGTH     = 10
 const MAX_LENGTH     = 500
 const MIN_SIMILARITY = 0.2
-const FETCH_LIMIT    = 20    // candidates from ANN search
-const TOP_N          = 3     // results returned to client
+const FETCH_LIMIT    = 20   // candidates from ANN search
+const TOP_N          = 3    // results returned to client
 
 // A UUID that will never match a real wish — passed to match_wishes() so it
 // doesn't exclude any candidate (the param is meant to skip the source wish).
 const DUMMY_WISH_ID = '00000000-0000-0000-0000-000000000000'
 
+let _openai: OpenAI | null = null
+function getOpenAI() {
+  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
+  return _openai
+}
+
 /** Strip control characters that can corrupt JSON bodies sent to OpenAI. */
 function sanitize(text: string): string {
   return text.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/g, '').trim()
+}
+
+/**
+ * Translate input to English using GPT so the query embedding lives in the
+ * same semantic space as the stored English wish embeddings.
+ * If the text is already English it is returned unchanged.
+ */
+async function translateToEnglish(text: string): Promise<string> {
+  const completion = await getOpenAI().chat.completions.create({
+    model: 'gpt-4o-mini',
+    max_tokens: 300,
+    messages: [
+      {
+        role: 'system',
+        content:
+          'You are a translator. Translate the user\'s text to English. ' +
+          'If it is already in English, return it unchanged. ' +
+          'Reply with ONLY the translation — no explanation, no quotes.',
+      },
+      { role: 'user', content: text },
+    ],
+  })
+  return completion.choices[0]?.message?.content?.trim() || text
 }
 
 export async function POST(request: NextRequest) {
@@ -42,22 +67,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'too_long' }, { status: 400 })
   }
 
-  // No user exclusion — return top 3 by similarity across all wishes.
-
-  // --- Step 1: embed the input (text-embedding-3-small, no GPT) ---
+  // --- Step 1: translate to English, then embed ---
+  // Wishes are stored with English embeddings (translation_en). Translating
+  // the query puts it in the same vector space → higher-quality similarity.
   let embedding: number[]
   try {
-    embedding = await generateEmbedding(text)
+    const textEn = await translateToEnglish(text)
+    embedding = await generateEmbedding(textEn)
   } catch (err) {
-    console.error('[peek] embedding error:', err)
+    console.error('[peek] translate/embed error:', err)
     return NextResponse.json({ error: 'embedding_failed' }, { status: 500 })
   }
 
   const supabase = createAdminClient()
 
   // --- Step 2: ANN search via existing match_wishes() RPC ---
-  // DUMMY_WISH_ID is passed as the source wish — it matches nothing, so no
-  // candidate is excluded by the "don't match yourself" guard in the RPC.
   const { data: matches, error: matchError } = await supabase.rpc('match_wishes', {
     query_embedding: embedding,
     match_wish_id:   DUMMY_WISH_ID,
@@ -77,17 +101,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ results: [] })
   }
 
-  // Build similarity lookup by wish_id
   const simMap = new Map(allMatches.map(m => [m.wish_id, m.similarity]))
   const allIds = allMatches.map(m => m.wish_id)
 
-  // --- Step 3: fetch wish text, filter by user ---
+  // --- Step 3: fetch wish text ---
   const { data: wishes, error: wishError } = await supabase
     .from('wishes')
     .select('id, original_text')
     .in('id', allIds)
     .eq('visibility', 'open')
     .neq('status', 'cancelled')
+
   if (wishError) {
     console.error('[peek] wishes fetch error:', wishError.message)
     return NextResponse.json({ error: 'query_failed' }, { status: 500 })
@@ -97,7 +121,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ results: [] })
   }
 
-  // --- Step 4: fetch enrichment metadata (emotional_tone, collaboration_type) ---
+  // --- Step 4: fetch enrichment metadata ---
   const wishIds = wishes.map(w => w.id)
   const { data: enrichments } = await supabase
     .from('wish_enrichment')
@@ -106,7 +130,7 @@ export async function POST(request: NextRequest) {
 
   const enrichMap = new Map((enrichments ?? []).map(e => [e.wish_id, e]))
 
-  // --- Step 5: rank by similarity, return top N ---
+  // --- Step 5: rank by similarity, return top 3 ---
   const ranked = wishes
     .sort((a, b) => (simMap.get(b.id) ?? 0) - (simMap.get(a.id) ?? 0))
     .slice(0, TOP_N)
