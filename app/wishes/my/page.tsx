@@ -181,7 +181,7 @@ export default async function MyWishesPage() {
                   )}
                   {noteCount > 0 && (
                     <span className="text-xs text-slate-500">
-                      💬 {noteCount === 1 ? 'פתק 1' : `${noteCount} פתקים`}
+                      💬 {tr.notes(noteCount)}
                     </span>
                   )}
                   <span className="text-xs text-slate-600 font-medium ms-auto">{tr.details}</span>

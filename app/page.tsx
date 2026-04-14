@@ -46,7 +46,7 @@ export default async function HomePage() {
                 <p className="text-sm text-slate-500 mb-4">
                   {lang === 'he' ? 'ללא צורך בהתחברות — גלה משאלות מהדהדות' : 'No sign-in needed — discover resonant wishes'}
                 </p>
-                <PeekBox />
+                <PeekBox lang={lang} />
               </div>
 
               {/* Divider */}

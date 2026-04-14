@@ -71,9 +71,7 @@ export default async function WishPage({ params }: Props) {
         {/* Notes (פתקים) — visible only to the wish owner */}
         {isOwner && notes.length > 0 && (
           <div className="mt-8">
-            <p className="section-label mb-4">
-              💬 {notes.length === 1 ? 'פתק 1' : `${notes.length} פתקים`} שהתקבלו
-            </p>
+            <p className="section-label mb-4">{tr.notesReceived(notes.length)}</p>
             <div className="flex flex-col gap-3">
               {notes.map(n => (
                 <div key={n.id} className="card p-5 flex flex-col gap-2 text-right">
