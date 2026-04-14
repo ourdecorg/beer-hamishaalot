@@ -23,15 +23,16 @@ People submit wishes — what they want to achieve and what they offer — and t
 
 ## Features
 
+- **Peek into the Well** — Public gateway (no login required): type any thought, get up to 3 semantically resonant wishes. Input is translated to English before embedding for cross-lingual matching. Visitors can leave a note (פתק) on any result; wish owners see notes in their wish detail page
 - **Submit a wish** — Freeform text describing what you want and what you offer
 - **AI enrichment** — GPT extracts themes, needs, skills, intent, location, and date range
 - **Semantic matching** — Vector embeddings (English cross-lingual) find relevant matches across all wishes
 - **Complementarity scoring** — Per-term embeddings compare needs ↔ skills between wish pairs (observability)
 - **Connection emails** — When a match is created, both owners receive an email with both wishes, a shared-basis summary, and a CTA button to confirm the connection (Resend). Contact details are NOT revealed — only after mutual acceptance (double opt-in)
-- **Admin tools** — Run batch matching, review match quality, debug connection scoring
+- **Admin tools** — Run batch matching, review match quality, debug connection scoring, backfill missing user profiles
 - **Double opt-in disclosure** — Each connection requires both parties to accept and choose which profile fields to share (display_name, email, phone, country, city). Contact details are revealed only after mutual acceptance
 - **Magic link auth** — Passwordless email authentication via Supabase
-- **RTL-first design** — Full Hebrew direction support
+- **Bilingual UI** — Full Hebrew (RTL) and English (LTR) support; PeekBox and all Peek/Note strings are fully translated
 
 ---
 
@@ -67,7 +68,8 @@ beer-hamishaalot/
 │   │   ├── settlements/           # Load city data
 │   │   └── test-data/             # Load test wishes
 │   ├── api/
-│   │   ├── wishes/                # CRUD + matching pipeline
+│   │   ├── wishes/                # CRUD + matching pipeline + notes
+│   │   ├── peek/                  # Public Peek into the Well endpoint
 │   │   ├── connections/           # Connection state machine
 │   │   ├── admin/                 # Admin-only endpoints
 │   │   └── getUserMatches/        # Webhook
@@ -76,6 +78,7 @@ beer-hamishaalot/
 │   ├── opengraph-image.tsx        # OG image 1200×630 (next/og)
 │   └── layout.tsx
 ├── components/
+│   ├── home/                      # PeekBox (Peek into the Well)
 │   ├── admin/                     # ReviewMatchesClient, AdminNav
 │   ├── wishes/                    # WishForm, WishCard, SettlementPicker
 │   └── layout/                    # Header, Footer
@@ -96,7 +99,7 @@ beer-hamishaalot/
 │   └── types.ts
 ├── public/
 │   └── logo.png
-├── supabase/migrations/           # 047 migrations
+├── supabase/migrations/           # 050 migrations
 └── SYSTEM.md                      # Full technical documentation
 ```
 
@@ -160,6 +163,7 @@ Set all environment variables in Railway → Service → Variables.
 | Connections | `/admin/connections` | Debug scoring for a specific wish pair |
 | Test Data | `/admin/test-data` | Load CSV of test wishes |
 | Settlements | `/admin/settlements` | Load Israeli city data (CBS format) |
+| Backfill Profiles | `/admin/backfill-profiles` | Create missing `user_profiles` rows from `auth.users` metadata |
 
 ---
 

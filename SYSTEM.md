@@ -44,10 +44,10 @@ Next.js 14 App Router (Railway)
 
 | URL | קובץ | סוג |
 |-----|------|-----|
-| `/` | app/page.tsx | Server Component — דף הבית |
+| `/` | app/page.tsx | Server Component — דף הבית: שתי זונות (Peek + שליחת משאלה) |
 | `/wishes/new` | app/wishes/new/page.tsx | Server Component — יצירת משאלה (עם checkbox הסכמה) |
-| `/wishes/my` | app/wishes/my/page.tsx | Server Component — המשאלות שלי (עם enrichment tags, ציון GPT) |
-| `/wishes/[id]` | app/wishes/[id]/page.tsx | Server Component — פרטי משאלה |
+| `/wishes/my` | app/wishes/my/page.tsx | Server Component — המשאלות שלי (matches, resonances, note count) |
+| `/wishes/[id]` | app/wishes/[id]/page.tsx | Server Component — פרטי משאלה + פתקים (לבעלים בלבד) |
 | `/matches` | app/matches/page.tsx | Server Component — ההתאמות שלי (published בלבד, enrichment GPT) |
 | `/privacy` | app/privacy/page.tsx | Server Component — מדיניות פרטיות |
 | `/terms` | app/terms/page.tsx | Server Component — תנאי שימוש |
@@ -58,6 +58,7 @@ Next.js 14 App Router (Railway)
 | `/admin/run-matching` | app/admin/run-matching/page.tsx | הרצת MATCHES |
 | `/admin/settlements` | app/admin/settlements/page.tsx | העלאת קובץ ישובים |
 | `/admin/review-matches` | app/admin/review-matches/page.tsx | Server Component — פידבק על איכות ההתאמות |
+| `/admin/backfill-profiles` | app/admin/backfill-profiles/page.tsx | Client Component — יצירת user_profiles חסרים מ-auth.users |
 
 ### API Routes (app/api/)
 
@@ -70,6 +71,8 @@ Next.js 14 App Router (Railway)
 | `/api/wishes/[id]` | DELETE | soft delete — מסמן `status='cancelled'` + connections→`deleted` |
 | `/api/wishes/[id]/matches` | GET | חיבורים של המשאלה (בעלים בלבד, מסנן deleted) |
 | `/api/wishes/[id]/resonate` | GET/POST/DELETE | ניהול resonances |
+| `/api/wishes/[id]/notes` | POST | יצירת פתק על משאלה — ציבורי, ללא login (migration 050) |
+| `/api/peek` | POST | "הצץ לבאר" — ציבורי; תרגום → embedding → ANN → top-3 משאלות (migration 050) |
 | `/api/connections/[id]/approve` | POST | State machine לאישור חיבורים (legacy) |
 | `/api/connections/[id]/respond` | POST | תגובה לחיבור: accepted/declined/later + בחירת שדות לשיתוף + snapshot פרופיל |
 | `/api/profile` | GET | שליפת פרופיל המשתמש המחובר |
@@ -81,6 +84,7 @@ Next.js 14 App Router (Railway)
 | `/api/admin/connections` | GET | נתוני debug לזוג משאלות (כולל connection_enrichment) |
 | `/api/admin/seed-settlements` | POST | העלאת קובץ ישובים CBS (admin בלבד, Windows-1255) |
 | `/api/admin/review-matches` | POST | upsert לטבלת match_reviews (admin בלבד) |
+| `/api/admin/backfill-profiles` | POST | יצירת user_profiles חסרים מ-auth.users (admin בלבד) |
 | `/api/getUserMatches` | POST | webhook — קבלת התאמות לפי email |
 | `/api/feed` | GET | Feed מותאם אישית |
 
@@ -154,13 +158,14 @@ Server component שטוען עד 60 רשומות מ-`match_attempts_log`, מצי
 
 | קובץ | מטרה |
 |------|------|
+| components/home/PeekBox.tsx | Client Component — "הצץ לבאר"; מקבל `lang` prop; state machine: idle→loading→results/empty; טופס פתק inline לכל תוצאה |
 | components/wishes/WishForm.tsx | טופס יצירת משאלה — טוען פרטי קשר מ-user_profiles בטעינה (pre-fill); שמירה מעדכנת את user_profiles |
 | components/wishes/WishCard.tsx | כרטיס משאלה |
 | components/wishes/SettlementPicker.tsx | חיפוש ישוב server-side עם ilike, debounce 150ms |
 | components/wishes/DeleteWishButton.tsx | כפתור מחיקה עם אישור דו-שלבי (soft delete) |
 | components/wishes/MatchesSection.tsx | רשימת חיבורים לצד משאלה בודדת; כולל UI לתגובה (Accept/Decline/Later), בחירת שדות לשיתוף, ותצוגת snapshot לאחר אישור הדדי |
 | components/wishes/ResonanceButton.tsx | כפתור לב |
-| components/admin/AdminNav.tsx | Sidebar ניווט לאדמין (5 מסכים) |
+| components/admin/AdminNav.tsx | Sidebar ניווט לאדמין (6 מסכים, כולל Backfill Profiles) |
 | components/admin/ReviewMatchesClient.tsx | Client Component — כרטיסי review עם חיפוש טקסט וסינונים |
 | components/layout/Header.tsx | Client Component — ניווט עליון; badge סביבה ב-dev |
 | components/layout/Footer.tsx | כותרת תחתית |
@@ -403,6 +408,21 @@ user_id    uuid FK→auth.users
 created_at timestamptz
 UNIQUE(wish_id, user_id)
 ```
+
+#### `wish_notes` ← migration 050
+```
+id             uuid PK
+wish_id        uuid FK→wishes (ON DELETE CASCADE)
+sender_user_id uuid FK→auth.users (ON DELETE SET NULL, nullable)
+sender_name    text (nullable, max 100)
+sender_email   text (nullable, max 200)
+message        text NOT NULL CHECK(1–1000 chars)
+created_at     timestamptz NOT NULL DEFAULT now()
+```
+פתקים שמשאירים מבקרי Peek על משאלות פתוחות, ללא חובת login.
+RLS: INSERT ציבורי (ללא auth) · SELECT לבעל המשאלה בלבד (בדיקה כנגד `wishes.user_id = auth.uid()`).
+בדף `/wishes/[id]` הפתקים מוצגים לבעלים עם שם, אימייל קליקבילי, ותאריך.
+בדף `/wishes/my` מוצג badge 💬 עם מספר הפתקים לכל משאלה.
 
 ---
 
@@ -738,6 +758,7 @@ ORDER BY embedding <=> query_embedding
 | wish_enrichment | בעלים OR public wish |
 | wish_embeddings | בעלים בלבד |
 | wish_term_embeddings | RLS מופעל (047) — גישה דרך service role בלבד |
+| wish_notes | INSERT ציבורי (ללא auth) · SELECT לבעל המשאלה בלבד |
 | wish_connections | משתתפים (wish_a OR wish_b); user-facing queries גם מסננים published=true |
 | connection_enrichment | admin client (service role) |
 | match_attempts_log | admin client (service role) |
@@ -819,10 +840,84 @@ ORDER BY embedding <=> query_embedding
 | 045 | DROP: wishes.contact_* · user_profiles.(address, linkedin_url, short_bio, organization, role) |
 | 046 | DROP מ-match_attempts_log: theme_overlap, intent_compatibility, freshness_factor, object_alignment, keywords_jaccard, anchor_overlap, semantic_similarity_orig, distance_km, failed_distance, failed_date_range |
 | 047 | RLS על wish_term_embeddings |
+| 048 | `peek_wishes()` SECURITY DEFINER RPC — joins wish_embeddings × wishes × wish_enrichment; מסנן open+not cancelled+consent; לשימוש ציבורי ללא RLS |
+| 049 | עדכון `peek_wishes()` — הוספת פרמטר `exclude_user_id uuid DEFAULT NULL` לסינון משאלות של משתמש מחובר |
+| 050 | `wish_notes` table — פתקים מ-Peek; INSERT ציבורי, SELECT לבעל המשאלה בלבד |
 
 ---
 
-## 13. Dependencies
+## 13. Peek into the Well — תכונת ההצצה
+
+### תיאור
+שער ציבורי לאפליקציה — מאפשר לכל מבקר, ללא login, לזרוק מחשבה ולקבל עד 3 משאלות מהדהדות.
+
+### זרימת עיבוד (`app/api/peek/route.ts`)
+
+```
+1. קבלת גוף { text } — sanitize + validate (10–500 תווים)
+2. translateToEnglish(text) — gpt-4o-mini; תרגום לאנגלית כדי שה-query embedding
+   יחיה באותו מרחב כמו English embeddings (translation_en) השמורים
+3. generateEmbedding(textEn) — text-embedding-3-small
+4. match_wishes() RPC עם DUMMY_WISH_ID='00000000-...' ו-MIN_SIMILARITY=0.35
+   (RPC קיים משלב 020 — לא נדרש migration חדש לפרודקשן)
+5. שליפת wishes (open, not cancelled) + wish_enrichment (emotional_tone, collaboration_type)
+6. מיון לפי similarity desc → slice(0, 3)
+7. החזרת [{ wish_id, text, similarity, emotional_tone, collaboration_type }]
+```
+
+**קבועים:**
+| קבוע | ערך |
+|------|-----|
+| `MIN_SIMILARITY` | 0.35 |
+| `FETCH_LIMIT` | 20 (candidates) |
+| `TOP_N` | 3 (returned) |
+| `MIN_DELAY_MS` (client) | 1500ms |
+
+### PeekBox (`components/home/PeekBox.tsx`)
+
+Client Component עם state machine: `idle → loading → results | empty`
+- מקבל `lang: Lang` prop מדף הבית (server component)
+- `dir` ו-`text-align` לפי locale — תמיכה מלאה ב-RTL/LTR
+- שדה אימייל תמיד `dir="ltr"` (טקסט לטיני)
+- כל המחרוזות דרך `t(lang).peekBox` (i18n מלא EN/HE)
+
+**מצב loading:** 3 נקודות מנפנפות + הודעות מתחלפות כל 600ms
+
+**תוצאה:** כרטיס לכל משאלה עם טקסט, תגיות collaboration_type ו-emotional_tone, וכפתור "השאר פתק לבעל המשאלה"
+
+### Wish Notes — פתקים
+
+**שליחת פתק (PeekBox → `POST /api/wishes/[id]/notes`):**
+- שם שולח, אימייל, הודעה (חובה, 1–1000 תווים)
+- ללא חובת login; `sender_user_id` מוזן אוטומטית אם המשתמש מחובר
+- אחרי שליחה: כפתור משתנה ל-"✓ הפתק נשלח לבעל המשאלה"
+
+**תצוגה לבעל המשאלה:**
+- `/wishes/my` — badge 💬 עם מספר הפתקים
+- `/wishes/[id]` — סקציית פתקים מלאה (הודעה, שם, אימייל קליקבילי, תאריך); נשלפת דרך Supabase client עם RLS
+
+### דף הבית — שתי זונות
+
+```
+[Hero: h1 + subtitle]
+
+┌─ זונה 1: הצץ לבאר (indigo) ─────────────────┐
+│ ללא צורך בהתחברות — גלה משאלות מהדהדות       │
+│ [PeekBox]                                    │
+└──────────────────────────────────────────────┘
+
+              ─── או / or ───
+
+┌─ זונה 2: זרוק משאלה (amber) ────────────────┐
+│ יש לך משאלה משלך?                            │
+│ [כתוב משאלה חדשה →]  (logged in)             │
+│ [הצטרף לבאר →]        (anonymous)            │
+└──────────────────────────────────────────────┘
+```
+
+---
+
+## 14. Dependencies
 
 | חבילה | גרסה | מטרה |
 |-------|------|------|
