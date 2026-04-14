@@ -12,6 +12,7 @@
  */
 import { NextResponse, type NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 import { generateEmbedding } from '@/lib/matching/embed'
 
 const MIN_LENGTH   = 10
@@ -37,6 +38,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'too_long' }, { status: 400 })
   }
 
+  // Identify logged-in user (if any) so we can exclude their own wishes
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  const excludeUserId = user?.id ?? null
+
   // --- Step 1: embed the input (text-embedding-3-small, no GPT) ---
   let embedding: number[]
   try {
@@ -48,12 +54,14 @@ export async function POST(request: NextRequest) {
 
   // --- Step 2: pgvector ANN search via SECURITY DEFINER RPC ---
   // The RPC uses the HNSW index on wish_embeddings.embedding (English cross-lingual).
-  // It returns only open, non-cancelled, consented wishes.
+  // It returns only open, non-cancelled, consented wishes — excluding the
+  // current user's own wishes so they always see other people's resonance.
   const supabase = createAdminClient()
   const { data, error } = await supabase.rpc('peek_wishes', {
-    query_embedding: embedding,
-    min_similarity:  MIN_SIMILARITY,
-    match_limit:     FETCH_LIMIT,
+    query_embedding:  embedding,
+    min_similarity:   MIN_SIMILARITY,
+    match_limit:      FETCH_LIMIT,
+    exclude_user_id:  excludeUserId,
   })
 
   if (error) {
