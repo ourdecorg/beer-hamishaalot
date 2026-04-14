@@ -18,7 +18,7 @@ import { generateEmbedding } from '@/lib/matching/embed'
 
 const MIN_LENGTH     = 10
 const MAX_LENGTH     = 500
-const MIN_SIMILARITY = 0.1   // permissive — LIMIT handles the cutoff
+const MIN_SIMILARITY = 0.2
 const FETCH_LIMIT    = 20    // candidates from ANN search
 const TOP_N          = 3     // results returned to client
 
