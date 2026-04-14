@@ -35,27 +35,64 @@ export default async function HomePage() {
               {tr.home.subtitle}
             </p>
 
-            {/* Peek experience — the gateway */}
-            <div className="max-w-2xl mx-auto mb-4">
-              <PeekBox />
-            </div>
+            {/* ── Two-zone layout: Peek vs. Submit ── */}
+            <div className="max-w-2xl mx-auto flex flex-col">
 
-            {user ? (
-              <Link
-                href="/wishes/my"
-                className="text-sm text-slate-500 hover:text-slate-700 transition-colors inline-flex items-center gap-1"
-              >
-                <span>{tr.home.myWishes}</span>
-                <span>{forwardArrow(lang)}</span>
-              </Link>
-            ) : (
-              <Link
-                href="/login"
-                className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
-              >
-                {tr.home.ctaWrite}
-              </Link>
-            )}
+              {/* Zone 1 — Peek (no login required) */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6 text-right">
+                <p className="text-xs font-semibold text-indigo-500 uppercase tracking-widest mb-0.5">
+                  {lang === 'he' ? 'הצץ לבאר' : 'Peek into the Well'}
+                </p>
+                <p className="text-sm text-slate-500 mb-4">
+                  {lang === 'he' ? 'ללא צורך בהתחברות — גלה משאלות מהדהדות' : 'No sign-in needed — discover resonant wishes'}
+                </p>
+                <PeekBox />
+              </div>
+
+              {/* Divider */}
+              <div className="flex items-center gap-3 py-5">
+                <div className="flex-1 h-px bg-slate-200" />
+                <span className="text-sm text-slate-400 font-medium px-1">
+                  {lang === 'he' ? 'או' : 'or'}
+                </span>
+                <div className="flex-1 h-px bg-slate-200" />
+              </div>
+
+              {/* Zone 2 — Submit your own wish */}
+              <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6 text-center flex flex-col items-center gap-3">
+                <p className="text-xs font-semibold text-amber-600 uppercase tracking-widest">
+                  {lang === 'he' ? 'זרוק משאלה' : 'Send a Wish'}
+                </p>
+                <p className="text-base font-semibold text-slate-800">
+                  {lang === 'he' ? 'יש לך משאלה משלך?' : 'Have your own wish?'}
+                </p>
+                <p className="text-sm text-slate-500 max-w-xs leading-relaxed">
+                  {lang === 'he'
+                    ? 'הבאר מקשיבה — ה-AI ימצא אנשים שיכולים לעזור'
+                    : 'The well is listening — AI will find people who can help'}
+                </p>
+                <Link
+                  href={user ? '/wishes/new' : '/login'}
+                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-amber-500 hover:bg-amber-400
+                             text-white text-sm font-semibold rounded-lg transition-all active:scale-95"
+                >
+                  {user
+                    ? (lang === 'he' ? 'כתוב משאלה חדשה' : 'Write a new wish')
+                    : (lang === 'he' ? 'הצטרף לבאר' : 'Join the Well')}
+                  <span>{forwardArrow(lang)}</span>
+                </Link>
+                {user && (
+                  <Link
+                    href="/wishes/my"
+                    className="text-xs text-slate-400 hover:text-slate-600 transition-colors inline-flex items-center gap-1"
+                  >
+                    <span>{tr.home.myWishes}</span>
+                    <span>{forwardArrow(lang)}</span>
+                  </Link>
+                )}
+              </div>
+
+            </div>
           </div>
         </section>
 
