@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
-import WishInputBox from '@/components/home/WishInputBox'
+import PeekBox from '@/components/home/PeekBox'
 import { createClient } from '@/lib/supabase/server'
 import { t, forwardArrow } from '@/lib/i18n'
 import { getLang } from '@/lib/i18n/server'
@@ -35,9 +35,9 @@ export default async function HomePage() {
               {tr.home.subtitle}
             </p>
 
-            {/* Input experience */}
+            {/* Peek experience — the gateway */}
             <div className="max-w-2xl mx-auto mb-4">
-              <WishInputBox lang={lang} />
+              <PeekBox />
             </div>
 
             {user ? (
