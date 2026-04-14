@@ -34,8 +34,8 @@ export default async function MyWishesPage() {
   const wishList = wishes ?? []
   const ids = wishList.map((w) => w.id)
 
-  // Parallel fetches for matches, resonances, enrichment, and best connection scores
-  const [connectionsRes, resonancesRes, connEnrichRes] = await Promise.all([
+  // Parallel fetches for matches, resonances, enrichment, best connection scores, and notes
+  const [connectionsRes, resonancesRes, connEnrichRes, notesRes] = await Promise.all([
     ids.length > 0
       ? supabase
           .from('wish_connections')
@@ -55,6 +55,10 @@ export default async function MyWishesPage() {
           .select('wish_a_id, wish_b_id, overall_connection_score')
           .or(`wish_a_id.in.(${ids.join(',')}),wish_b_id.in.(${ids.join(',')})`)
       : Promise.resolve({ data: [] }),
+
+    ids.length > 0
+      ? supabase.from('wish_notes').select('wish_id').in('wish_id', ids)
+      : Promise.resolve({ data: [] }),
   ])
 
   const matchCountMap = new Map<string, number>()
@@ -66,6 +70,11 @@ export default async function MyWishesPage() {
   const resonanceCountMap = new Map<string, number>()
   for (const r of resonancesRes.data ?? []) {
     resonanceCountMap.set(r.wish_id, (resonanceCountMap.get(r.wish_id) ?? 0) + 1)
+  }
+
+  const noteCountMap = new Map<string, number>()
+  for (const n of notesRes.data ?? []) {
+    noteCountMap.set(n.wish_id, (noteCountMap.get(n.wish_id) ?? 0) + 1)
   }
 
   // Best overall_connection_score per wish
@@ -118,9 +127,10 @@ export default async function MyWishesPage() {
           {wishList.map((wish) => {
             const vis = visibilityLabel[wish.visibility as keyof typeof visibilityLabel]
               ?? visibilityLabel.open
-            const matchCount   = matchCountMap.get(wish.id) ?? 0
+            const matchCount    = matchCountMap.get(wish.id)    ?? 0
             const resonanceCount = resonanceCountMap.get(wish.id) ?? 0
-            const bestScore    = bestScoreMap.get(wish.id) ?? null
+            const bestScore    = bestScoreMap.get(wish.id)    ?? null
+            const noteCount    = noteCountMap.get(wish.id)    ?? 0
 
             const date = new Date(wish.created_at).toLocaleDateString(dateLocale(lang), {
               day: 'numeric',
@@ -167,6 +177,11 @@ export default async function MyWishesPage() {
                   {resonanceCount > 0 && (
                     <span className="text-xs text-slate-500">
                       💛 {tr.resonances(resonanceCount)}
+                    </span>
+                  )}
+                  {noteCount > 0 && (
+                    <span className="text-xs text-slate-500">
+                      💬 {noteCount === 1 ? 'פתק 1' : `${noteCount} פתקים`}
                     </span>
                   )}
                   <span className="text-xs text-slate-600 font-medium ms-auto">{tr.details}</span>
