@@ -161,16 +161,16 @@ export default function PeekBox({ lang }: Props) {
             }}
             placeholder={tr.placeholder}
             disabled={boxState === 'loading'}
-            rows={3}
+            rows={4}
             dir={dir}
-            className={`w-full px-5 py-4 text-slate-900 placeholder:text-slate-400 text-base
+            className={`w-full px-4 sm:px-5 py-4 text-slate-900 placeholder:text-slate-400 text-base
                         leading-relaxed resize-none focus:outline-none disabled:opacity-50 ${textAlign}`}
           />
 
-          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50">
+          <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-t border-slate-100 bg-slate-50 gap-2">
             {boxState === 'loading' ? (
-              <div className="flex items-center gap-3">
-                <div className="flex gap-1.5">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="flex gap-1.5 shrink-0">
                   {[0, 1, 2].map(i => (
                     <span
                       key={i}
@@ -179,17 +179,17 @@ export default function PeekBox({ lang }: Props) {
                     />
                   ))}
                 </div>
-                <span className="text-sm text-slate-500">{tr.loadingMessages[msgIdx]}</span>
+                <span className="text-sm text-slate-500 truncate">{tr.loadingMessages[msgIdx]}</span>
               </div>
             ) : (
-              <p className="text-sm text-slate-400">{tr.hint}</p>
+              <p className="text-xs sm:text-sm text-slate-400 hidden xs:block">{tr.hint}</p>
             )}
 
             {boxState === 'idle' && (
               <button
                 onClick={handleSubmit}
-                className="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-500
-                           text-white text-sm font-semibold rounded-lg transition-all active:scale-95"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500
+                           text-white text-sm font-semibold rounded-lg transition-all active:scale-95 shrink-0 ms-auto"
               >
                 {tr.submitBtn}
               </button>
@@ -233,7 +233,7 @@ export default function PeekBox({ lang }: Props) {
           return (
             <div
               key={r.wish_id}
-              className={`bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col gap-3 ${textAlign}`}
+              className={`bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 flex flex-col gap-3 ${textAlign}`}
             >
               <p className="text-slate-800 text-base leading-relaxed">{r.text}</p>
 
@@ -265,7 +265,7 @@ export default function PeekBox({ lang }: Props) {
                     value={noteForm.name}
                     onChange={e => setNoteForm(f => ({ ...f, name: e.target.value }))}
                     dir={dir}
-                    className={`w-full px-3 py-2 text-sm border border-slate-200 rounded-lg
+                    className={`w-full px-3 py-3 text-sm border border-slate-200 rounded-lg
                                focus:outline-none focus:ring-1 focus:ring-indigo-400 ${textAlign}`}
                   />
                   <input
@@ -274,17 +274,17 @@ export default function PeekBox({ lang }: Props) {
                     value={noteForm.email}
                     onChange={e => setNoteForm(f => ({ ...f, email: e.target.value }))}
                     dir="ltr"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg
+                    className="w-full px-3 py-3 text-sm border border-slate-200 rounded-lg
                                focus:outline-none focus:ring-1 focus:ring-indigo-400 text-left"
                   />
                   <textarea
                     placeholder={tr.messagePlaceholder}
                     value={noteForm.message}
                     onChange={e => setNoteForm(f => ({ ...f, message: e.target.value }))}
-                    rows={3}
+                    rows={4}
                     maxLength={1000}
                     dir={dir}
-                    className={`w-full px-3 py-2 text-sm border border-slate-200 rounded-lg
+                    className={`w-full px-3 py-3 text-sm border border-slate-200 rounded-lg
                                resize-none focus:outline-none focus:ring-1 focus:ring-indigo-400 ${textAlign}`}
                   />
 
@@ -293,15 +293,15 @@ export default function PeekBox({ lang }: Props) {
                   <div className="flex gap-2 justify-end">
                     <button
                       onClick={() => setNoteOpenFor(null)}
-                      className="text-xs text-slate-400 hover:text-slate-600 px-3 py-1.5"
+                      className="text-sm text-slate-400 hover:text-slate-600 px-3 py-2.5"
                     >
                       {tr.cancelBtn}
                     </button>
                     <button
                       onClick={() => handleSendNote(r.wish_id)}
                       disabled={noteSending}
-                      className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600
-                                 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg
+                      className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-indigo-600
+                                 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg
                                  transition-all active:scale-95 disabled:opacity-50"
                     >
                       {noteSending ? tr.sendingBtn : tr.sendBtn}
@@ -311,7 +311,7 @@ export default function PeekBox({ lang }: Props) {
               ) : (
                 <button
                   onClick={() => openNote(r.wish_id)}
-                  className="w-full py-2.5 rounded-xl border border-indigo-200 text-indigo-700
+                  className="w-full py-3 rounded-xl border border-indigo-200 text-indigo-700
                              text-sm font-semibold hover:bg-indigo-50 transition-colors"
                 >
                   {tr.leaveNoteBtn}
