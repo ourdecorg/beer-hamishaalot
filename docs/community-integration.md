@@ -36,7 +36,7 @@ Community Frontend →  redirect user to link_url           →  WoW (user authe
 WoW                →  creates permanent link, redirects   →  /connect/community/success
 ```
 
-The flow proves that **the user controls the email address** they registered with in the community system. WoW stores a permanent mapping between `(server_id, community_user_id)` and the authenticated WoW account. No passwords or tokens are ever exchanged directly — the only shared secret is the HMAC signing key.
+The flow proves that **the user controls the email address** they registered with in the community system. WoW stores a permanent mapping between `(server_id, community_user_id)` and the authenticated WoW account. Each WoW account may hold exactly one community link globally — linking to a new community identity automatically replaces the previous one. No passwords or tokens are ever exchanged directly — the only shared secret is the HMAC signing key.
 
 ---
 
@@ -401,7 +401,7 @@ WoW handles everything from this point:
 
 ### What happens if the email doesn't match?
 
-The user sees an error screen and is invited to sign in again with the correct address. No link is created. You may initiate a new handshake if needed.
+The user is redirected back to `/connect/community?token=...&error=email_mismatch` and shown an explicit error message explaining that the accounts were not linked. They are then invited to sign in again with the correct address. No link is created. You may initiate a new handshake if needed.
 
 ---
 
@@ -426,7 +426,9 @@ The user can unlink their WoW account at any time from the WoW UI. When they do,
 
 If the user initiates a new link after unlinking, the handshake will succeed and the row will be updated to `'linked'` again.
 
-From your community system's perspective: if you receive `ALREADY_LINKED` for a user you believe is unlinked, it means the user re-linked via WoW's UI. You can re-initiate the flow to get a fresh `link_url` if needed — the new link will overwrite the previous one for that `(server_id, community_user_id)` pair.
+**Each WoW account holds exactly one community link globally.** If a WoW user completes a new link while already linked to a different community identity, the previous link is automatically replaced (upsert on `wow_user_id`). This means a WoW user cannot be simultaneously linked to multiple community identities, even on different servers.
+
+From your community system's perspective: if you receive `ALREADY_LINKED` for a user you believe is unlinked, it means the user re-linked via WoW's UI. You can re-initiate the flow to get a fresh `link_url` if needed — the new link will overwrite the previous one for that WoW account.
 
 ---
 
@@ -454,7 +456,7 @@ All error responses have the shape `{ "error": "ERROR_CODE" }`.
 | Token expired | "קישור פג תוקף" — link expired, must re-initiate |
 | Token already consumed | "קישור כבר שומש" — link was already used |
 | Email mismatch | Invited to sign in with the correct email address |
-| Link conflict | The WoW account is already linked to a different community identity on this server |
+| Link conflict | The community identity (`server_id` + `community_user_id`) is already claimed by a different WoW account |
 
 ---
 
