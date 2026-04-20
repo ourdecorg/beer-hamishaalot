@@ -1,6 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { completeCommunityLink } from '@/lib/community-links/complete'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -29,6 +31,20 @@ export async function GET(request: NextRequest) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      // ── Community link handshake ─────────────────────────────────────────
+      const handshakeToken = cookieStore.get('community_handshake')?.value
+      if (handshakeToken) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const admin = createAdminClient()
+          const result = await completeCommunityLink(handshakeToken, user, admin)
+          cookieStore.delete('community_handshake')
+          if (!result.ok && result.code !== 'HANDSHAKE_ALREADY_CONSUMED') {
+            console.warn('[auth/callback] community link failed', { code: result.code })
+          }
+        }
+      }
+
       // APP_URL overrides the internal Railway origin (localhost:8080)
       const appBase = process.env.APP_URL ?? origin
       return NextResponse.redirect(`${appBase}${next}`)
