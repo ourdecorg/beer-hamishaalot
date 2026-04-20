@@ -75,10 +75,11 @@ export async function completeCommunityLink(
     return { ok: false, code: 'EMAIL_MISMATCH', status: 403 }
   }
 
-  // 5. Insert permanent link
-  //    onConflict on (server_id, community_user_id): re-link with new wow_user
-  //    Unique on (wow_user_id, server_id) prevents one WoW user from linking
-  //    two community identities on the same server.
+  // 5. Upsert permanent link on wow_user_id.
+  //    Each WoW user may hold exactly one community link globally.
+  //    If a link already exists for this wow_user_id it is replaced.
+  //    The (server_id, community_user_id) unique constraint still guards
+  //    against a community identity being claimed by two WoW users.
   const now = new Date().toISOString()
   const { error: linkErr } = await admin
     .from('community_identity_links')
@@ -92,11 +93,11 @@ export async function completeCommunityLink(
         linked_at:         now,
         updated_at:        now,
       },
-      { onConflict: 'server_id,community_user_id' },
+      { onConflict: 'wow_user_id' },
     )
 
   if (linkErr) {
-    // Unique violation on (wow_user_id, server_id) — user already linked to a different community identity on this server
+    // Unique violation on (server_id, community_user_id) — community identity already claimed by another WoW user
     if (linkErr.code === '23505') {
       return { ok: false, code: 'LINK_CONFLICT', status: 409 }
     }

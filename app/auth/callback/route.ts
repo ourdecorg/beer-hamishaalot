@@ -39,8 +39,19 @@ export async function GET(request: NextRequest) {
           const admin = createAdminClient()
           const result = await completeCommunityLink(handshakeToken, user, admin)
           cookieStore.delete('community_handshake')
-          if (!result.ok && result.code !== 'HANDSHAKE_ALREADY_CONSUMED') {
-            console.warn('[auth/callback] community link failed', { code: result.code })
+
+          if (!result.ok) {
+            if (result.code === 'EMAIL_MISMATCH') {
+              // User authenticated with the wrong email — redirect back to the
+              // connect page so the mismatch screen is shown with the login form.
+              const appBase = process.env.APP_URL ?? origin
+              return NextResponse.redirect(
+                `${appBase}/connect/community?token=${encodeURIComponent(handshakeToken)}&error=email_mismatch`,
+              )
+            }
+            if (result.code !== 'HANDSHAKE_ALREADY_CONSUMED') {
+              console.warn('[auth/callback] community link failed', { code: result.code })
+            }
           }
         }
       }

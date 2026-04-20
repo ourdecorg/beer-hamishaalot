@@ -96,15 +96,16 @@ export default async function ConnectCommunityPage({ searchParams }: PageProps) 
         <SimplePage>
           <div className="text-center space-y-4">
             <div className="text-5xl">⚠️</div>
-            <h1 className="text-2xl font-bold text-slate-900">כתובת האימייל אינה תואמת</h1>
+            <h1 className="text-2xl font-bold text-slate-900">האימייל אינו תואם</h1>
             <p className="text-slate-600 text-sm leading-relaxed">
-              החיבור מיועד לכתובת אימייל אחרת. אנא התחבר עם הכתובת הנכונה.
+              החשבונות לא קושרו כי האימייל שהתחברת איתו שונה מהאימייל שרשום בקהילה.
+              אנא התחבר עם כתובת האימייל הנכונה.
             </p>
             <ConnectCommunityClient
               handshakeToken={token}
               displayName={pending.display_name ?? null}
               serverId={pending.server_id}
-              authError={searchParams?.error ?? null}
+              authError={null}
             />
           </div>
         </SimplePage>
